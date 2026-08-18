@@ -65,11 +65,14 @@ export default function ReportAdder({
       presetTags,
     ]
   );
+
   useEffect(() => {
     registerSection(section);
   }, [registerSection, section]);
 
-  if (!isReportMode || (activeReportPage && activeReportPage !== page)) return null;
+  if (!isReportMode || (activeReportPage && activeReportPage !== page)) {
+    return <span data-report-section-key={normalizedKey} hidden aria-hidden="true" />;
+  }
 
   const isAdded = reportItems.some((item) => item.sectionKey === normalizedKey);
 
@@ -108,6 +111,7 @@ export default function ReportAdder({
     <button
       type="button"
       data-report-control
+      data-report-section-key={normalizedKey}
       className="report-add-button"
       onClick={handleAdd}
       disabled={isAdded || isPreparing}
