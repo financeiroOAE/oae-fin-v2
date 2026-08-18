@@ -1,0 +1,98 @@
+/* Ajustes de legibilidade dos filtros e pequenos acabamentos de produção. */
+.card input[type="date"],
+.card select {
+  min-height: 40px !important;
+  height: 40px !important;
+  line-height: 1.2 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.card select {
+  padding-left: 0.75rem !important;
+  padding-right: 2rem !important;
+}
+
+.card label {
+  line-height: 1.3;
+}
+
+/* DRE: negativos ficam discretamente avermelhados, sem competir com os totais. */
+.dre-negative-value {
+  color: rgba(248, 113, 113, 0.88) !important;
+}
+
+/* Impostos sobre faturamento ainda está em revisão. Mantemos o bloco no lugar,
+   mas sem induzir leitura de números ainda não validados. */
+.card:has([data-report-section-key="projetos:impostos"]),
+.card:has([data-report-section-key="projetos:impostos-chart"]) {
+  position: relative;
+  overflow: hidden;
+  min-height: 150px;
+}
+
+.card:has([data-report-section-key="projetos:impostos"]) > *,
+.card:has([data-report-section-key="projetos:impostos-chart"]) > * {
+  filter: blur(5px);
+  opacity: 0.38;
+  pointer-events: none;
+  user-select: none;
+}
+
+.card:has([data-report-section-key="projetos:impostos"])::after,
+.card:has([data-report-section-key="projetos:impostos-chart"])::after {
+  content: "Impostos sobre Faturamento  ·  EM BREVE";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid rgba(57, 198, 198, 0.28);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-card) 86%, transparent);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+}
+
+.project-export-controls {
+  margin-left: auto;
+  margin-right: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.project-export-button {
+  min-height: 34px;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.project-export-button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.project-export-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+@media (max-width: 900px) {
+  .project-export-controls {
+    width: 100%;
+    margin: 0.5rem 0 0;
+  }
+}
