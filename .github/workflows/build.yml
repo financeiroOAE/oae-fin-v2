@@ -10,7 +10,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: file:./database.sqlite
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/oae_ci
+      JWT_SECRET: ci_only_secret_for_build_validation
     steps:
       - name: Checkout
         uses: actions/checkout@v4
