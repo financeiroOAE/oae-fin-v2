@@ -29,7 +29,16 @@ async function main() {
     console.log('Username: admin');
     console.log('Troca de senha obrigatória no primeiro acesso.');
   } else {
-    console.log('Usuário admin já existe.');
+    const needsAdminRole = adminExists.role !== 'ADMIN' || !adminExists.isActive;
+    if (needsAdminRole) {
+      await prisma.user.update({
+        where: { id: adminExists.id },
+        data: { role: 'ADMIN', isActive: true },
+      });
+      console.log('Usuário admin existente promovido/reativado como ADMIN.');
+    } else {
+      console.log('Usuário admin já existe e está ativo como ADMIN.');
+    }
   }
 }
 
