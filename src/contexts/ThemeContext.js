@@ -1,35 +1,37 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-const ThemeContext = createContext({});
+const THEME_STORAGE_KEY = "oae_panel_theme";
+const VALID_THEMES = new Set(["original", "preto", "cinza", "branco"]);
+const DEFAULT_THEME = "preto";
+
+const ThemeContext = createContext({
+  theme: DEFAULT_THEME,
+  setTheme: () => {},
+});
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState("dark"); // Default is dark
-  const [mounted, setMounted] = useState(false);
+  const [theme, setThemeState] = useState(DEFAULT_THEME);
 
   useEffect(() => {
-    setMounted(true);
-    const savedTheme = localStorage.getItem("oae_theme");
-    if (savedTheme && ["light", "dark", "gray"].includes(savedTheme)) {
-      setTheme(savedTheme);
-    }
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    const initialTheme = VALID_THEMES.has(savedTheme) ? savedTheme : DEFAULT_THEME;
+    setThemeState(initialTheme);
+    document.documentElement.setAttribute("data-theme", initialTheme);
   }, []);
 
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem("oae_theme", theme);
-      document.documentElement.setAttribute("data-theme", theme);
-    }
-  }, [theme, mounted]);
+  const setTheme = (nextTheme) => {
+    if (!VALID_THEMES.has(nextTheme)) return;
+    setThemeState(nextTheme);
+    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    document.documentElement.setAttribute("data-theme", nextTheme);
+  };
 
-  // Prevent hydration mismatch by not rendering until mounted
-  if (!mounted) {
-    return <div style={{ visibility: 'hidden' }}>{children}</div>;
-  }
+  const value = useMemo(() => ({ theme, setTheme }), [theme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );
