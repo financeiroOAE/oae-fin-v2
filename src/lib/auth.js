@@ -1,24 +1,34 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
-const secretKey = process.env.JWT_SECRET || 'super_secret_key_oae_fin_v2_2026';
-const key = new TextEncoder().encode(secretKey);
+function getJwtKey() {
+  const secretKey = process.env.JWT_SECRET;
+
+  if (!secretKey) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET não está configurado no ambiente de produção.');
+    }
+    return new TextEncoder().encode('dev_only_oae_fin_v2_change_me');
+  }
+
+  return new TextEncoder().encode(secretKey);
+}
 
 export async function encrypt(payload) {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('1d')
-    .sign(key);
+    .sign(getJwtKey());
 }
 
 export async function decrypt(input) {
   try {
-    const { payload } = await jwtVerify(input, key, {
+    const { payload } = await jwtVerify(input, getJwtKey(), {
       algorithms: ['HS256'],
     });
     return payload;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -31,7 +41,7 @@ export async function getSession() {
 }
 
 export async function createSession(user) {
-  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 dia
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const session = await encrypt({ user, expires });
 
   const cookieStore = await cookies();
