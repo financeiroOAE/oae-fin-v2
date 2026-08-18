@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const secretKey = process.env.JWT_SECRET || 'super_secret_key_oae_fin_v2_2026';
-const key = new TextEncoder().encode(secretKey);
+function getJwtKey() {
+  const secretKey = process.env.JWT_SECRET;
+
+  if (!secretKey) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET não está configurado no ambiente de produção.');
+    }
+    return new TextEncoder().encode('dev_only_oae_fin_v2_change_me');
+  }
+
+  return new TextEncoder().encode(secretKey);
+}
 
 const permissionRoutes = [
   { prefix: '/visao-financeira', permission: 'visao_financeira' },
@@ -29,7 +39,6 @@ const permissionDestinations = [
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
-  // Rotas públicas
   if (pathname.startsWith('/login') || pathname.startsWith('/acesso-negado') || pathname.startsWith('/api/login') || pathname.startsWith('/_next') || pathname.includes('.')) {
     return NextResponse.next();
   }
@@ -41,9 +50,8 @@ export async function proxy(request) {
   }
 
   try {
-    const { payload } = await jwtVerify(session, key, { algorithms: ['HS256'] });
-    
-    // Se o usuário precisa trocar a senha e não está na tela de troca de senha (no login), redireciona
+    const { payload } = await jwtVerify(session, getJwtKey(), { algorithms: ['HS256'] });
+
     if (payload.user?.mustChangePass && !pathname.startsWith('/login')) {
       const url = new URL('/login', request.url);
       url.searchParams.set('forceChange', 'true');
@@ -56,8 +64,6 @@ export async function proxy(request) {
       return response;
     }
 
-    // Sessões antigas continuam válidas até o próximo login; novas sessões
-    // carregam papel e permissões no token para a verificação otimista.
     if (payload.user?.role && payload.user.role !== 'ADMIN') {
       const permissions = Array.isArray(payload.user.permissions) ? payload.user.permissions : [];
       const route = permissionRoutes.find((item) => item.exact ? pathname === item.prefix : pathname.startsWith(item.prefix));
@@ -71,10 +77,9 @@ export async function proxy(request) {
         return NextResponse.redirect(url);
       }
     }
-    
+
     return NextResponse.next();
-  } catch (error) {
-    // Token inválido ou expirado
+  } catch {
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete('oae_session');
     return response;

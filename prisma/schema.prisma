@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./database.sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -21,11 +21,11 @@ model User {
 }
 
 model SyncHistory {
-  id              String   @id @default(cuid())
-  triggeredBy     String   // username
-  status          String   // "SUCCESS", "ERROR"
-  recordsCount    Int?     // Qtd de registros totais importados
-  details         String?  // JSON string com logs de cada aba
-  errorMessage    String?
-  createdAt       DateTime @default(now())
+  id           String   @id @default(cuid())
+  triggeredBy  String
+  status       String
+  recordsCount Int?
+  details      String?
+  errorMessage String?
+  createdAt    DateTime @default(now())
 }

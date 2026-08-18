@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# OAE Financeiro v2
 
-## Getting Started
+Painel financeiro corporativo da Oliveira Araújo Engenharia, desenvolvido em Next.js com Prisma, autenticação por usuário/senha e sincronização com Google Sheets.
 
-First, run the development server:
+## Desenvolvimento local
+
+1. Copie `.env.example` para `.env.local` e preencha as variáveis.
+2. Instale as dependências:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Gere o Prisma Client e prepare o banco:
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```bash
+npx prisma generate
+npx prisma db push
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Se for a primeira execução, defina `ADMIN_TEMP_PASSWORD` e crie o administrador:
 
-## Learn More
+```bash
+node scripts/seed.js
+```
 
-To learn more about Next.js, take a look at the following resources:
+5. Inicie o painel:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run dev -- -p 3001
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Variáveis obrigatórias
 
-## Deploy on Vercel
+- `JWT_SECRET`: segredo longo e exclusivo para assinar as sessões.
+- `DATABASE_URL`: URL do SQLite. Local: `file:./database.sqlite`. Em produção com volume em `/data`: `file:/data/database.sqlite`.
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REFRESH_TOKEN`
+- `GOOGLE_SPREADSHEET_ID`
+- `ADMIN_TEMP_PASSWORD`: necessário apenas na criação inicial do usuário administrador.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Nunca versionar `.env.local`, tokens, senhas ou o arquivo `database.sqlite`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Produção
+
+O projeto inclui `Dockerfile`. Como o sistema mantém usuários e histórico no SQLite, o ambiente de produção precisa oferecer armazenamento persistente.
+
+Configuração esperada do serviço:
+
+- build a partir do `Dockerfile`;
+- porta fornecida pelo ambiente via `PORT`;
+- volume persistente montado em `/data`;
+- `DATABASE_URL=file:/data/database.sqlite`;
+- demais variáveis configuradas como secrets do provedor;
+- HTTPS habilitado no domínio público.
+
+Na inicialização do container, `prisma db push` garante que as tabelas estejam presentes antes do Next.js iniciar.
+
+## Validação
+
+```bash
+npm ci
+npx prisma generate
+npm run build
+```
+
+O GitHub Actions também executa esse build em alterações destinadas ao branch `main`.
