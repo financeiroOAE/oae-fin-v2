@@ -2,8 +2,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import { ReportProvider } from "@/contexts/ReportContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import ReportDrawer from "@/components/report/ReportDrawer"; // We will create this
-import ThemeInitializer from "@/components/ThemeInitializer";
+import ReportDrawer from "@/components/report/ReportDrawer";
 
 export const metadata = {
   title: "Painel Financeiro OAE",
@@ -14,17 +13,14 @@ export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <ThemeInitializer />
         <ThemeProvider>
-        <ReportProvider>
-          <div className="app-layout">
-            <Sidebar />
-            <main className="main-content">
-              {children}
-            </main>
-          </div>
-          <ReportDrawer />
-        </ReportProvider>
+          <ReportProvider>
+            <div className="app-layout">
+              <Sidebar />
+              <main className="main-content">{children}</main>
+            </div>
+            <ReportDrawer />
+          </ReportProvider>
         </ThemeProvider>
       </body>
     </html>
