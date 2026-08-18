@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./database.sqlite"
+}
+
+model User {
+  id              String   @id @default(cuid())
+  username        String   @unique
+  displayName     String?
+  passwordHash    String
+  role            String   @default("USER")
+  menuPermissions String   @default("[]")
+  isActive        Boolean  @default(true)
+  mustChangePass  Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SyncHistory {
+  id              String   @id @default(cuid())
+  triggeredBy     String   // username
+  status          String   // "SUCCESS", "ERROR"
+  recordsCount    Int?     // Qtd de registros totais importados
+  details         String?  // JSON string com logs de cada aba
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+}

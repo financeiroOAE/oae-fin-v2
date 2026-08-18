@@ -1,0 +1,201 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+export default function LoginPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
+  const router = useRouter();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const payload = { username, password };
+      if (needsPasswordChange) {
+        if (!newPassword || newPassword.length < 8) {
+          throw new Error("A nova senha deve ter no mínimo 8 caracteres.");
+        }
+        payload.newPassword = newPassword;
+      }
+
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Erro no servidor: Resposta inesperada (não é JSON).");
+      }
+
+      const data = await res.json();
+
+      if (res.ok) {
+        router.push("/");
+      } else {
+        if (data.mustChangePass) {
+          setNeedsPasswordChange(true);
+          setPassword(""); // Limpa a senha provisória
+          setError("É necessário definir uma nova senha para o primeiro acesso.");
+        } else {
+          setError(data.error || "Credenciais inválidas");
+        }
+      }
+    } catch (err) {
+      setError(err.message || "Erro de conexão. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      minHeight: '100vh',
+      backgroundColor: 'var(--bg-main)',
+      backgroundImage: 'radial-gradient(circle at top right, rgba(57, 198, 198, 0.05), transparent 40%)',
+      padding: '2rem'
+    }}>
+      <div className="card" style={{ 
+        width: '100%', 
+        maxWidth: '400px', 
+        padding: '2.5rem',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem', height: '60px' }}>
+            <img 
+              src="/logo.png" 
+              alt="OAE" 
+              style={{ objectFit: 'contain', maxWidth: '100%', maxHeight: '100%' }} 
+              onError={(e) => {
+                e.target.onerror = null; 
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'block';
+              }}
+            />
+            <h1 style={{ display: 'none', color: 'var(--primary)', letterSpacing: '2px', fontSize: '1.75rem', margin: 0, alignSelf: 'center' }}>
+              OAE FIN
+            </h1>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            Acesso Restrito Corporativo
+          </p>
+        </div>
+
+        {error && (
+          <div style={{ 
+            background: needsPasswordChange ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)', 
+            border: `1px solid ${needsPasswordChange ? 'var(--warning)' : 'var(--danger)'}`, 
+            color: needsPasswordChange ? '#fbbf24' : '#f87171',
+            padding: '0.75rem', 
+            borderRadius: '6px', 
+            marginBottom: '1.5rem', 
+            fontSize: '0.875rem',
+            textAlign: 'center'
+          }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+              Usuário
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              disabled={needsPasswordChange || loading}
+              autoComplete="username"
+              style={{ padding: '0.875rem' }}
+              placeholder="Digite seu usuário"
+            />
+          </div>
+
+          {!needsPasswordChange ? (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                Senha
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+                autoComplete="current-password"
+                style={{ padding: '0.875rem' }}
+                placeholder="Digite sua senha"
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  Senha Atual (Provisória)
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  autoComplete="current-password"
+                  style={{ padding: '0.875rem' }}
+                  placeholder="Confirme a senha provisória"
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--primary)' }}>
+                  Nova Senha Definitiva
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  autoComplete="new-password"
+                  style={{ padding: '0.875rem', borderColor: 'var(--primary)' }}
+                  placeholder="No mínimo 6 caracteres"
+                />
+              </div>
+            </>
+          )}
+
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            disabled={loading}
+            style={{ 
+              marginTop: '0.5rem', 
+              padding: '0.875rem', 
+              fontSize: '1rem',
+              opacity: loading ? 0.7 : 1 
+            }}
+          >
+            {loading ? 'Processando...' : (needsPasswordChange ? 'Atualizar Senha e Entrar' : 'Entrar')}
+          </button>
+        </form>
+
+        <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+          Oliveira Araújo Engenharia &copy; {new Date().getFullYear()}
+        </div>
+      </div>
+    </div>
+  );
+}
