@@ -9,23 +9,27 @@ async function main() {
   });
 
   if (!adminExists) {
-    const saltRounds = 10;
-    const temporaryPassword = 'OAE_Temp_Pass2026'; // Senha temporária segura
-    const passwordHash = await bcrypt.hash(temporaryPassword, saltRounds);
+    const temporaryPassword = process.env.ADMIN_TEMP_PASSWORD;
+    if (!temporaryPassword || temporaryPassword.length < 12) {
+      throw new Error('ADMIN_TEMP_PASSWORD deve estar configurada com pelo menos 12 caracteres para criar o admin inicial.');
+    }
+
+    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
 
     await prisma.user.create({
       data: {
         username: 'admin',
         passwordHash,
+        role: 'ADMIN',
         mustChangePass: true,
       },
     });
 
-    console.log('✅ Usuário admin criado com sucesso.');
+    console.log('Usuário admin criado com sucesso.');
     console.log('Username: admin');
-    console.log(`Senha temporária: ${temporaryPassword}`);
+    console.log('Troca de senha obrigatória no primeiro acesso.');
   } else {
-    console.log('ℹ️ Usuário admin já existe.');
+    console.log('Usuário admin já existe.');
   }
 }
 
