@@ -3,6 +3,7 @@ FROM node:22-bookworm-slim
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV DATABASE_URL=file:./database.sqlite
 
 COPY package*.json ./
 COPY prisma ./prisma
