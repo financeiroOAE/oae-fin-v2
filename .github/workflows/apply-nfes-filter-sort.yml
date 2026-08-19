@@ -1,0 +1,36 @@
+name: Apply NFES Filter Sort
+
+on:
+  push:
+    branches: [feat-nfes-filtro-vencimento-2026-08-19]
+    paths:
+      - scripts/apply-nfes-filter-sort.js
+      - .github/workflows/apply-nfes-filter-sort.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat-nfes-filtro-vencimento-2026-08-19
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply NFES changes
+        run: node scripts/apply-nfes-filter-sort.js
+      - name: Commit generated changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/fluxo-caixa/page.js
+          git commit -m "feat: filtrar NFES por vencimento"
+          git push origin HEAD:feat-nfes-filtro-vencimento-2026-08-19

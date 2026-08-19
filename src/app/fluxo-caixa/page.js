@@ -242,7 +242,26 @@ export default function FluxoDeCaixa() {
     return Object.values(map).sort((a, b) => b.dataTimestamp - a.dataTimestamp);
   }, [baseData]);
 
-  const totalFaturamentosNfes = faturamentosNfes.reduce((acc, row) => acc + row.valor, 0);
+  const [filtroFaturamento, setFiltroFaturamento] = useState('MES_ATUAL');
+
+  const faturamentosNfesFiltrados = useMemo(() => {
+    const hoje = new Date();
+    const mesAtual = hoje.getMonth();
+    const anoAtual = hoje.getFullYear();
+
+    return faturamentosNfes
+      .filter((row) => {
+        if (filtroFaturamento === 'TODOS') return true;
+        if (!row.data) return false;
+        const [d, m, y] = String(row.data).split('/').map(Number);
+        if (!d || !m || !y) return false;
+        const vencimento = new Date(y, m - 1, d);
+        return vencimento.getMonth() === mesAtual && vencimento.getFullYear() === anoAtual;
+      })
+      .sort((a, b) => (a.dataTimestamp || 0) - (b.dataTimestamp || 0));
+  }, [faturamentosNfes, filtroFaturamento]);
+
+  const totalFaturamentosNfes = faturamentosNfesFiltrados.reduce((acc, row) => acc + row.valor, 0);
 
   const compromissosDoDia = useMemo(() => {
     return baseData.filter(item => item.natureza === 'Saída' && item.statusExibicao === 'A pagar' && item.dataTimestamp === hojeObj.getTime());
@@ -653,12 +672,23 @@ export default function FluxoDeCaixa() {
           </div>
 
           <div data-report-section className="card fluxo-billing-card" style={{ padding: '1.5rem' }}>
-            <ReportAdder sectionKey="fluxo:faturamento-nfes" title="Painel de Faturamento (NFES)" componentName="Tabela de Faturamentos" page="Fluxo de Caixa" type="TABLE" data={faturamentosNfes.map(row => ({ Documento: row.documento, Projeto: row.projeto, Data: row.data, Valor: row.valor }))} filters={{ Tipo: "NFES", Situação: "A receber" }} style={{ float: 'right' }} />
-            <ChartHeader
-              title="Painel de Faturamento (NFES)"
-              infoTitle="Faturamento"
-              infoContent="Lista todas as receitas da CR_GERAL cujo documento inclui o termo 'NFES'."
-            />
+            <ReportAdder sectionKey="fluxo:faturamento-nfes" title="Painel de Faturamento (NFES)" componentName="Tabela de Faturamentos" page="Fluxo de Caixa" type="TABLE" data={faturamentosNfesFiltrados.map(row => ({ Documento: row.documento, Projeto: row.projeto, Data: row.data, Valor: row.valor }))} filters={{ Tipo: "NFES", Situação: "A receber" }} style={{ float: 'right' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <ChartHeader
+                title="Painel de Faturamento (NFES)"
+                infoTitle="Faturamento"
+                infoContent="Lista receitas da CR_GERAL cujo documento inclui NFES, ordenadas por vencimento crescente. O filtro permite ver todos os documentos emitidos ou apenas os vencimentos do mês atual."
+              />
+              <select
+                value={filtroFaturamento}
+                onChange={(e) => setFiltroFaturamento(e.target.value)}
+                style={{ minWidth: '220px' }}
+                aria-label="Filtro do Painel de Faturamento"
+              >
+                <option value="MES_ATUAL">Vencimento no mês atual</option>
+                <option value="TODOS">Todos emitidos</option>
+              </select>
+            </div>
             <div className="table-container" style={{ marginTop: '1rem', maxHeight: '360px', overflowY: 'auto' }}>
               <table style={{ fontSize: '12px' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -670,7 +700,7 @@ export default function FluxoDeCaixa() {
                   </tr>
                 </thead>
                 <tbody>
-                  {faturamentosNfes.length > 0 ? faturamentosNfes.map((row, idx) => (
+                  {faturamentosNfesFiltrados.length > 0 ? faturamentosNfesFiltrados.map((row, idx) => (
                     <tr key={idx}>
                       <td style={{ fontWeight: '500' }}>{row.documento}</td>
                       <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.projeto}>{row.projeto}</td>
@@ -681,7 +711,7 @@ export default function FluxoDeCaixa() {
                     <tr><td colSpan="4" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhum faturamento encontrado.</td></tr>
                   )}
                 </tbody>
-                {faturamentosNfes.length > 0 && (
+                {faturamentosNfesFiltrados.length > 0 && (
                   <tfoot style={{ position: 'sticky', bottom: 0, background: 'var(--bg-elevated)', zIndex: 10, boxShadow: '0 -2px 10px rgba(0,0,0,0.1)' }}>
                     <tr>
                       <td colSpan="3" style={{ fontWeight: '600', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>Total:</td>
