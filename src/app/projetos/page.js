@@ -56,11 +56,11 @@ export default function Projetos() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [incluirRateioAdm, setIncluirRateioAdm] = useState(false);
 
-  const fetchDados = async () => {
+  const fetchDados = async (force = false) => {
     setIsSyncing(true);
     setError(null);
     try {
-      const response = await fetch('/api/sync', { method: 'GET' });
+      const response = await fetch(force ? '/api/sync?force=1' : '/api/sync', { method: 'GET', cache: 'no-store' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || result.details?.message || 'Erro desconhecido');
       setData(result.data || []);
@@ -443,7 +443,7 @@ export default function Projetos() {
         <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '2rem' }}>
           <AlertCircle size={48} style={{ margin: '0 auto', marginBottom: '1rem', color: 'var(--text-secondary)' }} />
           <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.5rem' }}>Dados não sincronizados</h2>
-          <button onClick={fetchDados} className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
+          <button onClick={() => fetchDados(true)} className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
             <RefreshCw size={16} style={{ marginRight: '0.5rem' }} /> Sincronizar Dados
           </button>
         </div>
@@ -465,7 +465,7 @@ export default function Projetos() {
             <FileText size={14} /> {isReportMode ? 'Sair do Modo Relatório' : 'Gerar Relatório'}
           </button>
           {lastSync && <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}><Database size={12} style={{ display: 'inline', marginRight: '4px' }} /> {lastSync}</span>}
-          <button onClick={fetchDados} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
+          <button onClick={() => fetchDados(true)} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
             <RefreshCw size={14} className={isSyncing ? "spinner" : ""} /> {isSyncing ? 'Atualizando...' : 'Atualizar Dados'}
           </button>
         </div>
