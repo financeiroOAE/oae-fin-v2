@@ -42,3 +42,23 @@ export async function PATCH(request, context) {
     return NextResponse.json({ error: 'Não foi possível atualizar o usuário.' }, { status: 500 });
   }
 }
+
+export async function DELETE(_request, context) {
+  const access = await requireAdmin();
+  if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
+
+  const { id } = await context.params;
+  const existing = await prisma.user.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 });
+  if (existing.role === 'ADMIN') {
+    return NextResponse.json({ error: 'O administrador principal não pode ser excluído.' }, { status: 400 });
+  }
+
+  try {
+    await prisma.user.delete({ where: { id } });
+    return NextResponse.json({ ok: true, id });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    return NextResponse.json({ error: 'Não foi possível excluir o usuário.' }, { status: 500 });
+  }
+}
