@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import { randomUUID } from 'crypto';
 
 function getJwtKey() {
   const secretKey = process.env.JWT_SECRET;
@@ -42,7 +43,8 @@ export async function getSession() {
 
 export async function createSession(user) {
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const session = await encrypt({ user, expires });
+  const sessionId = randomUUID();
+  const session = await encrypt({ user, expires, sessionId });
 
   const cookieStore = await cookies();
   cookieStore.set('oae_session', session, {
