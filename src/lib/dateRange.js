@@ -7,7 +7,7 @@ const toLocalDateInput = (date) => {
 
 export function getRolling30DayRange() {
   const today = new Date();
-  const end = new Date(today);
-  end.setDate(end.getDate() + 30);
-  return { start: toLocalDateInput(today), end: toLocalDateInput(end) };
+  const start = new Date(today.getFullYear(), today.getMonth(), 1);
+  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  return { start: toLocalDateInput(start), end: toLocalDateInput(end) };
 }
