@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 
 const TIME_ZONE = 'America/Sao_Paulo';
 const STORAGE_KEY = 'oae_fin_auto_sync_checked_day';
@@ -30,7 +31,11 @@ function getSaoPauloClock() {
 }
 
 export default function DailySyncScheduler() {
+  const pathname = usePathname();
+
   useEffect(() => {
+    if (pathname === '/login') return undefined;
+
     let running = false;
 
     const checkDailySync = async () => {
@@ -65,7 +70,7 @@ export default function DailySyncScheduler() {
     const interval = window.setInterval(checkDailySync, 60_000);
 
     return () => window.clearInterval(interval);
-  }, []);
+  }, [pathname]);
 
   return null;
 }
