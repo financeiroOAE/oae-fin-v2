@@ -29,6 +29,7 @@ function parseSortDate(value) {
 }
 
 async function performFullSync(triggeredBy) {
+  const startedAt = Date.now();
   const sheetsData = await batchReadSheets();
   const rawEmpresas = sheetsData.EMPRESAS || [];
 
@@ -109,6 +110,7 @@ async function performFullSync(triggeredBy) {
   console.log(`Soma de CP_GERAL.Valor (Saídas): ${somaCP}`);
   console.log(`Soma de CR_GERAL.Valor (Entradas): ${somaCR}`);
   console.log(`Soma de PROJETOS_2026.SALDO CONTRATUAL: ${somaProjetosSaldo}`);
+  console.log(`Tempo de processamento: ${Date.now() - startedAt}ms`);
   console.log('------------------------------------------');
 
   const syncedAt = new Date().toISOString();
@@ -124,6 +126,7 @@ async function performFullSync(triggeredBy) {
     message: 'Sincronização concluída com sucesso!',
   };
 
+  // O histórico é auditoria, não pode impedir a atualização dos números.
   await prisma.syncHistory.create({
     data: {
       triggeredBy,
@@ -131,6 +134,8 @@ async function performFullSync(triggeredBy) {
       recordsCount: totalRecords,
       details: JSON.stringify({ ...stats, syncedAt }),
     },
+  }).catch((historyError) => {
+    console.error('Falha ao gravar histórico de sincronização:', historyError?.message || historyError);
   });
 
   return payload;
