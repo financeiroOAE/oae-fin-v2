@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { Check, KeyRound, LoaderCircle, Plus, Save, ShieldCheck, UserRound } from 'lucide-react';
+import { Check, KeyRound, LoaderCircle, Plus, Save, ShieldCheck, Trash2, UserRound } from 'lucide-react';
 
 const emptyForm = { displayName: '', username: '', password: '', permissions: [] };
 
@@ -105,6 +105,26 @@ export default function UserAccessManager() {
     }
   };
 
+  const deleteUser = async (user) => {
+    const confirmed = window.confirm(`Excluir definitivamente o acesso de ${user.displayName || user.username}?`);
+    if (!confirmed) return;
+
+    setSavingId(`delete:${user.id}`);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch(`/api/users/${user.id}`, { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Não foi possível excluir o acesso.');
+      setUsers((current) => current.filter((item) => item.id !== user.id));
+      setMessage(`Acesso de ${user.username} excluído.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingId('');
+    }
+  };
+
   if (loading) return <div className="settings-state"><LoaderCircle className="report-spin" size={20} /> Carregando acessos...</div>;
 
   return (
@@ -136,6 +156,7 @@ export default function UserAccessManager() {
       <div className="access-user-list">
         {users.map((user) => {
           const isAdmin = user.role === 'ADMIN';
+          const deleting = savingId === `delete:${user.id}`;
           return (
             <article key={user.id} className="access-user-card">
               <header>
@@ -157,7 +178,12 @@ export default function UserAccessManager() {
                   <PermissionGrid menus={menus} permissions={user.permissions || []} onChange={(permissions) => updateLocalUser(user.id, { permissions })} />
                   <div className="settings-actions split">
                     <label className="access-active"><input type="checkbox" checked={user.isActive} onChange={(event) => updateLocalUser(user.id, { isActive: event.target.checked })} /> Usuário ativo</label>
-                    <button type="button" className="btn btn-primary" onClick={() => saveUser(user)} disabled={savingId === user.id}>{savingId === user.id ? <LoaderCircle size={15} className="report-spin" /> : <Save size={15} />} Salvar acesso</button>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <button type="button" className="btn" onClick={() => deleteUser(user)} disabled={Boolean(savingId)} style={{ border: '1px solid rgba(239,68,68,.45)', color: 'var(--danger)', background: 'rgba(239,68,68,.06)', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                        {deleting ? <LoaderCircle size={15} className="report-spin" /> : <Trash2 size={15} />} Excluir acesso
+                      </button>
+                      <button type="button" className="btn btn-primary" onClick={() => saveUser(user)} disabled={Boolean(savingId)}>{savingId === user.id ? <LoaderCircle size={15} className="report-spin" /> : <Save size={15} />} Salvar acesso</button>
+                    </div>
                   </div>
                 </>
               )}

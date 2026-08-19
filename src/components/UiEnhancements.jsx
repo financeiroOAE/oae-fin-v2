@@ -17,69 +17,38 @@ function markNegativeDreValues() {
   });
 }
 
-async function captureElement(element) {
-  const html2canvas = (await import('html2canvas')).default;
-  const previous = {
-    overflow: element.style.overflow,
-    maxHeight: element.style.maxHeight,
-    height: element.style.height,
-  };
-
-  element.style.overflow = 'visible';
-  element.style.maxHeight = 'none';
-  element.style.height = 'auto';
-
-  try {
-    return await html2canvas(element, {
-      scale: 1.35,
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#061b33',
-      windowWidth: Math.max(element.scrollWidth, element.clientWidth),
-      windowHeight: Math.max(element.scrollHeight, element.clientHeight),
-      ignoreElements: (node) => node.hasAttribute?.('data-project-export-control'),
-    });
-  } finally {
-    element.style.overflow = previous.overflow;
-    element.style.maxHeight = previous.maxHeight;
-    element.style.height = previous.height;
-  }
-}
-
-function addCanvasToPdf(pdf, canvas, addNewPage = false) {
-  if (addNewPage) pdf.addPage();
-
-  const margin = 8;
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const usableWidth = pageWidth - margin * 2;
-  const usableHeight = pageHeight - margin * 2;
-  const imageHeight = canvas.height * usableWidth / canvas.width;
-  const image = canvas.toDataURL('image/png', 0.92);
-
-  let remaining = imageHeight;
-  let offsetY = margin;
-  let firstSlice = true;
-
-  while (remaining > 0) {
-    if (!firstSlice) pdf.addPage();
-    pdf.addImage(image, 'PNG', margin, offsetY, usableWidth, imageHeight, undefined, 'FAST');
-    remaining -= usableHeight;
-    offsetY -= usableHeight;
-    firstSlice = false;
-  }
+function cleanText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
 }
 
 function parseCurrentPage(dataTable) {
   const pageText = Array.from(dataTable.querySelectorAll('span'))
-    .map((span) => (span.textContent || '').trim())
+    .map((span) => cleanText(span.textContent))
     .find((text) => /^Pág\.\s*\d+\s+de\s+\d+/i.test(text));
   const match = pageText?.match(/Pág\.\s*(\d+)\s+de\s+(\d+)/i);
   return match ? { current: Number(match[1]), total: Number(match[2]) } : { current: 1, total: 1 };
 }
 
-async function collectExtratoCanvases(dataTable) {
-  const canvases = [];
+function tableHeaders(table) {
+  return Array.from(table?.querySelectorAll('thead tr:first-child th') || []).map((th) => {
+    const clone = th.cloneNode(true);
+    clone.querySelectorAll('svg').forEach((node) => node.remove());
+    return cleanText(clone.textContent);
+  });
+}
+
+function visibleTableRows(table) {
+  const headers = tableHeaders(table);
+  return Array.from(table?.querySelectorAll('tbody tr') || [])
+    .map((tr) => Array.from(tr.querySelectorAll('td')).map((td) => cleanText(td.textContent)))
+    .filter((cells) => cells.length === headers.length && !cells.some((cell) => /Nenhum registro encontrado/i.test(cell)))
+    .map((cells) => Object.fromEntries(headers.map((header, index) => [header || `Coluna ${index + 1}`, cells[index]])));
+}
+
+async function collectAllTableRows(dataTable) {
+  const table = dataTable.querySelector('table');
+  if (!table) return [];
+
   const footer = dataTable.lastElementChild;
   const pageSizeSelect = Array.from(footer?.querySelectorAll('select') || []).find((select) =>
     Array.from(select.options || []).some((option) => option.value === '100')
@@ -89,37 +58,34 @@ async function collectExtratoCanvases(dataTable) {
   if (pageSizeSelect && pageSizeSelect.value !== '100') {
     pageSizeSelect.value = '100';
     pageSizeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    await sleep(350);
-  }
-
-  const refreshedFooter = dataTable.lastElementChild;
-  const buttons = Array.from(refreshedFooter?.querySelectorAll('button') || []);
-  const firstButton = buttons[0];
-  const nextButton = buttons[2];
-
-  if (firstButton && !firstButton.disabled) {
-    firstButton.click();
     await sleep(250);
   }
 
+  const firstButtons = Array.from(dataTable.lastElementChild?.querySelectorAll('button') || []);
+  if (firstButtons[0] && !firstButtons[0].disabled) {
+    firstButtons[0].click();
+    await sleep(180);
+  }
+
+  const rows = [];
   let guard = 0;
-  while (guard < 50) {
+  while (guard < 100) {
     guard += 1;
+    rows.push(...visibleTableRows(dataTable.querySelector('table')));
     const page = parseCurrentPage(dataTable);
-    canvases.push(await captureElement(dataTable));
     if (page.current >= page.total) break;
 
-    const currentButtons = Array.from(dataTable.lastElementChild?.querySelectorAll('button') || []);
-    const currentNext = currentButtons[2] || nextButton;
-    if (!currentNext || currentNext.disabled) break;
-    currentNext.click();
-    await sleep(300);
+    const buttons = Array.from(dataTable.lastElementChild?.querySelectorAll('button') || []);
+    const next = buttons[2];
+    if (!next || next.disabled) break;
+    next.click();
+    await sleep(180);
   }
 
   const finalButtons = Array.from(dataTable.lastElementChild?.querySelectorAll('button') || []);
   if (finalButtons[0] && !finalButtons[0].disabled) {
     finalButtons[0].click();
-    await sleep(150);
+    await sleep(120);
   }
 
   if (pageSizeSelect && originalSize && originalSize !== '100') {
@@ -127,52 +93,84 @@ async function collectExtratoCanvases(dataTable) {
     pageSizeSelect.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  return canvases;
+  return rows;
 }
 
-async function exportProjectDrawer(mode, panel, content, projectName) {
-  const { jsPDF } = await import('jspdf');
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  let hasPageContent = false;
+function summaryRows(content, projectName) {
+  const rows = [
+    { Seção: 'Projeto', Indicador: 'Projeto', Valor: projectName },
+    { Seção: 'Projeto', Indicador: 'Gerado em', Valor: new Date().toLocaleString('pt-BR') },
+  ];
 
   const cardsGrid = content.firstElementChild;
-  const extratoHeading = Array.from(content.querySelectorAll('h3')).find((heading) =>
-    (heading.textContent || '').includes('Extrato de Movimentações')
-  );
-  const extratoWrapper = extratoHeading?.nextElementSibling;
-  const dataTable = extratoWrapper?.querySelector('.card');
+  Array.from(cardsGrid?.children || []).forEach((card) => {
+    const section = cleanText(card.querySelector('h3')?.textContent) || 'Resumo';
+    const strongs = Array.from(card.querySelectorAll('strong'));
+    strongs.forEach((strong) => {
+      const row = strong.closest('div');
+      const label = cleanText(row?.querySelector('span')?.textContent);
+      const value = cleanText(strong.textContent);
+      if (label && value) rows.push({ Seção: section, Indicador: label, Valor: value });
+    });
+  });
 
-  if (mode === 'full' && cardsGrid) {
-    const header = panel.firstElementChild;
-    const summaryHost = document.createElement('div');
-    summaryHost.className = 'project-export-summary-host';
-    summaryHost.style.position = 'fixed';
-    summaryHost.style.left = '-10000px';
-    summaryHost.style.top = '0';
-    summaryHost.style.width = `${Math.max(content.clientWidth, 900)}px`;
-    summaryHost.style.padding = '24px';
-    summaryHost.style.background = '#061b33';
-    summaryHost.style.color = '#fff';
-    summaryHost.innerHTML = `${header ? header.innerHTML : ''}${cardsGrid.outerHTML}`;
-    summaryHost.querySelectorAll('[data-project-export-control]').forEach((node) => node.remove());
-    document.body.appendChild(summaryHost);
-    try {
-      addCanvasToPdf(pdf, await captureElement(summaryHost), false);
-      hasPageContent = true;
-    } finally {
-      summaryHost.remove();
+  return rows;
+}
+
+function findExtratoTable(content) {
+  const heading = Array.from(content.querySelectorAll('h3')).find((node) =>
+    cleanText(node.textContent).includes('Extrato de Movimentações')
+  );
+  return heading?.nextElementSibling?.querySelector('.card') || null;
+}
+
+function findAdministrativeTable(content) {
+  const details = Array.from(content.querySelectorAll('details')).find((node) =>
+    cleanText(node.querySelector('summary')?.textContent).includes('Títulos Administrativos Associados')
+  );
+  return details?.querySelector('table') || null;
+}
+
+function applyWorksheetWidths(XLSX, worksheet, rows) {
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+  worksheet['!cols'] = headers.map((key) => ({
+    wch: Math.min(46, Math.max(12, key.length + 2, ...rows.slice(0, 100).map((row) => cleanText(row[key]).length + 2))),
+  }));
+  if (rows.length && headers.length) {
+    worksheet['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: headers.length - 1 } }) };
+  }
+}
+
+async function exportProjectWorkbook(mode, content, projectName) {
+  const XLSX = await import('xlsx');
+  const workbook = XLSX.utils.book_new();
+  const extratoTable = findExtratoTable(content);
+  const extratoRows = extratoTable ? await collectAllTableRows(extratoTable) : [];
+
+  if (mode === 'full') {
+    const resumo = summaryRows(content, projectName);
+    const resumoSheet = XLSX.utils.json_to_sheet(resumo);
+    applyWorksheetWidths(XLSX, resumoSheet, resumo);
+    XLSX.utils.book_append_sheet(workbook, resumoSheet, 'Resumo Executivo');
+
+    const admTable = findAdministrativeTable(content);
+    if (admTable) {
+      const admRows = visibleTableRows(admTable);
+      if (admRows.length) {
+        const admSheet = XLSX.utils.json_to_sheet(admRows);
+        applyWorksheetWidths(XLSX, admSheet, admRows);
+        XLSX.utils.book_append_sheet(workbook, admSheet, 'Titulos Administrativos');
+      }
     }
   }
 
-  if (dataTable) {
-    const extratoCanvases = await collectExtratoCanvases(dataTable);
-    extratoCanvases.forEach((canvas) => {
-      addCanvasToPdf(pdf, canvas, hasPageContent);
-      hasPageContent = true;
-    });
+  if (extratoRows.length) {
+    const extratoSheet = XLSX.utils.json_to_sheet(extratoRows);
+    applyWorksheetWidths(XLSX, extratoSheet, extratoRows);
+    XLSX.utils.book_append_sheet(workbook, extratoSheet, 'Extrato');
   }
 
-  if (!hasPageContent) return;
+  if (!workbook.SheetNames.length) return;
 
   const safeName = String(projectName || 'projeto')
     .normalize('NFD')
@@ -180,12 +178,13 @@ async function exportProjectDrawer(mode, panel, content, projectName) {
     .replace(/[^a-zA-Z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .toLowerCase();
-  pdf.save(`${safeName || 'projeto'}-${mode === 'full' ? 'relatorio-completo' : 'extrato'}.pdf`);
+
+  XLSX.writeFile(workbook, `${safeName || 'projeto'}-${mode === 'full' ? 'relatorio-completo' : 'somente-extrato'}.xlsx`);
 }
 
 function installProjectExportButtons() {
   const extratoHeading = Array.from(document.querySelectorAll('h3')).find((heading) =>
-    (heading.textContent || '').includes('Extrato de Movimentações')
+    cleanText(heading.textContent).includes('Extrato de Movimentações')
   );
   if (!extratoHeading) return;
 
@@ -194,7 +193,7 @@ function installProjectExportButtons() {
   const header = panel?.firstElementChild;
   if (!content || !panel || !header || header.querySelector('[data-project-export-control]')) return;
 
-  const projectName = header.querySelector('h2')?.textContent?.trim() || 'projeto';
+  const projectName = cleanText(header.querySelector('h2')?.textContent) || 'projeto';
   const controls = document.createElement('div');
   controls.setAttribute('data-project-export-control', 'true');
   controls.className = 'project-export-controls';
@@ -207,9 +206,9 @@ function installProjectExportButtons() {
     button.onclick = async () => {
       const original = button.textContent;
       button.disabled = true;
-      button.textContent = 'Gerando PDF...';
+      button.textContent = 'Gerando Excel...';
       try {
-        await exportProjectDrawer(mode, panel, content, projectName);
+        await exportProjectWorkbook(mode, content, projectName);
       } finally {
         button.disabled = false;
         button.textContent = original;
@@ -218,8 +217,8 @@ function installProjectExportButtons() {
     return button;
   };
 
-  controls.appendChild(makeButton('Exportar projeto', 'full'));
-  controls.appendChild(makeButton('Somente extrato', 'extract'));
+  controls.appendChild(makeButton('Relatório completo (Excel)', 'full'));
+  controls.appendChild(makeButton('Somente extrato (Excel)', 'extract'));
 
   const closeButton = header.querySelector('button');
   if (closeButton) header.insertBefore(controls, closeButton);

@@ -1,3 +1,21 @@
+function normalizeDateTimestamp(item) {
+  if (!item) return item;
+
+  let timestamp = item.dataTimestamp;
+  if (item.data) {
+    const parts = String(item.data).split('/');
+    if (parts.length === 3) {
+      const [day, month, year] = parts.map(Number);
+      if (day && month && year) timestamp = new Date(year, month - 1, day, 0, 0, 0, 0).getTime();
+    }
+  } else if (Number.isFinite(timestamp)) {
+    const date = new Date(timestamp);
+    timestamp = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0).getTime();
+  }
+
+  return { ...item, dataTimestamp: Number.isFinite(timestamp) ? timestamp : 0 };
+}
+
 export function consolidateFinancialData(baseData, options = {}) {
   const { 
     filterProjetos = [], 
@@ -5,13 +23,14 @@ export function consolidateFinancialData(baseData, options = {}) {
     incluirRateioAdm = false 
   } = options;
 
+  const normalizedBaseData = (baseData || []).map(normalizeDateTimestamp);
   const isFiltroSomenteAdm = filterProjetos.length === 1 && filterProjetos[0].toUpperCase() === 'ADMINISTRAÇÃO';
   const isFiltroAdmPresente = filterProjetos.some(p => p.toUpperCase() === 'ADMINISTRAÇÃO');
 
   const consolidatedMap = new Map();
   const nonConsolidatable = [];
 
-  baseData.forEach(item => {
+  normalizedBaseData.forEach(item => {
     if (item.natureza !== 'Entrada' || !item.lancamento) {
       nonConsolidatable.push(item);
       return;
@@ -84,5 +103,5 @@ export function consolidateFinancialData(baseData, options = {}) {
     }
   });
 
-  return [...nonConsolidatable, ...processedConsolidated];
+  return [...nonConsolidatable, ...processedConsolidated].map(normalizeDateTimestamp);
 }
