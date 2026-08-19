@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-  RefreshCw, 
+import {
+  RefreshCw,
   BarChart3,
   ChevronRight,
   Activity,
@@ -23,18 +23,31 @@ export default function Home() {
   const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
-    async function fetchUser() {
+    let active = true;
+
+    async function initializePanel() {
       try {
-        const res = await fetch('/api/session');
-        const data = await res.json();
-        if (data?.user?.username) {
-          setUserName(data.user.username);
+        const res = await fetch('/api/session', { cache: 'no-store' });
+        const sessionData = await res.json();
+        if (!active || !sessionData?.user?.username) return;
+
+        setUserName(sessionData.user.username);
+        setIsSyncing(true);
+
+        const syncRes = await fetch('/api/sync', { method: 'GET', cache: 'no-store' });
+        const syncData = await syncRes.json();
+        if (!syncRes.ok) {
+          throw new Error(syncData.error || syncData.details?.message || 'Falha ao carregar os dados financeiros.');
         }
       } catch (err) {
-        // Ignora erro sutilmente se a sessão falhar
+        if (active) setError(err.message || 'Falha ao carregar os dados financeiros.');
+      } finally {
+        if (active) setIsSyncing(false);
       }
     }
-    fetchUser();
+
+    initializePanel();
+    return () => { active = false; };
   }, []);
 
   const handleSync = async () => {
@@ -43,13 +56,13 @@ export default function Home() {
     setMessage('');
 
     try {
-      const response = await fetch('/api/sync', { method: 'GET' });
+      const response = await fetch('/api/sync?force=1', { method: 'GET', cache: 'no-store' });
       const result = await response.json();
 
       if (!response.ok) {
         throw new Error(result.error || result.details?.message || 'Erro desconhecido');
       }
-      setMessage('Sincronização concluída com sucesso!');
+      setMessage('Dados atualizados. Todas as telas usarão os novos números.');
       setTimeout(() => setMessage(''), 5000);
     } catch (err) {
       setError(err.message);
@@ -76,27 +89,14 @@ export default function Home() {
       <div className="fade-in" style={{ marginTop: '2rem' }}>
         <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
           {!logoError ? (
-            <img 
-              src="/logo.png" 
-              alt="Oliveira Araújo Engenharia" 
-              style={{ height: '56px', width: 'auto', objectFit: 'contain', margin: '0 auto 1.5rem auto', display: 'block' }} 
+            <img
+              src="/logo.png"
+              alt="Oliveira Araújo Engenharia"
+              style={{ height: '56px', width: 'auto', objectFit: 'contain', margin: '0 auto 1.5rem auto', display: 'block' }}
               onError={() => setLogoError(true)}
             />
           ) : (
-            <div style={{
-              display: 'flex',
-              width: '64px',
-              height: '64px',
-              margin: '0 auto 1.5rem auto',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'var(--primary)',
-              borderRadius: '12px',
-              color: '#fff',
-              fontWeight: '900',
-              fontSize: '18px',
-              letterSpacing: '1px',
-            }}>
+            <div style={{ display: 'flex', width: '64px', height: '64px', margin: '0 auto 1.5rem auto', alignItems: 'center', justifyContent: 'center', background: 'var(--primary)', borderRadius: '12px', color: '#fff', fontWeight: '900', fontSize: '18px', letterSpacing: '1px' }}>
               OAE
             </div>
           )}
@@ -105,7 +105,7 @@ export default function Home() {
             Bem-vindo{userName ? `, ${userName}` : ''}
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            O que você deseja consultar hoje?
+            {isSyncing ? 'Carregando a base financeira da sessão...' : 'O que você deseja consultar hoje?'}
           </p>
         </div>
 
@@ -115,34 +115,13 @@ export default function Home() {
             { name: 'Fluxo de Caixa', desc: 'Saldos bancários e evolução', icon: Activity, color: 'var(--success)', onClick: () => router.push('/fluxo-caixa') },
             { name: 'Projetos', desc: 'Contratos e curvas', icon: FolderKanban, color: 'var(--info)', onClick: () => router.push('/projetos') },
             { name: 'DRE Gerencial', desc: 'Demonstrativo de resultados', icon: ChartColumn, color: 'var(--purple)', onClick: () => router.push('/dre') },
-            { name: 'Atualização de Dados', desc: 'Sincronizar Google Sheets', icon: RefreshCw, color: 'var(--orange)', onClick: handleSync },
+            { name: 'Atualização de Dados', desc: 'Forçar nova leitura do Google Sheets', icon: RefreshCw, color: 'var(--orange)', onClick: handleSync },
             { name: 'Histórico', desc: 'Logs de sincronização', icon: History, color: 'var(--text-secondary)', onClick: () => router.push('/historico') },
           ].map((item, idx) => {
             const Icon = item.icon;
             return (
-              <div 
-                key={idx} 
-                className="card shortcut-card" 
-                onClick={item.onClick}
-                style={{ 
-                  cursor: 'pointer',
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  padding: '1.25rem',
-                  gap: '1rem',
-                  border: '1px solid var(--border-color)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
-                <div style={{ 
-                  width: '44px', height: '44px', 
-                  borderRadius: '10px', 
-                  backgroundColor: `${item.color}15`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: item.color,
-                  flexShrink: 0
-                }}>
+              <div key={idx} className="card shortcut-card" onClick={item.onClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '1.25rem', gap: '1rem', border: '1px solid var(--border-color)', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
                   <Icon size={20} strokeWidth={2} className={item.name === 'Atualização de Dados' && isSyncing ? "spinner" : ""} />
                 </div>
                 <div style={{ flex: 1 }}>
