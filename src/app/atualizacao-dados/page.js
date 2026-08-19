@@ -20,18 +20,18 @@ export default function AtualizacaoDados() {
     setErrorDetails(null);
     setShowErrorDetails(false);
     const startTime = performance.now();
-    
+
     try {
-      const response = await fetch('/api/sync');
+      const response = await fetch('/api/sync?force=1', { cache: 'no-store' });
       const result = await response.json();
-      
+
       const endTime = performance.now();
       setDuration(((endTime - startTime) / 1000).toFixed(2));
 
       if (!response.ok) {
         throw new Error(result.error || result.message || 'Falha ao conectar ou processar os dados.');
       }
-      
+
       setStats(result.stats || null);
       setLastSync(new Date().toLocaleString('pt-BR'));
       setStatusMsg(`Sincronização concluída com sucesso! Total de ${result.recordsCount || (result.stats ? Object.values(result.stats).reduce((a,b)=>a+b,0) : 0)} registros processados.`);
@@ -45,8 +45,7 @@ export default function AtualizacaoDados() {
   };
 
   useEffect(() => {
-    // Apenas carrega os dados passivamente caso já estejam em cache na API
-    // Se a API for lenta, não forçar a carga passiva bloquear.
+    // Esta tela não sincroniza automaticamente. O painel já fixa um snapshot na primeira abertura da sessão.
   }, []);
 
   return (
@@ -57,28 +56,27 @@ export default function AtualizacaoDados() {
             Atualização de Dados
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-            Operação de sincronização com o banco de dados oficial no Google Sheets
+            Os números permanecem fixos durante a sessão e só mudam ao clicar em Atualizar Dados.
           </p>
         </div>
         <button onClick={fetchDados} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '14px', padding: '0.75rem 1.5rem' }}>
           <RefreshCw size={16} className={isSyncing ? "spin" : ""} /> {isSyncing ? 'Atualizando Dados...' : 'Atualizar Dados'}
         </button>
       </header>
-      
-      {/* Resumo da Operação */}
+
       <div className="card" style={{ padding: '2rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Database size={16} /> Status da Conexão
             </h2>
-            <div style={{ display: 'flex', gap: '2rem', marginTop: '1rem', color: 'var(--text-secondary)', fontSize: '13px' }}>
+            <div style={{ display: 'flex', gap: '2rem', marginTop: '1rem', color: 'var(--text-secondary)', fontSize: '13px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: errorMsg ? 'var(--danger)' : 'var(--success)' }}></div>
                 {errorMsg ? 'Google Sheets Desconectado/Erro' : 'Google Sheets Conectado'}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Clock size={14} /> Última Sincronização: {lastSync || 'Pendente'}
+                <Clock size={14} /> Última atualização manual: {lastSync || 'Ainda não realizada nesta tela'}
               </div>
               {duration && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -89,7 +87,6 @@ export default function AtualizacaoDados() {
           </div>
         </div>
 
-        {/* Mensagens de Feedback */}
         {isSyncing && (
           <div style={{ padding: '1rem', background: 'rgba(57, 198, 198, 0.1)', border: '1px solid var(--primary)', borderRadius: '6px', color: 'var(--primary)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <RefreshCw size={16} className="spin" /> {statusMsg}
@@ -107,10 +104,7 @@ export default function AtualizacaoDados() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '600' }}>
               <ServerCrash size={16} /> {errorMsg}
             </div>
-            <button 
-              onClick={() => setShowErrorDetails(!showErrorDetails)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--danger)', textDecoration: 'underline', cursor: 'pointer', textAlign: 'left', padding: 0, fontSize: '12px', marginTop: '0.5rem' }}
-            >
+            <button onClick={() => setShowErrorDetails(!showErrorDetails)} style={{ background: 'transparent', border: 'none', color: 'var(--danger)', textDecoration: 'underline', cursor: 'pointer', textAlign: 'left', padding: 0, fontSize: '12px', marginTop: '0.5rem' }}>
               {showErrorDetails ? 'Ocultar Detalhes Técnicos' : 'Mostrar Detalhes Técnicos'}
             </button>
             {showErrorDetails && (
@@ -121,7 +115,6 @@ export default function AtualizacaoDados() {
           </div>
         )}
 
-        {/* Abas Sincronizadas */}
         {stats && (
           <div style={{ marginTop: '1rem' }}>
             <h3 style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '1rem' }}>Abas Processadas</h3>
@@ -136,7 +129,6 @@ export default function AtualizacaoDados() {
           </div>
         )}
       </div>
-
     </div>
   );
 }
