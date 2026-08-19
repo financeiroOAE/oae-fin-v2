@@ -34,3 +34,5 @@ jobs:
           git add src/app/fluxo-caixa/page.js src/app/projetos/page.js
           git commit -m "fix: estruturar relatórios e exibir todos os dias do fluxo"
           git push origin HEAD:fix-reports-and-flow-days-2026-08-19
+
+# Trigger de aplicação validado em 19/08/2026.
