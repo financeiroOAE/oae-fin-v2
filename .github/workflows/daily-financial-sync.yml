@@ -1,0 +1,45 @@
+name: Sincronizacao Financeira 16h30
+
+on:
+  schedule:
+    - cron: '30 16 * * *'
+      timezone: 'America/Sao_Paulo'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Sincronizar snapshot financeiro oficial
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OIDC_RESPONSE=$(curl --fail --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=oae-fin-daily-sync")
+
+          OIDC_TOKEN=$(printf '%s' "$OIDC_RESPONSE" | jq -r '.value')
+
+          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
+            echo "Falha ao obter token OIDC do GitHub Actions."
+            exit 1
+          fi
+
+          curl --fail --show-error --silent \
+            --retry 3 \
+            --retry-delay 15 \
+            --max-time 240 \
+            -X POST \
+            -H "Authorization: Bearer ${OIDC_TOKEN}" \
+            -H "Content-Type: application/json" \
+            https://oae-fin-v2.onrender.com/api/sync/cron
+
+          echo
+          echo "Sincronizacao financeira concluida."
