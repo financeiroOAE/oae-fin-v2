@@ -347,7 +347,11 @@ export async function exportReportToExcel(items, config) {
   usedNames.add("resumo");
 
   items.forEach((item, index) => {
-    const rows = getReportRows(item);
+    // Excel é uma exportação de dados, não uma captura visual. Quando o bloco
+    // oferece a relação completa filtrada, ela tem prioridade sobre resumo/visível.
+    const rows = Array.isArray(item?.dataSets?.all)
+      ? item.dataSets.all
+      : getReportRows(item);
     const worksheet = createWorksheet(XLSX, item, rows);
     XLSX.utils.book_append_sheet(workbook, worksheet, uniqueSheetName(item.title || `Bloco ${index + 1}`, usedNames));
     if (item.includePending && Array.isArray(item.pendingData) && item.pendingData.length > 0) {

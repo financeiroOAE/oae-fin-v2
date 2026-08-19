@@ -1,0 +1,36 @@
+name: Apply Visao Excel Hotfix
+
+on:
+  push:
+    branches: [fix-visao-excel-2026-08-18]
+    paths:
+      - scripts/apply-visao-excel-hotfix.js
+      - .github/workflows/apply-visao-excel-hotfix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-visao-excel-2026-08-18
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply hotfix
+        run: node scripts/apply-visao-excel-hotfix.js
+      - name: Commit generated changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/visao-financeira/page.js src/lib/reportExport.js
+          git commit -m "fix: corrigir realizados e Excel detalhado"
+          git push origin HEAD:fix-visao-excel-2026-08-18
