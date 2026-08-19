@@ -105,6 +105,28 @@ export default function VisaoFinanceira() {
     });
   }, [baseData, filterDataInicial, filterDataFinal, filterProjetos, filterStatus, filterNomes, filterContas]);
 
+  // Base de conteúdo sem recorte temporal. É usada nos campos realizados para que
+  // um filtro de datas futuras não apague o histórico realizado de 2026.
+  const contentFilteredData = useMemo(() => {
+    return baseData.filter(item => {
+      if (filterStatus.length > 0 && !filterStatus.includes(item.statusExibicao)) return false;
+      if (filterProjetos.length > 0 && !filterProjetos.includes(item.projeto)) return false;
+      if (filterNomes.length > 0 && !filterNomes.includes(item.nome)) return false;
+      if (filterContas.length > 0 && !filterContas.includes(item.contaDescricao)) return false;
+      return true;
+    });
+  }, [baseData, filterProjetos, filterStatus, filterNomes, filterContas]);
+
+  const realized2026Data = useMemo(() => {
+    const start2026 = new Date(2026, 0, 1, 0, 0, 0, 0).getTime();
+    const endToday = new Date().setHours(23, 59, 59, 999);
+    return contentFilteredData.filter(item =>
+      item.status === 'Realizado' &&
+      item.dataTimestamp >= start2026 &&
+      item.dataTimestamp <= endToday
+    );
+  }, [contentFilteredData]);
+
   const projetosDisponiveis = Array.from(new Set(baseData.map(d => d.projeto).filter(Boolean))).sort();
   const nomesDisponiveis = Array.from(new Set(baseData.map(d => d.nome).filter(Boolean))).sort();
   const contasDisponiveis = Array.from(new Set(baseData.map(d => d.contaDescricao).filter(Boolean))).sort();
@@ -112,9 +134,9 @@ export default function VisaoFinanceira() {
   // KPIs
   const totalBancario = saldosBancarios.reduce((acc, row) => acc + (Number(row.Saldo) || 0), 0);
   
-  const entradasRealizadas = filteredData.filter(r => r.natureza === 'Entrada' && r.status === 'Realizado').reduce((acc, r) => acc + r.valor, 0);
+  const entradasRealizadas = realized2026Data.filter(r => r.natureza === 'Entrada').reduce((acc, r) => acc + r.valor, 0);
   const entradasARealizar = filteredData.filter(r => r.natureza === 'Entrada' && r.status === 'A realizar').reduce((acc, r) => acc + r.valor, 0);
-  const saidasRealizadas = filteredData.filter(r => r.natureza === 'Saída' && r.status === 'Realizado').reduce((acc, r) => acc + r.valor, 0);
+  const saidasRealizadas = realized2026Data.filter(r => r.natureza === 'Saída').reduce((acc, r) => acc + r.valor, 0);
   const saidasARealizar = filteredData.filter(r => r.natureza === 'Saída' && r.status === 'A realizar').reduce((acc, r) => acc + r.valor, 0);
 
   const resultadoRealizado = entradasRealizadas - saidasRealizadas;
@@ -245,6 +267,8 @@ export default function VisaoFinanceira() {
     Projeto: item.projeto,
     "Nome / Fornecedor": item.nome,
     Conta: item.contaDescricao,
+    Documento: item.documento || '',
+    Lançamento: item.lancamento || '',
     Situação: item.statusExibicao,
     Natureza: item.natureza,
     Valor: item.valor,
