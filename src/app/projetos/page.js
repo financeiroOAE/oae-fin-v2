@@ -428,6 +428,71 @@ export default function Projetos() {
     return data.filter(item => getProjectKey(item.projeto) === selectedProject.projectKey);
   }, [selectedProject, data]);
 
+  const exportSelectedProjectExcel = async (mode = 'full') => {
+    if (!selectedProject) return;
+    const XLSX = await import('xlsx');
+    const workbook = XLSX.utils.book_new();
+
+    const movementRows = selectedProjectMoves
+      .map(item => ({
+        Data: item.data || '',
+        Documento: item.documento || '',
+        Status: item.status || '',
+        Natureza: item.natureza || '',
+        Lançamento: item.lancamento || '',
+        Nome: item.nome || '',
+        Projeto: item.projeto || '',
+        Conta: item.contaNome || item.contaDescricao || '',
+        Valor: Number(item.valor) || 0,
+      }))
+      .sort((a, b) => {
+        const pa = String(a.Data).split('/');
+        const pb = String(b.Data).split('/');
+        const ta = pa.length === 3 ? new Date(pa[2], pa[1] - 1, pa[0]).getTime() : 0;
+        const tb = pb.length === 3 ? new Date(pb[2], pb[1] - 1, pb[0]).getTime() : 0;
+        return ta - tb;
+      });
+
+    const appendSheet = (rows, name) => {
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!autofilter'] = rows.length ? { ref: ws['!ref'] } : undefined;
+      ws['!cols'] = Object.keys(rows[0] || {}).map((key) => ({ wch: Math.min(42, Math.max(12, key.length + 2)) }));
+      XLSX.utils.book_append_sheet(workbook, ws, name.slice(0, 31));
+    };
+
+    if (mode === 'full') {
+      const resumo = [{
+        Projeto: selectedProject.nome,
+        Empresa: selectedProject.empresa,
+        Tipo: selectedProject.tipo,
+        Contratado: selectedProject.contratado,
+        Faturado: selectedProject.faturado,
+        '% Faturado': selectedProject.percentFaturado,
+        'Saldo Contratual': selectedProject.saldoContratual,
+        Recebido: selectedProject.recebido,
+        'A Receber': selectedProject.aReceber,
+        Pago: selectedProject.pago,
+        'A Pagar': selectedProject.aPagar,
+        Resultado: selectedProject.resultadoCaixa,
+      }];
+      appendSheet(resumo, 'Resumo Executivo');
+
+      const admRows = (selectedProject.titulosAdmAssociados || []).map(item => ({
+        Lançamento: item.lancamento || '',
+        Documento: item.documento || '',
+        Nome: item.nome || '',
+        Data: item.data || '',
+        'Valor Admin': Number(item.valor) || 0,
+      }));
+      if (admRows.length) appendSheet(admRows, 'Títulos Administrativos');
+    }
+
+    appendSheet(movementRows, 'Extrato');
+
+    const safe = String(selectedProject.nome || 'projeto').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+    XLSX.writeFile(workbook, `${mode === 'full' ? 'relatorio-completo' : 'extrato'}-${safe}.xlsx`, { cellDates: true });
+  };
+
   const clearAllFilters = () => {
     setFilterProjetos([]); setFilterEmpresas([]); setFilterTipos([]);
     const range = getRolling30DayRange();
@@ -861,9 +926,17 @@ export default function Projetos() {
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>{selectedProject.empresa} • {selectedProject.tipo}</span>
                 <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--primary)' }}>{selectedProject.nome}</h2>
               </div>
-              <button onClick={() => setSelectedProject(null)} className="btn" style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%' }}>
-                <X size={20} color="var(--text-secondary)" />
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <button onClick={() => exportSelectedProjectExcel('full')} className="btn" style={{ fontSize: '12px', background: 'var(--primary)', color: '#fff' }}>
+                  <FileText size={14} /> Relatório completo
+                </button>
+                <button onClick={() => exportSelectedProjectExcel('extract')} className="btn" style={{ fontSize: '12px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
+                  <FileText size={14} /> Somente extrato
+                </button>
+                <button onClick={() => setSelectedProject(null)} className="btn" style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%' }}>
+                  <X size={20} color="var(--text-secondary)" />
+                </button>
+              </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
