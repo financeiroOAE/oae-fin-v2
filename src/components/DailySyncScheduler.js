@@ -52,7 +52,7 @@ export default function DailySyncScheduler() {
 
         if (response.ok) {
           localStorage.setItem(STORAGE_KEY, clock.dayKey);
-          window.dispatchEvent(new CustomEvent('oae-fin-snapshot-updated'));
+          window.location.reload();
         }
       } catch {
         // A próxima verificação tenta novamente sem interromper a navegação.
