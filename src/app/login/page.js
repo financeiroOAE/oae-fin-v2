@@ -72,16 +72,32 @@ export default function LoginPage() {
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
       }}>
         <div style={{ textAlign: "center", marginBottom: "1.75rem" }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem", minHeight: "118px" }}>
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.7rem",
+            marginBottom: "1rem",
+            padding: "1.1rem 1rem",
+            minHeight: "155px",
+            borderRadius: "12px",
+            background: "#f7fafc",
+            border: "1px solid rgba(255,255,255,0.14)",
+          }}>
             <img
-              src="/login-logo.png"
-              alt="Oliveira Araújo Engenharia"
-              style={{ objectFit: "contain", width: "100%", maxWidth: "330px", maxHeight: "118px" }}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "/logo.png";
-              }}
+              src="/logo.png"
+              alt="Símbolo Oliveira Araújo Engenharia"
+              style={{ width: "82px", height: "82px", objectFit: "contain", display: "block" }}
             />
+            <div style={{ lineHeight: 1, color: "#082c5c" }}>
+              <div style={{ fontSize: "1.42rem", fontWeight: 800, letterSpacing: "0.055em", whiteSpace: "nowrap" }}>
+                OLIVEIRA ARAÚJO
+              </div>
+              <div style={{ marginTop: "0.55rem", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.42em", color: "#626a76", paddingLeft: "0.42em" }}>
+                ENGENHARIA
+              </div>
+            </div>
           </div>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
             Acesso Restrito Corporativo
