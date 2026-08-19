@@ -1,6 +1,7 @@
 name: Apply NFES Note Receivable
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
