@@ -60,20 +60,39 @@ export async function GET(request) {
 
   const username = session.user.username;
   const force = new URL(request.url).searchParams.get('force') === '1';
+  let snapshot = null;
 
   try {
-    const snapshot = await readCurrentSnapshot();
+    snapshot = await readCurrentSnapshot();
     const scheduledDue = !force && isDailySyncDue(snapshot?.updatedAt);
 
     if (force || scheduledDue) {
       const triggeredBy = force ? username : 'AUTO_16:30';
-      const payload = await refreshFinancialSnapshot(triggeredBy);
 
-      return NextResponse.json({
-        ...payload,
-        fromSnapshot: false,
-        refreshReason: force ? 'MANUAL' : 'AUTO_16:30',
-      });
+      try {
+        const payload = await refreshFinancialSnapshot(triggeredBy);
+        return NextResponse.json({
+          ...payload,
+          fromSnapshot: false,
+          refreshReason: force ? 'MANUAL' : 'AUTO_16:30',
+        });
+      } catch (refreshError) {
+        await registerSyncError(triggeredBy, refreshError);
+
+        // Nunca derrubar o painel se já existir uma fotografia válida.
+        if (snapshot?.payload) {
+          return NextResponse.json({
+            ...snapshot.payload,
+            fromSnapshot: true,
+            snapshotAt: snapshot.updatedAt,
+            snapshotUpdatedBy: snapshot.updatedBy,
+            refreshFailed: true,
+            refreshError: refreshError?.message || 'Falha ao atualizar dados',
+          });
+        }
+
+        throw refreshError;
+      }
     }
 
     if (!snapshot) {
