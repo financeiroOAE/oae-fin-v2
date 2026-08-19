@@ -79,22 +79,21 @@ export default function LoginPage() {
             justifyContent: "center",
             gap: "0.7rem",
             marginBottom: "1rem",
-            padding: "1.1rem 1rem",
-            minHeight: "155px",
+            padding: "0.5rem 0",
+            minHeight: "145px",
             borderRadius: "12px",
-            background: "#f7fafc",
-            border: "1px solid rgba(255,255,255,0.14)",
+            background: "transparent",
           }}>
             <img
               src="/logo.png"
               alt="Símbolo Oliveira Araújo Engenharia"
               style={{ width: "82px", height: "82px", objectFit: "contain", display: "block" }}
             />
-            <div style={{ lineHeight: 1, color: "#082c5c" }}>
+            <div style={{ lineHeight: 1, color: "var(--text-main)" }}>
               <div style={{ fontSize: "1.42rem", fontWeight: 800, letterSpacing: "0.055em", whiteSpace: "nowrap" }}>
                 OLIVEIRA ARAÚJO
               </div>
-              <div style={{ marginTop: "0.55rem", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.42em", color: "#626a76", paddingLeft: "0.42em" }}>
+              <div style={{ marginTop: "0.55rem", fontSize: "0.76rem", fontWeight: 700, letterSpacing: "0.42em", color: "var(--text-secondary)", paddingLeft: "0.42em" }}>
                 ENGENHARIA
               </div>
             </div>
