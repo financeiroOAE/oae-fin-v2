@@ -34,3 +34,5 @@ for (const relativePath of targets) {
   fs.writeFileSync(filePath, src);
   console.log(`Atualizado: ${relativePath}`);
 }
+
+console.log('Correção de sincronização manual aplicada.');
