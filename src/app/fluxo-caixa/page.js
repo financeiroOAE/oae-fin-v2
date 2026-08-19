@@ -133,6 +133,18 @@ export default function FluxoDeCaixa() {
 
   const evolutionData = useMemo(() => {
     const map = {};
+
+    if (isDaily && filterDataInicial && filterDataFinal) {
+      const cursor = new Date(filterDataInicial + 'T00:00:00');
+      const end = new Date(filterDataFinal + 'T00:00:00');
+      while (cursor <= end) {
+        const label = `${String(cursor.getDate()).padStart(2, '0')}/${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+        const ts = cursor.getTime();
+        map[label] = { dataExibicao: label, Entradas: 0, Saídas: 0, Resultado: 0, timestamp: ts };
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+
     filteredData.forEach(item => {
       if (!item.data) return;
       const parts = item.data.split('/');
@@ -154,7 +166,7 @@ export default function FluxoDeCaixa() {
       }
     });
     return Object.values(map).sort((a, b) => a.timestamp - b.timestamp);
-  }, [filteredData, isDaily]);
+  }, [filteredData, isDaily, filterDataInicial, filterDataFinal]);
 
   // Visões anuais respeitam os demais filtros, sem usar Data Inicial/Data Final.
   const annualFilteredData = useMemo(() => baseData.filter(item => {
@@ -562,7 +574,7 @@ export default function FluxoDeCaixa() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={evolutionData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
-                <XAxis dataKey="dataExibicao" stroke="var(--text-secondary)" fontSize={11} tickMargin={10} axisLine={false} tickLine={false} />
+                <XAxis dataKey="dataExibicao" stroke="var(--text-secondary)" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} interval={0} angle={-45} textAnchor="end" height={52} />
                 <YAxis stroke="var(--text-secondary)" fontSize={11} tickFormatter={(val) => `R$ ${(val / 1000)}k`} axisLine={false} tickLine={false} />
                 <RechartsTooltip content={<CustomTooltip />} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
