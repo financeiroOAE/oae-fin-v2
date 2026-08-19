@@ -9,6 +9,11 @@ import ReportDrawer from "@/components/report/ReportDrawer";
 export const metadata = {
   title: "Painel Financeiro OAE",
   description: "Sistema Financeiro - Oliveira Araújo Engenharia",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({ children }) {
