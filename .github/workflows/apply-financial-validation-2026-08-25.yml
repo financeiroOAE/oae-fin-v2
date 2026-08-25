@@ -6,6 +6,7 @@ on:
       - fix-financial-validation-2026-08-25
     paths:
       - scripts/apply-financial-validation-2026-08-25.js
+      - .github/workflows/apply-financial-validation-2026-08-25.yml
 
 permissions:
   contents: write
