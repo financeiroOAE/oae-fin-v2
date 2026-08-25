@@ -181,7 +181,7 @@ export default function FluxoDeCaixa() {
   const annualData2026 = useMemo(() => {
     const map = {};
     const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-    meses.forEach((m, i) => map[i] = { mesNome: m, Entradas: 0, 'Receitas Previstas': 0, Saídas: 0, Resultado: 0, id: i });
+    meses.forEach((m, i) => map[i] = { mesNome: m, 'Entradas Realizadas': 0, 'Entradas Programadas': 0, Saídas: 0, Resultado: 0, id: i });
     
     annualFilteredData.forEach(item => {
       if (!item.data) return;
@@ -195,8 +195,8 @@ export default function FluxoDeCaixa() {
           const isPrevisto = status === 'A REALIZAR';
           if (!isRealizado && !isPrevisto) return;
           if (item.natureza === 'Entrada') {
-            if (isPrevisto) map[m]['Receitas Previstas'] += item.valor;
-            else map[m].Entradas += item.valor;
+            if (isPrevisto) map[m]['Entradas Programadas'] += item.valor;
+            else map[m]['Entradas Realizadas'] += item.valor;
             map[m].Resultado += item.valor;
           }
           if (item.natureza === 'Saída') {
@@ -381,11 +381,11 @@ export default function FluxoDeCaixa() {
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
         <div style={{ flex: '1 1 150px' }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Data Inicial</label>
-          <input type="date" value={filterDataInicial} readOnly aria-readonly="true" title="Período fixo: hoje" />
+          <input type="date" value={filterDataInicial} onChange={(e) => setFilterDataInicial(e.target.value)} />
         </div>
         <div style={{ flex: '1 1 150px' }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Data Final</label>
-          <input type="date" value={filterDataFinal} readOnly aria-readonly="true" title="Período fixo: 30 dias à frente" />
+          <input type="date" value={filterDataFinal} onChange={(e) => setFilterDataFinal(e.target.value)} />
         </div>
         <div style={{ flex: '2 1 200px', minWidth: 0 }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Situação</label>
@@ -740,9 +740,9 @@ export default function FluxoDeCaixa() {
 
       {/* Fluxo anual imediatamente antes das movimentações */}
       <div id="report-fluxo-anual" data-report-section className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-        <ReportAdder sectionKey="fluxo:anual" title="Fluxo Financeiro Anual — 2026" componentName="Gráfico de Fluxo Anual" page="Fluxo de Caixa" type="CHART" data={annualData2026} filters={{ Ano: 2026 }} captureId="report-fluxo-anual" presetTags={["executive-financial"]} style={{ float: 'right' }} />
+        <ReportAdder sectionKey="fluxo:anual" title="Movimentações Financeiras Anuais — 2026" componentName="Gráfico de Fluxo Anual" page="Fluxo de Caixa" type="CHART" data={annualData2026} filters={{ Ano: 2026 }} captureId="report-fluxo-anual" presetTags={["executive-financial"]} style={{ float: 'right' }} />
         <ChartHeader
-          title="Fluxo Financeiro Anual — 2026"
+          title="Movimentações Financeiras Anuais — 2026"
           infoTitle="Fluxo Anual 2026"
           infoContent="Representa o fluxo consolidado dos meses de janeiro a dezembro de 2026. Este gráfico possui um recorte de período independente do filtro padrão de 30 dias utilizado nos outros componentes."
         />
@@ -756,7 +756,7 @@ export default function FluxoDeCaixa() {
               <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
               <ReferenceLine y={0} stroke="var(--border-color)" />
               <Bar dataKey="Entradas" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={50} />
-              <Bar dataKey="Receitas Previstas" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={50} />
+              <Bar dataKey="Entradas Programadas" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={50} />
               <Bar dataKey="Saídas" fill="var(--danger)" radius={[4, 4, 0, 0]} maxBarSize={50} />
               <Bar dataKey="Resultado" fill="var(--info)" radius={[4, 4, 0, 0]} maxBarSize={50} />
             </BarChart>
