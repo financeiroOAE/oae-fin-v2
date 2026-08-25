@@ -655,28 +655,28 @@ export default function VisaoFinanceira() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>
         
         {/* ROW 1: Evolução Operacional e Resultado Financeiro */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1.5rem' }}>
-          <div id="report-visao-fluxo" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1.5rem', alignItems: 'stretch' }}>
+          <div id="report-visao-fluxo" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
             <ReportAdder sectionKey="visao:fluxo-operacional" title="Fluxo Operacional de Entradas e Saídas" componentName="Gráfico de Fluxo Operacional" page="Visão Financeira" type="CHART" data={flowData} columns={[{ key: "label", label: "Período" }, { key: "Entradas", label: "Entradas", format: "currency" }, { key: "Saídas", label: "Saídas", format: "currency" }]} filters={reportFilters} captureId="report-visao-fluxo" presetTags={["executive-financial"]} explanation="Evolução das entradas e saídas no período selecionado." style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.5rem' }}>Fluxo Operacional de Entradas e Saídas (R$)</h2>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Evolução do período selecionado</p>
-            <div style={{ flex: 1, minHeight: '260px' }}>
+            <div style={{ flex: 1, minHeight: '320px', minWidth: 0 }}>
               <IncomeExpenseChart data={flowData} />
             </div>
           </div>
-          <div id="report-visao-resultado" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+          <div id="report-visao-resultado" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
             <ReportAdder sectionKey="visao:resultado" title="Resultado Financeiro Consolidado" componentName="Gráfico de Resultado Financeiro" page="Visão Financeira" type="CHART" data={flowData.map(row => ({ Período: row.label, Resultado: row.Entradas - row.Saídas }))} filters={reportFilters} captureId="report-visao-resultado" presetTags={["executive-financial"]} explanation="Resultado líquido obtido pela diferença entre entradas e saídas." style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.5rem' }}>Resultado Financeiro Consolidado (R$)</h2>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Evolução do saldo (Entradas - Saídas) no período selecionado</p>
-            <div style={{ flex: 1, minHeight: '260px' }}>
+            <div style={{ flex: 1, minHeight: '320px', minWidth: 0 }}>
               <MonthlyResultChart data={flowData} />
             </div>
           </div>
         </div>
 
         {/* ROW 2: Status Financeiro e Curva ABC */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1.5rem' }}>
-          <div id="report-visao-status" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+          <div id="report-visao-status" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <ReportAdder sectionKey="visao:status" title="Status Financeiro Consolidado" componentName="Tributos, Receitas e Pagamentos" page="Visão Financeira" type="CHART" data={[
               { name: 'Receitas Recebidas', value: projectRevenueStatus.realizado.total },
               { name: 'Receitas A Receber', value: projectRevenueStatus.pendente.total },
@@ -687,13 +687,13 @@ export default function VisaoFinanceira() {
             ]} filters={reportFilters} captureId="report-visao-status" presetTags={["executive-financial"]} explanation="Receitas de projetos (1010101 + 1010107), pagamentos e tributos dentro do período selecionado." style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.35rem' }}>Status Financeiro Consolidado</h2>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Tributos, receitas de projetos e pagamentos no período selecionado.</p>
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem', alignItems: 'start' }}>
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
               <PieStatusChart realizado={taxStatusBreakdown.realizado} pendente={taxStatusBreakdown.pendente} colorRealizado="var(--primary)" colorPendente="rgba(57, 198, 198, 0.25)" titulo="Tributos" labelRealizado="Pago" labelPendente="A pagar" />
               <PieStatusChart realizado={projectRevenueStatus.realizado.total} pendente={projectRevenueStatus.pendente.total} colorRealizado="var(--success)" colorPendente="rgba(16, 185, 129, 0.3)" titulo="Receitas" labelRealizado="Recebido" labelPendente="A receber" />
               <PieStatusChart realizado={saidasRealizadas} pendente={saidasARealizar} colorRealizado="var(--danger)" colorPendente="rgba(239, 68, 68, 0.3)" titulo="Pagamentos" labelRealizado="Pago" labelPendente="A pagar" />
             </div>
           </div>
-          <div id="report-visao-abc" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+          <div id="report-visao-abc" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
             <ReportAdder sectionKey="visao:abc" title="Curva ABC dos Projetos" componentName="Curva ABC" page="Visão Financeira" type="TABLE" data={abcDonutData.map(item => ({ Classe: item.name, Projetos: item.count, Valor: item.value, Regra: item.rule }))} filters={reportFilters} captureId="report-visao-abc" presetTags={["executive-financial", "project-executive"]} style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Curva ABC dos Projetos</h2>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Projetos ativos classificados pelo valor contratado.</p>

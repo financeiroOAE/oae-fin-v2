@@ -16,6 +16,36 @@ const CONFIG_STORAGE_KEY = "oae_report_config_v2";
 const TEMPLATES_STORAGE_KEY = "oae_report_templates_v2";
 const MAX_PERSISTED_ROWS = 500;
 
+function normalizeReportText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+}
+
+function isExcludedExecutiveSection(section) {
+  const text = normalizeReportText([
+    section?.sectionKey,
+    section?.title,
+    section?.componentName,
+  ].filter(Boolean).join(" "));
+  return text.includes("EQUIPE") && text.includes("PROJETO");
+}
+
+function sanitizeReportItems(items) {
+  return Array.isArray(items) ? items.filter((item) => !isExcludedExecutiveSection(item)) : [];
+}
+
+function sanitizeReportTemplates(templates) {
+  if (!Array.isArray(templates)) return [];
+  return templates.map((template) => ({
+    ...template,
+    sections: Array.isArray(template.sections)
+      ? template.sections.filter((section) => !isExcludedExecutiveSection(section))
+      : [],
+  }));
+}
+
 const defaultConfig = {
   title: "Relatório Financeiro Executivo",
   orientation: "auto",
@@ -113,9 +143,9 @@ export function ReportProvider({ children }) {
       const savedConfig = parseStoredValue(CONFIG_STORAGE_KEY, defaultConfig);
       const savedTemplates = parseStoredValue(TEMPLATES_STORAGE_KEY, []);
 
-      setReportItems(Array.isArray(savedItems) ? savedItems : []);
+      setReportItems(sanitizeReportItems(savedItems));
       setReportConfig({ ...defaultConfig, ...(savedConfig || {}) });
-      setTemplates(Array.isArray(savedTemplates) ? savedTemplates : []);
+      setTemplates(sanitizeReportTemplates(savedTemplates));
       hydratedRef.current = true;
     });
 
@@ -176,6 +206,7 @@ export function ReportProvider({ children }) {
   }, []);
 
   const registerSection = useCallback((section) => {
+    if (isExcludedExecutiveSection(section)) return;
     if (!section?.sectionKey && (!section?.page || !section?.title)) return;
     const normalized = snapshotSection(section);
     setAvailableSections((current) => {
@@ -188,6 +219,7 @@ export function ReportProvider({ children }) {
   }, []);
 
   const addReportItem = useCallback((section) => {
+    if (isExcludedExecutiveSection(section)) return;
     const normalized = snapshotSection(section);
     setReportItems((current) => {
       if (current.some((item) => item.sectionKey === normalized.sectionKey)) {
@@ -266,6 +298,7 @@ export function ReportProvider({ children }) {
   const applyPreset = useCallback(
     (presetTag) => {
       const matches = Object.values(availableSections).filter((section) =>
+        !isExcludedExecutiveSection(section) &&
         section.presetTags?.includes(presetTag) &&
         (!activeReportPage || section.page === activeReportPage)
       );
