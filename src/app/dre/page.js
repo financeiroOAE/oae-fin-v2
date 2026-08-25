@@ -245,8 +245,8 @@ function PendingClassificationDrawer({ items, onClose }) {
 
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '0.9rem 1rem', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-color)' }}>
-              <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>Lançamentos que compõem as pendências</strong>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Detalhamento abaixo para auditoria e ajuste do DEPARA.</p>
+              <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>Lançamentos fora da DRE</strong>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Detalhamento para auditoria. Somente itens classificados como Pendente de Classificação exigem ajuste do DEPARA.</p>
             </div>
             <div style={{ overflowX: 'auto', maxHeight: '48vh', overflowY: 'auto' }}>
               <table style={{ minWidth: '1050px', fontSize: '12px' }}>
@@ -729,8 +729,11 @@ export default function Dre() {
 
   const outsideDreItems = useMemo(() => {
     const map = new Map();
-    [...dreData.naoClassificados.items, ...intentionalOutsideItems].forEach((item, index) => {
-      const key = [item.data, item.documento, item.lancamento, item.contaCodigo, item.projeto, item.valor, index < dreData.naoClassificados.items.length ? 'pending' : 'outside'].join('|');
+    [...dreData.naoClassificados.items, ...intentionalOutsideItems].forEach((item) => {
+      // A mesma movimentacao pode ter sido capturada como nao classificada pelo
+      // motor e tambem reconhecida pela regra patrimonial. A chave nao inclui a
+      // origem da captura para impedir duplicidade no resumo.
+      const key = [item.data, item.documento, item.lancamento, item.contaCodigo, item.projeto, item.valor].join('|');
       if (!map.has(key)) map.set(key, item);
     });
     return [...map.values()];
