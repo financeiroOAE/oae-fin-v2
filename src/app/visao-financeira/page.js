@@ -14,7 +14,7 @@ import InfoTooltip from "@/components/InfoTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
-import { classifyFinancialEntry, isPartnerWithdrawal } from "@/lib/financialClassification";
+import { classifyFinancialEntry, isPartnerWithdrawal, isRevenueTax } from "@/lib/financialClassification";
 import { getActiveProjects, getActiveProjectNames, getProjectKey } from "@/lib/projectRules";
 
 const getYearToDateRange = () => {
@@ -137,14 +137,13 @@ export default function VisaoFinanceira() {
   }, [openFilteredData, filterDataInicial, filterDataFinal]);
 
   const forecastFilteredData = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endOf2026 = new Date('2026-12-31T23:59:59').getTime();
+    const start = filterDataInicial ? new Date(filterDataInicial + 'T00:00:00').getTime() : 0;
+    const end = filterDataFinal ? new Date(filterDataFinal + 'T23:59:59').getTime() : Infinity;
     return openFilteredData.filter((item) => {
       if (String(item.status || '').trim().toUpperCase() !== 'A REALIZAR') return false;
-      return item.dataTimestamp >= today.getTime() && item.dataTimestamp <= endOf2026;
+      return item.dataTimestamp >= start && item.dataTimestamp <= end;
     });
-  }, [openFilteredData]);
+  }, [openFilteredData, filterDataInicial, filterDataFinal]);
 
   const projetosDisponiveis = useMemo(() => getActiveProjectNames(projetosBrutos, true), [projetosBrutos]);
   const activeProjects = useMemo(() => getActiveProjects(projetosBrutos), [projetosBrutos]);
@@ -163,37 +162,30 @@ export default function VisaoFinanceira() {
   const resultadoRealizado = entradasRealizadas - saidasRealizadas;
   const resultadoPrevisto = entradasARealizar - saidasARealizar;
   
-  // Agrupamentos Dinâmicos (Diário vs Mensal)
-  const isDaily = useMemo(() => {
-    if (!filterDataInicial || !filterDataFinal) return false;
-    const diffTime = Math.abs(new Date(filterDataFinal) - new Date(filterDataInicial));
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) <= 60;
-  }, [filterDataInicial, filterDataFinal]);
-
+  // Os graficos mensais mantem Jan-Dez sempre visiveis. O filtro de periodo
+  // altera somente os valores; meses fora do intervalo permanecem com zero.
   const flowData = useMemo(() => {
-    const map = {};
-    filteredData.forEach(item => {
-      if (!item.data) return;
-      const parts = item.data.split('/');
-      if (parts.length !== 3) return;
-      
-      const label = isDaily ? `${parts[0]}/${parts[1]}` : `${parts[1]}/${parts[2]}`;
-      const ts = isDaily ? item.dataTimestamp : new Date(parts[2], parts[1] - 1, 1).getTime();
+    const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const rows = monthLabels.map((label, month) => ({
+      label,
+      Entradas: 0,
+      Saídas: 0,
+      timestamp: new Date(2026, month, 1).getTime(),
+      month,
+    }));
 
-      if (!map[label]) {
-        map[label] = { label, Entradas: 0, Saídas: 0, timestamp: ts };
-      }
-      if (item.natureza === 'Entrada') map[label].Entradas += item.valor;
-      if (item.natureza === 'Saída') map[label].Saídas += item.valor;
+    filteredData.forEach((item) => {
+      const parts = String(item.data || '').split('/');
+      if (parts.length !== 3 || parts[2] !== '2026') return;
+      const month = Number(parts[1]) - 1;
+      if (month < 0 || month > 11) return;
+      if (item.natureza === 'Entrada') rows[month].Entradas += Number(item.valor) || 0;
+      if (item.natureza === 'Saída') rows[month].Saídas += Number(item.valor) || 0;
     });
-    return Object.values(map).sort((a, b) => a.timestamp - b.timestamp);
-  }, [filteredData, isDaily]);
 
-  // Status Pie Charts
-  const pieRecebimentos = [
-    { name: 'Recebido', value: entradasRealizadas },
-    { name: 'A receber', value: entradasARealizar }
-  ];
+    return rows;
+  }, [filteredData]);
+
   const piePagamentos = [
     { name: 'Pago', value: saidasRealizadas },
     { name: 'A pagar', value: saidasARealizar }
@@ -202,24 +194,23 @@ export default function VisaoFinanceira() {
   // Top Projetos Entradas / Saídas
   const topProjetosEntradas = useMemo(() => {
     const map = {};
-    filteredData.forEach((item) => {
+    realizedFilteredData.forEach((item) => {
       if (item.natureza !== 'Entrada') return;
       const projectName = String(item.projeto || '').trim();
       const projectUpper = projectName.toUpperCase();
       if (!projectName || projectUpper.includes('ADMINISTRA') || projectUpper === 'GRUPO OAE' || projectUpper === 'SEM PROJETO') return;
-      if (!activeProjectKeys.has(getProjectKey(projectName))) return;
 
       const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
       const projectRevenue = rows.reduce((sum, row) => {
-        const classification = classifyFinancialEntry(row);
-        if (classification.type !== 'receita_projeto' && classification.type !== 'receita_administrativa') return sum;
+        const code = String(row.contaCodigo || '').replace(/\D/g, '');
+        if (code !== '1010101' && code !== '1010107') return sum;
         return sum + (Number(row.valor) || 0);
       }, 0);
       if (projectRevenue <= 0) return;
       map[projectName] = (map[projectName] || 0) + projectRevenue;
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
-  }, [filteredData, activeProjectKeys]);
+  }, [realizedFilteredData]);
 
   const topProjetosSaidas = useMemo(() => {
     const map = {};
@@ -229,59 +220,53 @@ export default function VisaoFinanceira() {
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
   }, [filteredData, activeProjectKeys]);
 
-  // Top Contas Entradas / Saídas
-  const entryStatusBreakdown = useMemo(() => {
-    const result = {
-      projetos: { realizado: 0, pendente: 0 },
-      capital: { realizado: 0, pendente: 0 },
-    };
-
-    const accumulate = (items, bucket) => {
-      items.filter((item) => item.natureza === 'Entrada').forEach((item) => {
+  // Receita de projetos: a fonte de verdade e a conta da CR_GERAL.
+  // 1010101 = faturamento e 1010107 = administrativo. Nao dependemos do
+  // cadastro de projetos ativos para decidir se uma receita existe.
+  const projectRevenueStatus = useMemo(() => {
+    const accumulate = (items) => {
+      let obra = 0;
+      let adm = 0;
+      items.forEach((item) => {
+        if (item.natureza !== 'Entrada') return;
         const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
         rows.forEach((row) => {
-          const classification = classifyFinancialEntry(row);
+          const code = String(row.contaCodigo || '').replace(/\D/g, '');
           const value = Number(row.valor) || 0;
-          if (classification.type === 'receita_projeto' || classification.type === 'receita_administrativa') result.projetos[bucket] += value;
-          if (classification.type === 'emprestimo' || classification.type === 'aporte') result.capital[bucket] += value;
+          if (code === '1010101') obra += value;
+          if (code === '1010107') adm += value;
         });
       });
+      return { obra, adm, total: obra + adm };
     };
 
-    accumulate(realizedFilteredData, 'realizado');
-    accumulate(forecastFilteredData, 'pendente');
-    return result;
+    return {
+      realizado: accumulate(realizedFilteredData),
+      pendente: accumulate(forecastFilteredData),
+    };
   }, [realizedFilteredData, forecastFilteredData]);
 
+  const taxStatusBreakdown = useMemo(() => ({
+    realizado: realizedFilteredData
+      .filter((item) => item.natureza === 'Saída' && isRevenueTax(item))
+      .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0),
+    pendente: forecastFilteredData
+      .filter((item) => item.natureza === 'Saída' && isRevenueTax(item))
+      .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0),
+  }), [realizedFilteredData, forecastFilteredData]);
+
   const projectFinancialOverview = useMemo(() => {
-    let receitaObra = 0;
-    let receitaAdm = 0;
-    let saidas = 0;
-
-    filteredData.forEach((item) => {
-      const status = String(item.status || '').trim().toUpperCase();
-      if (status !== 'REALIZADO') return;
-
-      const itemProjectKey = getProjectKey(item.projeto);
-      if (!activeProjectKeys.has(itemProjectKey)) return;
-
-      if (item.natureza === 'Entrada') {
-        const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
-        rows.forEach((row) => {
-          const classification = classifyFinancialEntry(row);
-          if (classification.type === 'receita_projeto') receitaObra += Number(row.valor) || 0;
-          if (classification.type === 'receita_administrativa') receitaAdm += Number(row.valor) || 0;
-        });
-      } else if (item.natureza === 'Saída') {
-        saidas += Math.abs(Number(item.valor) || 0);
-      }
-    });
-
-    const receita = receitaObra + receitaAdm;
+    const receitaObra = projectRevenueStatus.realizado.obra;
+    const receitaAdm = projectRevenueStatus.realizado.adm;
+    const receita = projectRevenueStatus.realizado.total;
+    const saidas = realizedFilteredData
+      .filter((item) => item.natureza === 'Saída')
+      .filter((item) => filterProjetos.length > 0 || !String(item.projeto || '').toUpperCase().includes('ADMINISTRA'))
+      .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0);
     const resultado = receita - saidas;
     const margem = receita > 0 ? (resultado / receita) * 100 : 0;
     return { receita, receitaObra, receitaAdm, saidas, resultado, margem };
-  }, [filteredData, activeProjectKeys]);
+  }, [projectRevenueStatus, realizedFilteredData, filterProjetos]);
 
   const abcDonutData = useMemo(() => {
     const aggregated = new Map();
@@ -500,7 +485,7 @@ export default function VisaoFinanceira() {
           </p>
         </div>
         <div className="card" style={{ padding: '1.5rem' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Target size={16} color="var(--primary)"/> Resultado Previsto <InfoTooltip title="Resultado Previsto" content="A receber menos A pagar dos lançamentos ainda A realizar, com vencimento de hoje até 31/12/2026. Os filtros de projeto, nome e conta continuam válidos." /></p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Target size={16} color="var(--primary)"/> Resultado Previsto <InfoTooltip title="Resultado Previsto" content="A receber menos A pagar dos lançamentos ainda A realizar dentro do período selecionado. Os filtros de projeto, nome e conta também são aplicados." /></p>
           <p style={{ fontSize: '24px', fontWeight: '700', color: resultadoPrevisto >= 0 ? 'var(--success)' : 'var(--danger)' }}>
             {formatCurrency(resultadoPrevisto)}
           </p>
@@ -553,21 +538,23 @@ export default function VisaoFinanceira() {
         {/* ROW 2: Status Financeiro e Curva ABC */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1.5rem' }}>
           <div id="report-visao-status" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <ReportAdder sectionKey="visao:status" title="Status Financeiro Consolidado" componentName="Gráficos de Status" page="Visão Financeira" type="CHART" data={[
-              { name: 'Projetos Recebido', value: entryStatusBreakdown.projetos.realizado },
-              { name: 'Projetos A Receber', value: entryStatusBreakdown.projetos.pendente },
-              { name: 'Empréstimos/Aportes Realizado', value: entryStatusBreakdown.capital.realizado },
-              { name: 'Empréstimos/Aportes A Realizar', value: entryStatusBreakdown.capital.pendente },
-              ...piePagamentos
-            ]} filters={reportFilters} captureId="report-visao-status" presetTags={["executive-financial"]} style={{ alignSelf: 'flex-end' }} />
-            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '1.5rem' }}>Status Financeiro Consolidado</h2>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', justifyContent: 'center' }}>
-              <PieStatusChart realizado={entryStatusBreakdown.projetos.realizado} pendente={entryStatusBreakdown.projetos.pendente} colorRealizado="var(--success)" colorPendente="rgba(16, 185, 129, 0.3)" titulo="Projetos" labelRealizado="Recebido" labelPendente="A receber" />
-              <PieStatusChart realizado={entryStatusBreakdown.capital.realizado} pendente={entryStatusBreakdown.capital.pendente} colorRealizado="var(--info)" colorPendente="rgba(59,130,246,0.3)" titulo="Capital" labelRealizado="Realizado" labelPendente="A realizar" />
+            <ReportAdder sectionKey="visao:status" title="Status Financeiro Consolidado" componentName="Tributos, Receitas e Pagamentos" page="Visão Financeira" type="CHART" data={[
+              { name: 'Receitas Recebidas', value: projectRevenueStatus.realizado.total },
+              { name: 'Receitas A Receber', value: projectRevenueStatus.pendente.total },
+              { name: 'Pagamentos Realizados', value: saidasRealizadas },
+              { name: 'Pagamentos A Realizar', value: saidasARealizar },
+              { name: 'Tributos Pagos', value: taxStatusBreakdown.realizado },
+              { name: 'Tributos A Pagar', value: taxStatusBreakdown.pendente },
+            ]} filters={reportFilters} captureId="report-visao-status" presetTags={["executive-financial"]} explanation="Receitas de projetos (1010101 + 1010107), pagamentos e tributos dentro do período selecionado." style={{ alignSelf: 'flex-end' }} />
+            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.35rem' }}>Status Financeiro Consolidado</h2>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Tributos, receitas de projetos e pagamentos no período selecionado.</p>
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem', alignItems: 'start' }}>
+              <PieStatusChart realizado={taxStatusBreakdown.realizado} pendente={taxStatusBreakdown.pendente} colorRealizado="var(--primary)" colorPendente="rgba(57, 198, 198, 0.25)" titulo="Tributos" labelRealizado="Pago" labelPendente="A pagar" />
+              <PieStatusChart realizado={projectRevenueStatus.realizado.total} pendente={projectRevenueStatus.pendente.total} colorRealizado="var(--success)" colorPendente="rgba(16, 185, 129, 0.3)" titulo="Receitas" labelRealizado="Recebido" labelPendente="A receber" />
               <PieStatusChart realizado={saidasRealizadas} pendente={saidasARealizar} colorRealizado="var(--danger)" colorPendente="rgba(239, 68, 68, 0.3)" titulo="Pagamentos" labelRealizado="Pago" labelPendente="A pagar" />
             </div>
           </div>
-          <div id="report-visao-abc" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gridColumn: '1 / -1' }}>
+          <div id="report-visao-abc" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
             <ReportAdder sectionKey="visao:abc" title="Curva ABC dos Projetos" componentName="Curva ABC" page="Visão Financeira" type="TABLE" data={abcDonutData.map(item => ({ Classe: item.name, Projetos: item.count, Valor: item.value, Regra: item.rule }))} filters={reportFilters} captureId="report-visao-abc" presetTags={["executive-financial", "project-executive"]} style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Curva ABC dos Projetos</h2>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Projetos ativos classificados pelo valor contratado.</p>
@@ -622,6 +609,10 @@ export default function VisaoFinanceira() {
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         
+        @media (max-width: 1050px) {
+          #report-visao-status > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+        }
+
         input[type="date"] {
           background-color: var(--bg-elevated);
           border: 1px solid var(--border-color);

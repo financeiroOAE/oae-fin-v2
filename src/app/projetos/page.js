@@ -504,8 +504,10 @@ export default function Projetos() {
     const rows = months.map((mes, index) => ({ mes, month: index, Receitas: 0, Custos: 0, Despesas: 0 }));
     const allowedProjects = new Set(filteredProjetos.map((project) => project.projectKey));
 
-    projectCashData.forEach((item) => {
-      if (item.natureza !== 'Entrada' || !allowedProjects.has(getProjectKey(item.projeto))) return;
+    const revenueItems = usarCarteiraCompleta ? data : projectCashData;
+    revenueItems.forEach((item) => {
+      if (item.natureza !== 'Entrada') return;
+      if (!usarCarteiraCompleta && !allowedProjects.has(getProjectKey(item.projeto))) return;
       const status = String(item.status || '').toUpperCase();
       if (!(status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO'))) return;
       const parts = String(item.data || '').split('/');
@@ -514,8 +516,8 @@ export default function Projetos() {
       if (month < 0 || month > 11) return;
       const originalRows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
       const revenue = originalRows.reduce((sum, row) => {
-        const classification = classifyFinancialEntry(row);
-        return (classification.type === 'receita_projeto' || classification.type === 'receita_administrativa') ? sum + (Number(row.valor) || 0) : sum;
+        const code = String(row.contaCodigo || '').replace(/\D/g, '');
+        return (code === '1010101' || code === '1010107') ? sum + (Number(row.valor) || 0) : sum;
       }, 0);
       rows[month].Receitas += revenue;
     });
@@ -539,7 +541,7 @@ export default function Projetos() {
     });
 
     return rows;
-  }, [data, filteredProjetos, projectCashData]);
+  }, [data, filteredProjetos, projectCashData, usarCarteiraCompleta]);
 
   const reportFilters = {
     "Data inicial": filterDataInicial || "Todas",
@@ -939,13 +941,12 @@ export default function Projetos() {
       </div>
 
 
-      <div className="card" data-report-section style={{ padding: '1.5rem', marginBottom: '2rem' }}>
+      <div className="card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
           <div>
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Custo de Equipe por Projeto</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Contas EQUIP. TÉC. somadas nos projetos exibidos. Ao filtrar uma obra, os valores passam a representar somente aquela obra.</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Contas EQUIP. TÉC. somadas nos projetos exibidos. Ao filtrar uma obra, os valores passam a representar somente aquela obra. Este painel fica somente em Projetos e não é oferecido no Relatório Executivo.</p>
           </div>
-          <ReportAdder sectionKey="projetos:custo-equipe" title="Custo de Equipe por Projeto" componentName="Gráfico de Custo de Equipe" page="Projetos" type="TABLE" data={teamCostsChartData} filters={reportFilters} presetTags={["project-executive"]} />
         </div>
         <div style={{ minHeight: '280px' }}>
           <RankingBarChart data={teamCostsChartData} dataKey="Valor" color="var(--warning)" emptyMessage="Sem contas de equipe identificadas para os projetos filtrados." />
