@@ -21,47 +21,16 @@
   color: rgba(248, 113, 113, 0.88) !important;
 }
 
-.project-export-controls {
-  margin-left: auto;
-  margin-right: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.project-export-button {
-  min-height: 34px;
-  padding: 0.4rem 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-card);
-  color: var(--text-main);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.project-export-button:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.project-export-button:disabled {
-  opacity: 0.55;
-  cursor: wait;
-}
-
 .has-demonstrative-help {
   position: relative;
+  overflow: visible !important;
 }
 
 .card-help-wrap {
   position: absolute;
   top: 10px;
   right: 10px;
-  z-index: 70;
+  z-index: 10000;
   display: inline-flex;
   align-items: center;
 }
@@ -98,16 +67,16 @@
 
 .card-help-popover {
   position: absolute;
-  top: calc(100% + 7px);
   right: 0;
-  left: auto;
-  z-index: 80;
+  bottom: calc(100% + 8px);
+  top: auto;
+  z-index: 2147480000;
   width: min(300px, calc(100vw - 40px));
   padding: 0.8rem 0.9rem;
   border: 1px solid var(--border-color);
   border-radius: 9px;
-  background: color-mix(in srgb, var(--bg-card) 97%, transparent);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+  background: color-mix(in srgb, var(--bg-card) 98%, transparent);
+  box-shadow: 0 16px 36px rgba(0,0,0,0.42);
   backdrop-filter: blur(12px);
   color: var(--text-secondary);
   font-size: 12px;
@@ -116,6 +85,7 @@
   text-transform: none;
   letter-spacing: normal;
   white-space: normal;
+  pointer-events: auto;
 }
 
 .card-help-popover[hidden] {
@@ -143,10 +113,8 @@
   margin-bottom: 0;
 }
 
-/* Nos cards demonstrativos, usamos somente o i de informação para não duplicar ajuda. */
-.has-demonstrative-help > .info-tooltip-container,
-.has-demonstrative-help h2 > .info-tooltip-container,
-.has-demonstrative-help h3 > .info-tooltip-container {
+/* Nos cards demonstrativos, usamos somente o i do canto para não duplicar ajuda. */
+.has-demonstrative-help .info-tooltip-container {
   display: none !important;
 }
 
@@ -163,18 +131,13 @@
 }
 
 @media (max-width: 900px) {
-  .project-export-controls {
-    width: 100%;
-    margin: 0.5rem 0 0;
-    justify-content: flex-start;
-  }
-
   .card-help-popover {
     position: fixed;
-    top: auto;
+    top: 16px;
     right: 16px;
     left: 16px;
-    bottom: 16px;
+    bottom: auto;
     width: auto;
+    z-index: 2147480000;
   }
 }

@@ -1,3 +1,5 @@
+import { isTeamExpense } from '@/lib/financialClassification';
+
 /**
  * dreEngine.js — Motor da DRE Gerencial OAE_FIN V2
  *
@@ -43,6 +45,11 @@ const CLASS_MAP = [
 export function mapClasseToDreId(item) {
   const dreClasse = item.dreClasseLabel || item.dreClasse || '';
   const dreLinha = item.dreLinhaLabel || item.dreLinha || '';
+  const projeto = String(item.projeto || '').toUpperCase();
+
+  // Equipe vinculada ao centro de custo administrativo é despesa administrativa,
+  // nunca custo direto de projeto.
+  if (item.natureza === 'Saída' && projeto.includes('ADMINISTRA') && isTeamExpense(item)) return 'DESP_ADM';
 
   if (dreClasse.includes('PENDENTE') || dreLinha.includes('PENDENTE')) return null;
 

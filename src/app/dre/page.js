@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import MultiSelect from "@/components/MultiSelect";
 import InfoTooltip from "@/components/InfoTooltip";
+import { getActiveProjectNames } from "@/lib/projectRules";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import {
   DRE_ORDER, buildMeses, buildDreStructure, tagItemsWithMesKey
@@ -184,9 +185,19 @@ function DreResultRow({ groupDef, value, byMonth, meses, showMonths }) {
 }
 
 // ─── Linha de Grupo (Nível 1) ────────────────────────────────────────────────
-const sortAccounts = (accounts) => Object.values(accounts || {}).sort((a, b) =>
-  a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base', numeric: true })
-);
+const accountSection = (label) => {
+  const text = String(label || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  if (text.includes('C.D.P') || text.includes('CDP')) return 'CDP';
+  if (text.includes('EQUIPE')) return 'EQUIPE';
+  return 'OUTRO';
+};
+
+const sortAccounts = (accounts) => Object.values(accounts || {}).sort((a, b) => {
+  const order = { CDP: 0, EQUIPE: 1, OUTRO: 2 };
+  const sectionDiff = order[accountSection(a.label)] - order[accountSection(b.label)];
+  if (sectionDiff !== 0) return sectionDiff;
+  return a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base', numeric: true });
+});
 
 function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggle, onAccountClick, dreData, isEditMode, onDragStart, onDragOver, onDrop }) {
   const accounts = sortAccounts(groupData.accounts);
@@ -309,6 +320,7 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
                 showMonths={showMonths}
                 onAccountClick={onAccountClick}
                 paddingLeft="4.5rem"
+                showSeparator={idx > 0 && accountSection(subAccounts[idx - 1].label) === 'CDP' && accountSection(account.label) === 'EQUIPE'}
               />
             ));
 
@@ -322,6 +334,7 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
               meses={meses}
               showMonths={showMonths}
               onAccountClick={onAccountClick}
+              showSeparator={idx > 0 && accountSection(accounts[idx - 1].label) === 'CDP' && accountSection(account.label) === 'EQUIPE'}
             />
           ))
         )
@@ -331,11 +344,11 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
 }
 
 // ─── Linha de Conta (Nível 2) ─────────────────────────────────────────────────
-function DreAccountRow({ account, meses, showMonths, onAccountClick, paddingLeft = "3rem" }) {
+function DreAccountRow({ account, meses, showMonths, onAccountClick, paddingLeft = "3rem", showSeparator = false }) {
   return (
     <tr
       onClick={() => onAccountClick(account)}
-      style={{ background: "rgba(255,255,255,0.01)", cursor: "pointer", transition: "background 0.1s" }}
+      style={{ background: "rgba(255,255,255,0.01)", cursor: "pointer", transition: "background 0.1s", borderTop: showSeparator ? "2px solid var(--border-color)" : "none" }}
       onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
       onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.01)"}
     >
@@ -375,6 +388,7 @@ export default function Dre() {
   const { isReportMode, openReportBuilder, exitReportMode } = useReport();
   const [isSyncing, setIsSyncing] = useState(false);
   const [data, setData] = useState([]);
+  const [projetosBrutos, setProjetosBrutos] = useState([]);
   const [error, setError] = useState(null);
   const [lastSync, setLastSync] = useState(null);
   const [visao, setVisao] = useState('REALIZADO'); // 'REALIZADO', 'SOMENTE_PREVISAO', 'REALIZADO_PREVISAO'
@@ -383,7 +397,6 @@ export default function Dre() {
   const [filterDataInicial, setFilterDataInicial] = useState(() => getDreDateRange().start);
   const [filterDataFinal, setFilterDataFinal] = useState(() => getDreDateRange().end);
   const [filterProjetos, setFilterProjetos] = useState([]);
-  const [filterCCs, setFilterCCs] = useState([]);
 
   // UI
   const [expandedGroups, setExpandedGroups] = useState(DEFAULT_EXPANDED_GROUPS);
@@ -399,6 +412,7 @@ export default function Dre() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Erro desconhecido");
       setData(result.data || []);
+      setProjetosBrutos(result.projetos || []);
       setLastSync(new Date().toLocaleString("pt-BR"));
     } catch (err) {
       setError(err.message);
@@ -433,8 +447,7 @@ export default function Dre() {
     });
   }, [data]);
 
-  const projetosDisponiveis = useMemo(() =>
-    Array.from(new Set(baseData.map(d => d.projeto).filter(Boolean))).sort(), [baseData]);
+  const projetosDisponiveis = useMemo(() => getActiveProjectNames(projetosBrutos, true), [projetosBrutos]);
 
   const annualView = visao !== 'REALIZADO';
   const annualRange = getDreDateRange(visao);
@@ -447,45 +460,37 @@ export default function Dre() {
     
     let items = filterDreItems(baseData, {
       filterDataInicial: effectiveDataInicial, filterDataFinal: effectiveDataFinal,
-      filterProjetos, filterEmpresas: [],
-      filterCCs,
+      filterProjetos: [], filterEmpresas: [],
+      filterCCs: [],
       visao
     });
 
-    const hasFiltroCC = filterCCs.length > 0;
-    const hasFiltroProj = filterProjetos.length > 0;
-    const isAdmCC = hasFiltroCC && filterCCs.every(cc => cc.toUpperCase().includes("ADMINISTRA"));
-
-    if (hasFiltroProj || hasFiltroCC) {
-      // Entradas: regra administrativa
+    if (filterProjetos.length > 0) {
       const entradas = items.filter(i => i.natureza === "Entrada");
       const saidas = items.filter(i => i.natureza === "Saída");
-
-      const projetosAlvo = hasFiltroProj ? filterProjetos : filterCCs;
       const consolidated = consolidateFinancialData(entradas, {
-        filterProjetos: projetosAlvo,
+        filterProjetos,
         isProjetosPage: false,
         incluirRateioAdm: true,
       });
 
+      const somenteAdm = filterProjetos.length === 1 && filterProjetos[0].toUpperCase().includes('ADMINISTRA');
       const entradasFiltradas = consolidated.filter(item => {
-        const proj = item.projeto || "";
-        if (isAdmCC) return projetosAlvo.some(cc => proj.toUpperCase().includes("ADMINISTRA"));
-        return projetosAlvo.some(p => proj === p || proj.toUpperCase().includes(p.toUpperCase()));
+        const proj = String(item.projeto || '');
+        if (somenteAdm) return proj.toUpperCase().includes('ADMINISTRA') && Math.abs(Number(item.valor) || 0) > 0;
+        return filterProjetos.some(p => proj === p || proj.toUpperCase().includes(p.toUpperCase()));
       });
 
-      // Saídas: apenas pelo projeto direto
       const saidasFiltradas = saidas.filter(item => {
-        const proj = item.projeto || "";
-        const alvo = hasFiltroCC ? filterCCs : filterProjetos;
-        return alvo.some(p => proj === p || proj.toUpperCase().includes(p.toUpperCase()));
+        const proj = String(item.projeto || '');
+        return filterProjetos.some(p => proj === p || proj.toUpperCase().includes(p.toUpperCase()));
       });
 
       items = [...entradasFiltradas, ...saidasFiltradas];
     }
 
     return items;
-  }, [baseData, effectiveDataInicial, effectiveDataFinal, filterProjetos, filterCCs, visao]);
+  }, [baseData, effectiveDataInicial, effectiveDataFinal, filterProjetos, visao]);
 
   const meses = useMemo(() => buildMeses(effectiveDataInicial, effectiveDataFinal), [effectiveDataInicial, effectiveDataFinal]);
   const showMonths = meses.length > 1;
@@ -511,16 +516,16 @@ export default function Dre() {
     setFilterDataInicial(range.start);
     setFilterDataFinal(range.end);
     setFilterProjetos([]);
-    setFilterCCs([]);
   };
 
-  const hasActiveFilters = filterProjetos.length > 0 || filterCCs.length > 0;
+  const hasActiveFilters = filterProjetos.length > 0;
 
   // KPIs
   const receitaBruta = dreData.groups["RECEITA_BRUTA"]?.total || 0;
   const resLiquido = dreData.computedValues["RES_LIQUIDO"] || 0;
   const resOperacional = dreData.computedValues["RES_OPERACIONAL"] || 0;
   const totalCustos = (dreData.groups["CUSTOS_SERVICOS"]?.total || 0);
+  const totalDespesas = (dreData.groups["DESP_ADM"]?.total || 0) + (dreData.groups["DESP_COMERCIAL"]?.total || 0) + (dreData.groups["DESP_FINANCEIRA"]?.total || 0);
   const margem = receitaBruta > 0 ? (resLiquido / receitaBruta) * 100 : 0;
 
   const reportFilters = {
@@ -528,7 +533,6 @@ export default function Dre() {
     "Data inicial": effectiveDataInicial || "Todas",
     "Data final": effectiveDataFinal || "Todas",
     Projetos: filterProjetos.length ? filterProjetos : "Todos",
-    "Centros de custo": filterCCs.length ? filterCCs : "Todos",
   };
 
   const dreReportDataSets = useMemo(() => {
@@ -680,10 +684,26 @@ export default function Dre() {
             <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>Projeto / Obra</label>
             <MultiSelect options={projetosDisponiveis} selected={filterProjetos} onChange={setFilterProjetos} placeholder="Todos os projetos" />
           </div>
-          <div style={{ flex: "1 1 200px", display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-            <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>Centro de Custo</label>
-            <MultiSelect options={projetosDisponiveis} selected={filterCCs} onChange={setFilterCCs} placeholder="Todos os CCs" />
+        </div>
+      </div>
+
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        {[
+          ['Receita Bruta', receitaBruta, 'var(--success)'],
+          ['Custos dos Serviços', totalCustos, 'var(--warning)'],
+          ['Despesas', totalDespesas, 'var(--danger)'],
+          ['Resultado Operacional', resOperacional, resOperacional >= 0 ? 'var(--success)' : 'var(--danger)'],
+          ['Resultado Líquido', resLiquido, resLiquido >= 0 ? 'var(--success)' : 'var(--danger)'],
+        ].map(([label, value, color]) => (
+          <div key={label} className="card" style={{ padding: '1rem', borderTop: `3px solid ${color}` }}>
+            <p style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', fontWeight: '700' }}>{label}</p>
+            <p style={{ fontSize: '17px', fontWeight: '700', color }}>{fmt(value)}</p>
           </div>
+        ))}
+        <div className="card" style={{ padding: '1rem', borderTop: '3px solid var(--primary)' }}>
+          <p style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', fontWeight: '700' }}>Margem Líquida</p>
+          <p style={{ fontSize: '17px', fontWeight: '700', color: margem >= 0 ? 'var(--success)' : 'var(--danger)' }}>{margem.toFixed(2).replace('.', ',')}%</p>
         </div>
       </div>
 

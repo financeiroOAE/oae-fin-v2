@@ -7,19 +7,26 @@ import MonthlyResultChart from "@/components/charts/MonthlyResultChart";
 import TopBarChart from "@/components/charts/TopBarChart";
 import AccountBarChart from "@/components/charts/AccountBarChart";
 import PieStatusChart from "@/components/charts/PieStatusChart";
-import AnnualFlowChart from "@/components/charts/AnnualFlowChart";
-import DataTable from "@/components/DataTable";
+import ABCClassDonut from "@/components/charts/ABCClassDonut";
+import ProjectComparisonChart from "@/components/charts/ProjectComparisonChart";
 import MultiSelect from "@/components/MultiSelect";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
-import { getRolling30DayRange } from "@/lib/dateRange";
-import { classifyFinancialEntry } from "@/lib/financialClassification";
+import { classifyFinancialEntry, isPartnerWithdrawal } from "@/lib/financialClassification";
+import { getActiveProjects, getActiveProjectNames, getProjectKey } from "@/lib/projectRules";
+
+const getYearToDateRange = () => {
+  const today = new Date();
+  const localDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return { start: `${today.getFullYear()}-01-01`, end: localDate(today) };
+};
 
 export default function VisaoFinanceira() {
   const { isReportMode, openReportBuilder, exitReportMode } = useReport();
   const [isSyncing, setIsSyncing] = useState(false);
   const [data, setData] = useState([]);
+  const [projetosBrutos, setProjetosBrutos] = useState([]);
   const [saldosBancarios, setSaldosBancarios] = useState([]);
   const [somaProjetos, setSomaProjetos] = useState(0);
   const [error, setError] = useState(null);
@@ -27,8 +34,8 @@ export default function VisaoFinanceira() {
 
   // Global Filters - Inicializando para Últimos 30 Dias no mount, mas o useState não roda window aqui diretamente no SSR
   // Usaremos um useEffect para setar as datas padrão.
-  const [filterDataInicial, setFilterDataInicial] = useState(() => getRolling30DayRange().start);
-  const [filterDataFinal, setFilterDataFinal] = useState(() => getRolling30DayRange().end);
+  const [filterDataInicial, setFilterDataInicial] = useState(() => getYearToDateRange().start);
+  const [filterDataFinal, setFilterDataFinal] = useState(() => getYearToDateRange().end);
   // filtros multi-select (array vazio = Todos)
   const [filterProjetos, setFilterProjetos] = useState([]);
   const [filterStatus, setFilterStatus] = useState([]);
@@ -44,6 +51,7 @@ export default function VisaoFinanceira() {
       if (!response.ok) throw new Error(result.error || result.details?.message || 'Erro desconhecido');
 
       setData(result.data || []);
+      setProjetosBrutos(result.projetos || []);
       setSaldosBancarios(result.saldosBancarios || []);
       setSomaProjetos(result.somaProjetosSaldo || 0);
       setLastSync(new Date().toLocaleString('pt-BR'));
@@ -110,7 +118,9 @@ export default function VisaoFinanceira() {
     String(item.status || '').trim().toUpperCase() === 'REALIZADO'
   ), [filteredData]);
 
-  const projetosDisponiveis = Array.from(new Set(baseData.map(d => d.projeto).filter(Boolean))).sort();
+  const projetosDisponiveis = useMemo(() => getActiveProjectNames(projetosBrutos, true), [projetosBrutos]);
+  const activeProjects = useMemo(() => getActiveProjects(projetosBrutos), [projetosBrutos]);
+  const activeProjectKeys = useMemo(() => new Set(activeProjects.map(project => getProjectKey(project.ID || project.OBRA))), [activeProjects]);
   const nomesDisponiveis = Array.from(new Set(baseData.map(d => d.nome).filter(Boolean))).sort();
   const contasDisponiveis = Array.from(new Set(baseData.map(d => d.contaDescricao).filter(Boolean))).sort();
 
@@ -172,37 +182,101 @@ export default function VisaoFinanceira() {
         const projectName = String(row.projeto || '').trim();
         const projectUpper = projectName.toUpperCase();
         if (!projectName || projectUpper.includes('ADMINISTRA') || projectUpper === 'GRUPO OAE' || projectUpper === 'SEM PROJETO') return;
+        if (!activeProjectKeys.has(getProjectKey(projectName))) return;
         map[projectName] = (map[projectName] || 0) + (Number(row.valor) || 0);
       });
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
-  }, [filteredData]);
+  }, [filteredData, activeProjectKeys]);
 
   const topProjetosSaidas = useMemo(() => {
     const map = {};
-    filteredData.filter(i => i.natureza === 'Saída' && i.projeto).forEach(i => {
-      map[i.projeto] = (map[i.projeto] || 0) + i.valor;
+    filteredData.filter(i => i.natureza === 'Saída' && i.projeto && activeProjectKeys.has(getProjectKey(i.projeto))).forEach(i => {
+      map[i.projeto] = (map[i.projeto] || 0) + (Number(i.valor) || 0);
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
-  }, [filteredData]);
+  }, [filteredData, activeProjectKeys]);
 
   // Top Contas Entradas / Saídas
-  const entryCategoryData = useMemo(() => {
-    const map = {};
-    filteredData.filter(i => i.natureza === 'Entrada').forEach(item => {
+  const entryStatusBreakdown = useMemo(() => {
+    const result = {
+      projetos: { realizado: 0, pendente: 0 },
+      capital: { realizado: 0, pendente: 0 },
+    };
+
+    filteredData.filter(item => item.natureza === 'Entrada').forEach(item => {
       const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
       rows.forEach(row => {
         const classification = classifyFinancialEntry(row);
-        map[classification.label] = (map[classification.label] || 0) + (Number(row.valor) || 0);
+        const status = String(row.status || item.status || '').trim().toUpperCase();
+        const bucket = status === 'REALIZADO' ? 'realizado' : status === 'A REALIZAR' ? 'pendente' : null;
+        if (!bucket) return;
+        const value = Number(row.valor) || 0;
+        if (classification.type === 'receita_projeto' || classification.type === 'receita_administrativa') result.projetos[bucket] += value;
+        if (classification.type === 'emprestimo' || classification.type === 'aporte') result.capital[bucket] += value;
       });
     });
-    return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor);
+    return result;
   }, [filteredData]);
+
+  const projectFinancialOverview = useMemo(() => {
+    let receita = 0;
+    let saidas = 0;
+
+    filteredData.forEach(item => {
+      const key = getProjectKey(item.projeto);
+      if (!activeProjectKeys.has(key)) return;
+      const status = String(item.status || '').trim().toUpperCase();
+      if (status !== 'REALIZADO') return;
+
+      if (item.natureza === 'Entrada') {
+        const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
+        rows.forEach(row => {
+          const classification = classifyFinancialEntry(row);
+          if (classification.type === 'receita_projeto' || classification.type === 'receita_administrativa') receita += Number(row.valor) || 0;
+        });
+      } else if (item.natureza === 'Saída') {
+        saidas += Math.abs(Number(item.valor) || 0);
+      }
+    });
+
+    const resultado = receita - saidas;
+    const margem = receita > 0 ? (resultado / receita) * 100 : 0;
+    return {
+      receita,
+      saidas,
+      resultado,
+      margem,
+      chart: [{ nome: 'Projetos da Empresa', Receita: receita, 'Custos e Despesas': saidas, Resultado: resultado }]
+    };
+  }, [filteredData, activeProjectKeys]);
+
+  const abcDonutData = useMemo(() => {
+    const projects = activeProjects
+      .map(project => ({
+        nome: String(project.OBRA || '').trim(),
+        contratado: Number(project.CONTRATO) || 0,
+        faturado: Number(project['NF FATURADAS']) || 0,
+      }))
+      .filter(project => project.nome && project.contratado > 0)
+      .sort((a, b) => b.contratado - a.contratado);
+
+    const classes = [
+      { name: 'Classe A', color: 'var(--success)', rule: 'Contratos acima de R$ 500 mil', test: (value) => value > 500000 },
+      { name: 'Classe B', color: 'var(--warning)', rule: 'Contratos de R$ 100 mil a R$ 500 mil', test: (value) => value >= 100000 && value <= 500000 },
+      { name: 'Classe C', color: 'var(--danger)', rule: 'Contratos abaixo de R$ 100 mil', test: (value) => value < 100000 },
+    ];
+
+    return classes.map(def => {
+      const classProjects = projects.filter(project => def.test(project.contratado));
+      return { ...def, value: classProjects.reduce((sum, project) => sum + project.contratado, 0), count: classProjects.length, projects: classProjects };
+    }).filter(item => item.count > 0);
+  }, [activeProjects]);
 
   const topContasSaidas = useMemo(() => {
     const map = {};
-    filteredData.filter(i => i.natureza === 'Saída' && i.contaDescricao).forEach(i => {
-      map[i.contaDescricao] = (map[i.contaDescricao] || 0) + i.valor;
+    filteredData.filter(i => i.natureza === 'Saída' && i.contaDescricao && !isPartnerWithdrawal(i)).forEach(i => {
+      map[i.contaDescricao] = (map[i.contaDescricao] || 0) + (Number(i.valor) || 0);
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
   }, [filteredData]);
@@ -270,9 +344,8 @@ export default function VisaoFinanceira() {
     Valor: item.valor,
   }));
 
-  // O período financeiro padrão permanece fixo entre hoje e os próximos 30 dias.
-  const setFilter30Dias = () => {
-    const range = getRolling30DayRange();
+  const resetDefaultPeriod = () => {
+    const range = getYearToDateRange();
     setFilterDataInicial(range.start);
     setFilterDataFinal(range.end);
   };
@@ -326,7 +399,7 @@ export default function VisaoFinanceira() {
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderTop: '2px solid var(--primary)' }}>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', marginRight: '0.5rem' }}>Período padrão:</span>
-          <button onClick={setFilter30Dias} className="btn" style={{ fontSize: '11px', padding: '0.25rem 0.5rem', background: 'var(--bg-elevated)' }}>Hoje + próximos 30 dias</button>
+          <button onClick={resetDefaultPeriod} className="btn" style={{ fontSize: '11px', padding: '0.25rem 0.5rem', background: 'var(--bg-elevated)' }}>01/01 até hoje</button>
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -339,7 +412,7 @@ export default function VisaoFinanceira() {
             <input type="date" value={filterDataFinal} onChange={(e) => setFilterDataFinal(e.target.value)} style={{ width: '100%', height: '34px', fontSize: '13px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
           <div style={{ flex: '2 1 220px', minWidth: 0 }}>
-            <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><Building2 size={12}/> Projeto / Centro de Custo</label>
+            <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><Building2 size={12}/> Projeto / Obra</label>
             <MultiSelect options={projetosDisponiveis} value={filterProjetos} onChange={setFilterProjetos} placeholder="Todos os projetos" />
           </div>
           <div style={{ flex: '2 1 200px', minWidth: 0 }}>
@@ -356,7 +429,7 @@ export default function VisaoFinanceira() {
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end' }}>
             <button 
-              onClick={() => { setFilter30Dias(); setFilterProjetos([]); setFilterStatus([]); setFilterNomes([]); setFilterContas([]); }}
+              onClick={() => { resetDefaultPeriod(); setFilterProjetos([]); setFilterStatus([]); setFilterNomes([]); setFilterContas([]); }}
               className="btn" 
               style={{ height: '34px', fontSize: '12px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', marginTop: '1.6rem' }}
             >
@@ -434,22 +507,28 @@ export default function VisaoFinanceira() {
           </div>
         </div>
 
-        {/* ROW 2: Status Financeiro e Fluxo Anual */}
+        {/* ROW 2: Status Financeiro e Curva ABC */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '1.5rem' }}>
           <div id="report-visao-status" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <ReportAdder sectionKey="visao:status" title="Status Financeiro Consolidado" componentName="Gráficos de Status" page="Visão Financeira" type="CHART" data={[...pieRecebimentos, ...piePagamentos]} filters={reportFilters} captureId="report-visao-status" presetTags={["executive-financial"]} style={{ alignSelf: 'flex-end' }} />
+            <ReportAdder sectionKey="visao:status" title="Status Financeiro Consolidado" componentName="Gráficos de Status" page="Visão Financeira" type="CHART" data={[
+              { name: 'Projetos Recebido', value: entryStatusBreakdown.projetos.realizado },
+              { name: 'Projetos A Receber', value: entryStatusBreakdown.projetos.pendente },
+              { name: 'Empréstimos/Aportes Realizado', value: entryStatusBreakdown.capital.realizado },
+              { name: 'Empréstimos/Aportes A Realizar', value: entryStatusBreakdown.capital.pendente },
+              ...piePagamentos
+            ]} filters={reportFilters} captureId="report-visao-status" presetTags={["executive-financial"]} style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '1.5rem' }}>Status Financeiro Consolidado</h2>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', justifyContent: 'center' }}>
-              <PieStatusChart realizado={entradasRealizadas} pendente={entradasARealizar} colorRealizado="var(--success)" colorPendente="rgba(16, 185, 129, 0.3)" titulo="Entradas" />
-              <PieStatusChart realizado={saidasRealizadas} pendente={saidasARealizar} colorRealizado="var(--danger)" colorPendente="rgba(239, 68, 68, 0.3)" titulo="Pagamentos" />
+              <PieStatusChart realizado={entryStatusBreakdown.projetos.realizado} pendente={entryStatusBreakdown.projetos.pendente} colorRealizado="var(--success)" colorPendente="rgba(16, 185, 129, 0.3)" titulo="Receitas de Projetos" labelRealizado="Recebido" labelPendente="A Receber" />
+              <PieStatusChart realizado={entryStatusBreakdown.capital.realizado} pendente={entryStatusBreakdown.capital.pendente} colorRealizado="var(--info)" colorPendente="rgba(59,130,246,0.3)" titulo="Empréstimos / Aportes" labelRealizado="Entrada Realizada" labelPendente="A Realizar" />
+              <PieStatusChart realizado={saidasRealizadas} pendente={saidasARealizar} colorRealizado="var(--danger)" colorPendente="rgba(239, 68, 68, 0.3)" titulo="Pagamentos" labelRealizado="Pago" labelPendente="A Pagar" />
             </div>
           </div>
-          <div id="report-visao-anual" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <ReportAdder sectionKey="visao:anual" title="Movimentações Financeiras Anuais — 2026" componentName="Gráfico de Fluxo Anual" page="Visão Financeira" type="CHART" data={annualData} filters={{ Ano: 2026 }} captureId="report-visao-anual" presetTags={["executive-financial"]} style={{ alignSelf: 'flex-end' }} />
-            <h2 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-main)' }}>Movimentações Financeiras Anuais — 2026</h2>
-            <div style={{ flex: 1, minHeight: '240px' }}>
-              <AnnualFlowChart data={annualData} />
-            </div>
+          <div id="report-visao-abc" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+            <ReportAdder sectionKey="visao:abc" title="Curva ABC dos Projetos" componentName="Curva ABC" page="Visão Financeira" type="TABLE" data={abcDonutData.map(item => ({ Classe: item.name, Projetos: item.count, Valor: item.value, Regra: item.rule }))} filters={reportFilters} captureId="report-visao-abc" presetTags={["executive-financial", "project-executive"]} style={{ alignSelf: 'flex-end' }} />
+            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Curva ABC dos Projetos</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Projetos ativos classificados pelo valor contratado.</p>
+            <ABCClassDonut data={abcDonutData} />
           </div>
         </div>
 
@@ -473,33 +552,25 @@ export default function VisaoFinanceira() {
           </div>
         </div>
 
-        {/* ROW 4: Plano de Contas */}
+        {/* ROW 4: Visão Financeira dos Projetos e Despesas */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '3rem' }}>
-          <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <AccountBarChart 
-              data={entryCategoryData} 
-              title="Composição das Entradas por Natureza" 
-              infoContent="Separa Receita de Projetos, Receitas Administrativas, Outras Receitas, Empréstimos/Financiamentos, Aportes, Movimentações Financeiras e Outras Entradas. Empréstimos e aportes são entradas de caixa, mas não são receita." 
-              color="var(--success)" 
-            />
+          <div id="report-visao-projetos-financeiro" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+            <ReportAdder sectionKey="visao:projetos-financeiro" title="Visão Financeira Geral dos Projetos" componentName="Resultado e Margem dos Projetos" page="Visão Financeira" type="CHART" data={projectFinancialOverview.chart} filters={reportFilters} captureId="report-visao-projetos-financeiro" presetTags={["executive-financial", "project-executive"]} style={{ alignSelf: 'flex-end' }} />
+            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Visão Financeira Geral dos Projetos</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Receitas de projetos versus custos e despesas realizados no período.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(120px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Receita</span><strong style={{display:'block',fontSize:'14px',color:'var(--success)'}}>{formatCurrency(projectFinancialOverview.receita)}</strong></div>
+              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Custos + Despesas</span><strong style={{display:'block',fontSize:'14px',color:'var(--danger)'}}>{formatCurrency(projectFinancialOverview.saidas)}</strong></div>
+              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Resultado</span><strong style={{display:'block',fontSize:'14px',color:projectFinancialOverview.resultado >= 0 ? 'var(--success)' : 'var(--danger)'}}>{formatCurrency(projectFinancialOverview.resultado)}</strong></div>
+              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Margem</span><strong style={{display:'block',fontSize:'14px',color:projectFinancialOverview.margem >= 0 ? 'var(--success)' : 'var(--danger)'}}>{projectFinancialOverview.margem.toFixed(2).replace('.', ',')}%</strong></div>
+            </div>
+            <div style={{ minHeight: '260px' }}><ProjectComparisonChart data={projectFinancialOverview.chart} keys={['Receita', 'Custos e Despesas', 'Resultado']} names={['Receita', 'Custos e Despesas', 'Resultado']} colors={['var(--success)', 'var(--danger)', 'var(--primary)']} /></div>
           </div>
           <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <AccountBarChart 
-              data={topContasSaidas} 
-              title="Despesas por Plano de Conta" 
-              infoContent="Concentração por contas contábeis de Saídas" 
-              color="var(--danger)" 
-            />
+            <AccountBarChart data={topContasSaidas} title="Despesas por Plano de Conta" infoContent="Concentração das saídas por plano de conta. Retiradas dos sócios não entram nesta visão." color="var(--danger)" />
           </div>
         </div>
 
-      </div>
-
-      {/* Tabela Interativa de Movimentações */}
-      <div data-report-section style={{ marginBottom: '2rem' }}>
-        <ReportAdder sectionKey="visao:movimentacoes" title="Movimentações Financeiras" componentName="Tabela de Movimentações" page="Visão Financeira" type="TABLE" data={reportMovementRows} dataSets={{ summary: [{ "Quantidade de lançamentos": reportMovementRows.length, "Valor total": filteredData.reduce((sum, item) => sum + (item.valor || 0), 0) }], visible: reportMovementRows.slice(0, 15), all: reportMovementRows }} detailMode="visible" detailOptions={["summary", "visible", "all"]} filters={reportFilters} presetTags={["executive-financial"]} style={{ float: 'right' }} />
-        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '1rem' }}>Movimentações Financeiras</h2>
-        <DataTable data={filteredData} />
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `

@@ -17,17 +17,10 @@ import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { getRolling30DayRange } from "@/lib/dateRange";
-import { isRevenueTax, getRevenueTaxLabel } from "@/lib/financialClassification";
+import { isRevenueTax, getRevenueTaxLabel, classifyFinancialEntry, isTeamExpense } from "@/lib/financialClassification";
+import { getProjectKey, isProjectOngoing, getActiveProjectNames } from "@/lib/projectRules";
 
 const TABLE_PAGE_SIZE = 15;
-
-// O nome da obra pode estar abreviado ou grafado de formas diferentes entre
-// PROJETOS_2026, CP_GERAL e CR_GERAL. O código inicial é o identificador estável.
-const getProjectKey = (value) => {
-  const normalized = String(value || '').trim().toUpperCase();
-  const code = normalized.match(/^(\d+(?:A\d+)?)/)?.[1];
-  return code || normalized.replace(/[^A-Z0-9]/g, '');
-};
 
 export default function Projetos() {
   const { isReportMode, openReportBuilder, exitReportMode } = useReport();
@@ -97,7 +90,7 @@ export default function Projetos() {
     const mapaProjetos = {};
     projetosBrutos.forEach(p => {
       const nomeObra = String(p.OBRA || '').trim();
-      if (!nomeObra || nomeObra.toUpperCase().includes('ADMINISTRATIVO')) return;
+      if (!nomeObra || nomeObra.toUpperCase().includes('ADMINISTRATIVO') || !isProjectOngoing(p)) return;
       const projectKey = getProjectKey(p.ID || nomeObra);
       mapaProjetos[projectKey] = {
         projectKey,
@@ -132,12 +125,16 @@ export default function Projetos() {
         if (!isRealizado && !isPrevisto) return;
         
         if (item.natureza === 'Entrada') {
+          const classification = classifyFinancialEntry(item);
+          const receitaDiretaItem = Number(item.valorDireto) || (classification.type === 'receita_projeto' ? (Number(item.valor) || 0) : 0);
+          const receitaAdmItem = Number(item.valorAdministrativo) || (classification.type === 'receita_administrativa' ? (Number(item.valor) || 0) : 0);
+
           if (isRealizado) {
-            projeto.recebido += item.valor;
-            projeto.receitaDireta += item.valorDireto || 0;
-            projeto.receitaAdm += item.valorAdministrativo || 0;
+            projeto.recebido += Number(item.valor) || 0;
+            projeto.receitaDireta += receitaDiretaItem;
+            projeto.receitaAdm += receitaAdmItem;
           } else {
-            projeto.aReceber += item.valor;
+            projeto.aReceber += Number(item.valor) || 0;
           }
         } else if (item.natureza === 'Saída') {
           if (isRealizado) projeto.pago += item.valor;
@@ -166,7 +163,7 @@ export default function Projetos() {
     });
   }, [projetosCruzados, filterProjetos, filterEmpresas, filterTipos, colFilterProjeto, colFilterEmpresa, colFilterMinFaturadoPerc]);
 
-  const listaProjetos = Array.from(new Set(projetosCruzados.map(p => p.nome))).sort();
+  const listaProjetos = getActiveProjectNames(projetosBrutos, true);
   const listaEmpresas = Array.from(new Set(projetosCruzados.map(p => p.empresa))).sort();
   const listaTipos = Array.from(new Set(projetosCruzados.map(p => p.tipo))).sort();
 
@@ -200,6 +197,7 @@ export default function Projetos() {
   };
 
   const [kpiModal, setKpiModal] = useState(null);
+  const [showUnclassified, setShowUnclassified] = useState(false);
 
   const kpiBreakdown = useMemo(() => {
     if (!kpiModal) return [];
@@ -230,7 +228,7 @@ export default function Projetos() {
   const totalAPagar = filteredProjetos.reduce((acc, p) => acc + p.aPagar, 0);
   const totalResultado = totalRecebido - totalPago;
   
-  const totalRecebidoAdmGlobal = filteredProjetos.reduce((acc, p) => acc + p.recebidoAdm, 0);
+  const totalRecebidoAdmGlobal = filteredProjetos.reduce((acc, p) => acc + (p.receitaAdm || 0), 0);
 
   function isCDP(planoFinanceiro) {
     const raw = String(planoFinanceiro || '');
@@ -272,6 +270,7 @@ export default function Projetos() {
 
     // Custos e Despesas: usar a classificação gerencial da DRE (DEPARA)
     let cPago = 0, cAPagar = 0, dPago = 0, dAPagar = 0, nc = 0;
+    const naoClassificados = [];
     
     data.forEach(item => {
       if (item.natureza !== 'Saída') return;
@@ -302,7 +301,10 @@ export default function Projetos() {
         if (isRealizado) dPago += valor;
         else if (isPrevisto) dAPagar += valor;
       } else {
-        if (isRealizado) nc += valor;
+        if (isRealizado) {
+          nc += valor;
+          naoClassificados.push(item);
+        }
       }
     });
 
@@ -313,7 +315,8 @@ export default function Projetos() {
       custoAPagar: cAPagar,
       despesa: dPago,
       despesaAPagar: dAPagar,
-      naoClassificado: nc
+      naoClassificado: nc,
+      naoClassificados
     };
   }, [data, filteredProjetos, dIni, dFim, realizadoIni, realizadoFim, incluirRateioAdm]);
 
@@ -378,6 +381,35 @@ export default function Projetos() {
       .map(p => ({ nome: p.nome, Valor: p.pago })),
     [filteredProjetos]);
 
+  const teamCostsChartData = useMemo(() => {
+    const allowedProjects = new Map(filteredProjetos.map(p => [p.projectKey, p.nome]));
+    const map = {};
+
+    data.forEach(item => {
+      if (item.natureza !== 'Saída' || !isTeamExpense(item)) return;
+      const projectKey = getProjectKey(item.projeto);
+      const projectName = allowedProjects.get(projectKey);
+      if (!projectName) return;
+
+      let ts = 0;
+      if (item.data) {
+        const parts = String(item.data).split('/');
+        if (parts.length === 3) ts = new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+      }
+      if (ts < dIni || ts > dFim) return;
+
+      const status = String(item.status || '').toUpperCase();
+      const validStatus = status.includes('REALIZADO') || status.includes('PAGO') || status.includes('EFETIVADO') || status.includes('A REALIZAR') || status.includes('A PAGAR') || status.includes('PREVISTO');
+      if (!validStatus) return;
+
+      map[projectName] = (map[projectName] || 0) + Math.abs(Number(item.valor) || 0);
+    });
+
+    return Object.entries(map)
+      .map(([nome, Valor]) => ({ nome, Valor }))
+      .sort((a, b) => b.Valor - a.Valor);
+  }, [data, filteredProjetos, dIni, dFim]);
+
   const reportFilters = {
     "Data inicial": filterDataInicial || "Todas",
     "Data final": filterDataFinal || "Todas",
@@ -409,8 +441,7 @@ export default function Projetos() {
     const map = {};
     selectedProjectMoves.forEach(item => {
       if (item.natureza !== 'Saída') return;
-      const accountText = String(item.contaNome || item.contaDescricao || '').toUpperCase();
-      if (!accountText.includes('EQUIP')) return;
+      if (!isTeamExpense(item)) return;
       const account = item.contaNome || item.contaDescricao || item.contaCodigo || 'Equipe não identificada';
       if (!map[account]) map[account] = { Conta: account, Pago: 0, 'A Pagar': 0, Total: 0 };
       const value = Math.abs(Number(item.valor) || 0);
@@ -421,74 +452,6 @@ export default function Projetos() {
     });
     return Object.values(map).sort((a, b) => b.Total - a.Total);
   }, [selectedProject, selectedProjectMoves]);
-
-  const exportSelectedProjectExcel = async (mode = 'full') => {
-    if (!selectedProject) return;
-    const XLSX = await import('xlsx');
-    const workbook = XLSX.utils.book_new();
-
-    const movementRows = selectedProjectMoves
-      .map(item => ({
-        Data: item.data || '',
-        Documento: item.documento || '',
-        Status: item.status || '',
-        Natureza: item.natureza || '',
-        Lançamento: item.lancamento || '',
-        Nome: item.nome || '',
-        Projeto: item.projeto || '',
-        Conta: item.contaNome || item.contaDescricao || '',
-        Valor: Number(item.valor) || 0,
-      }))
-      .sort((a, b) => {
-        const pa = String(a.Data).split('/');
-        const pb = String(b.Data).split('/');
-        const ta = pa.length === 3 ? new Date(pa[2], pa[1] - 1, pa[0]).getTime() : 0;
-        const tb = pb.length === 3 ? new Date(pb[2], pb[1] - 1, pb[0]).getTime() : 0;
-        return ta - tb;
-      });
-
-    const appendSheet = (rows, name) => {
-      const ws = XLSX.utils.json_to_sheet(rows);
-      if (rows.length) ws['!autofilter'] = { ref: ws['!ref'] };
-      XLSX.utils.book_append_sheet(workbook, ws, name.slice(0, 31));
-    };
-
-    if (mode === 'full') {
-      appendSheet([{
-        Projeto: selectedProject.nome,
-        Empresa: selectedProject.empresa,
-        Tipo: selectedProject.tipo,
-        Contratado: selectedProject.contratado,
-        Faturado: selectedProject.faturado,
-        '% Faturado': selectedProject.percentFaturado,
-        'Saldo Contratual': selectedProject.saldoContratual,
-        Recebido: selectedProject.recebido,
-        'A Receber': selectedProject.aReceber,
-        Pago: selectedProject.pago,
-        'A Pagar': selectedProject.aPagar,
-        Resultado: selectedProject.resultadoCaixa,
-      }], 'Resumo Executivo');
-
-      const admRows = (selectedProject.titulosAdmAssociados || []).map(item => ({
-        Lançamento: item.lancamento || '',
-        Documento: item.documento || '',
-        Nome: item.nome || '',
-        Data: item.data || '',
-        'Valor Admin': Number(item.valor) || 0,
-      }));
-      if (admRows.length) appendSheet(admRows, 'Títulos Administrativos');
-    }
-
-    appendSheet(movementRows, 'Extrato');
-
-    const safe = String(selectedProject.nome || 'projeto')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .toLowerCase();
-    XLSX.writeFile(workbook, `${mode === 'full' ? 'relatorio-completo' : 'extrato'}-${safe}.xlsx`, { cellDates: true });
-  };
 
   const clearAllFilters = () => {
     setFilterProjetos([]); setFilterEmpresas([]); setFilterTipos([]);
@@ -709,6 +672,7 @@ export default function Projetos() {
           {dreStats.naoClassificado > 0 && (
             <div style={{ marginTop: '1rem', fontSize: '11px', color: 'var(--warning)', padding: '0.5rem', background: 'rgba(245,158,11,0.1)', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Aviso: <strong>{formatCurrency(dreStats.naoClassificado)}</strong> ainda sem classificação DRE válida.</span>
+              <button type="button" onClick={() => setShowUnclassified(true)} className="btn" style={{ fontSize: '11px', padding: '0.3rem 0.65rem', background: 'transparent', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.35)' }}>Ver lançamentos</button>
               <InfoTooltip title="Movimentações Não Classificadas" content="Essas movimentações não entram na composição Receita/Custo/Despesa até terem classificação segura. Isso evita que o resultado gerencial seja calculado incorretamente." />
             </div>
           )}
@@ -822,6 +786,20 @@ export default function Projetos() {
         </div>
       </div>
 
+
+      <div className="card" data-report-section style={{ padding: '1.5rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Custo de Equipe por Projeto</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Custos e compromissos de equipe vinculados aos projetos/obras no período selecionado.</p>
+          </div>
+          <ReportAdder sectionKey="projetos:custo-equipe" title="Custo de Equipe por Projeto" componentName="Gráfico de Custo de Equipe" page="Projetos" type="TABLE" data={teamCostsChartData} filters={reportFilters} presetTags={["project-executive"]} />
+        </div>
+        <div style={{ minHeight: '280px' }}>
+          <RankingBarChart data={teamCostsChartData} dataKey="Valor" color="var(--warning)" emptyMessage="Sem custos de equipe identificados para os projetos filtrados." />
+        </div>
+      </div>
+
       {/* 7. Relatório Executivo com Paginação */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>Relatório Executivo de Projetos</h2>
@@ -914,6 +892,24 @@ export default function Projetos() {
         </div>
       )}
 
+
+      {showUnclassified && (
+        <div onClick={() => setShowUnclassified(false)} style={{ position: 'fixed', inset: 0, zIndex: 10020, background: 'rgba(0,0,0,0.62)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
+          <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 'min(1000px, 96vw)', maxHeight: '82vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div><h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>Movimentações Não Classificadas</h3><p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{dreStats.naoClassificados?.length || 0} lançamento(s)</p></div>
+              <button type="button" onClick={() => setShowUnclassified(false)} className="btn" style={{ background: 'transparent', border: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-elevated)' }}><tr><th style={{padding:'0.65rem'}}>Data</th><th style={{padding:'0.65rem'}}>Projeto</th><th style={{padding:'0.65rem'}}>Nome</th><th style={{padding:'0.65rem'}}>Conta</th><th style={{padding:'0.65rem'}}>Status</th><th style={{padding:'0.65rem',textAlign:'right'}}>Valor</th></tr></thead>
+                <tbody>{(dreStats.naoClassificados || []).map((item, idx) => <tr key={idx} style={{ borderTop:'1px solid var(--border-color)' }}><td style={{padding:'0.65rem'}}>{item.data}</td><td style={{padding:'0.65rem'}}>{item.projeto}</td><td style={{padding:'0.65rem'}}>{item.nome}</td><td style={{padding:'0.65rem'}}>{item.contaNome || item.contaDescricao || item.contaCodigo}</td><td style={{padding:'0.65rem'}}>{item.status}</td><td style={{padding:'0.65rem',textAlign:'right'}}>{formatCurrency(Math.abs(item.valor || 0))}</td></tr>)}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 8. Drawer */}
       {selectedProject && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', justifyContent: 'flex-end', backdropFilter: 'blur(2px)' }}>
@@ -924,12 +920,6 @@ export default function Projetos() {
                 <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--primary)' }}>{selectedProject.nome}</h2>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <button onClick={() => exportSelectedProjectExcel('full')} className="btn" style={{ fontSize: '12px', background: 'var(--primary)', color: '#fff' }}>
-                  <FileText size={14} /> Relatório completo
-                </button>
-                <button onClick={() => exportSelectedProjectExcel('extract')} className="btn" style={{ fontSize: '12px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
-                  <FileText size={14} /> Somente extrato
-                </button>
                 <button onClick={() => setSelectedProject(null)} className="btn" style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%' }}>
                   <X size={20} color="var(--text-secondary)" />
                 </button>

@@ -1,3 +1,5 @@
+import { classifyFinancialEntry } from '@/lib/financialClassification';
+
 function parseDateToLocalMidnight(value, fallbackTimestamp) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0).getTime();
@@ -6,21 +8,18 @@ function parseDateToLocalMidnight(value, fallbackTimestamp) {
   const raw = String(value ?? '').trim();
 
   if (raw) {
-    // DD/MM/YYYY, inclusive quando o valor vier acompanhado de horário.
     let match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (match) {
       const [, day, month, year] = match;
       return new Date(Number(year), Number(month) - 1, Number(day), 0, 0, 0, 0).getTime();
     }
 
-    // YYYY-MM-DD / ISO.
     match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
     if (match) {
       const [, year, month, day] = match;
       return new Date(Number(year), Number(month) - 1, Number(day), 0, 0, 0, 0).getTime();
     }
 
-    // Serial de data do Google Sheets/Excel (base 1899-12-30).
     if (/^\d+(?:\.\d+)?$/.test(raw)) {
       const serial = Number(raw);
       if (Number.isFinite(serial) && serial > 20000 && serial < 80000) {
@@ -63,6 +62,13 @@ function normalizeDateTimestamp(item) {
   };
 }
 
+function projectRevenueValue(item, incluirRateioAdm) {
+  const classification = classifyFinancialEntry(item);
+  if (classification.type === 'receita_projeto') return Number(item.valor) || 0;
+  if (classification.type === 'receita_administrativa' && incluirRateioAdm) return Number(item.valor) || 0;
+  return 0;
+}
+
 export function consolidateFinancialData(baseData, options = {}) {
   const {
     filterProjetos = [],
@@ -79,11 +85,16 @@ export function consolidateFinancialData(baseData, options = {}) {
 
   normalizedBaseData.forEach(item => {
     if (item.natureza !== 'Entrada' || !item.lancamento) {
+      if (isProjetosPage && item.natureza === 'Entrada') {
+        const value = projectRevenueValue(item, incluirRateioAdm);
+        if (value === 0) return;
+        nonConsolidatable.push({ ...item, valor: value });
+        return;
+      }
       nonConsolidatable.push(item);
       return;
     }
 
-    // Group by both lancamento and status to preserve the distinction between Realizado and A Realizar
     const statusKey = String(item.status || '').trim().toUpperCase();
     const key = `${item.lancamento}|${statusKey}`;
 
@@ -92,6 +103,7 @@ export function consolidateFinancialData(baseData, options = {}) {
         ...item,
         valorDireto: 0,
         valorAdministrativo: 0,
+        valorOutrasEntradas: 0,
         linhasOriginais: [],
         centroCustoObra: null
       });
@@ -100,55 +112,61 @@ export function consolidateFinancialData(baseData, options = {}) {
     const consItem = consolidatedMap.get(key);
     consItem.linhasOriginais.push(item);
 
-    const isAdm = item.projeto && item.projeto.toUpperCase().includes('ADMINISTRA');
+    const classification = classifyFinancialEntry(item);
+    const value = Number(item.valor) || 0;
 
-    if (isAdm) {
-      consItem.valorAdministrativo += item.valor;
-    } else {
-      consItem.valorDireto += item.valor;
-      if (!consItem.centroCustoObra) {
+    if (classification.type === 'receita_administrativa') {
+      consItem.valorAdministrativo += value;
+      if (!consItem.centroCustoObra && item.projeto && !String(item.projeto).toUpperCase().includes('ADMINISTRA')) {
         consItem.centroCustoObra = item.projeto;
       }
+    } else if (classification.type === 'receita_projeto') {
+      consItem.valorDireto += value;
+      if (item.projeto) consItem.centroCustoObra = item.projeto;
+    } else {
+      consItem.valorOutrasEntradas += value;
     }
   });
 
   const processedConsolidated = Array.from(consolidatedMap.values()).map(cons => {
-    const ccFinal = cons.centroCustoObra || 'ADMINISTRAÇÃO';
+    const ccFinal = cons.centroCustoObra || cons.projeto || 'ADMINISTRAÇÃO';
 
     if (isProjetosPage) {
+      const projectValue = cons.valorDireto + (incluirRateioAdm ? cons.valorAdministrativo : 0);
+      if (projectValue === 0) return null;
       return {
         ...cons,
-        valor: cons.valorDireto + (incluirRateioAdm ? cons.valorAdministrativo : 0),
-        projeto: ccFinal,
-        isConsolidated: true
-      };
-    } else {
-      if (isFiltroSomenteAdm) {
-        return {
-          ...cons,
-          valor: cons.valorAdministrativo,
-          projeto: 'ADMINISTRAÇÃO',
-          isConsolidated: true
-        };
-      }
-
-      if (isFiltroAdmPresente && !filterProjetos.includes(ccFinal)) {
-        return {
-          ...cons,
-          valor: cons.valorAdministrativo,
-          projeto: 'ADMINISTRAÇÃO',
-          isConsolidated: true
-        };
-      }
-
-      return {
-        ...cons,
-        valor: cons.valorDireto + cons.valorAdministrativo,
+        valor: projectValue,
         projeto: ccFinal,
         isConsolidated: true
       };
     }
-  });
+
+    if (isFiltroSomenteAdm) {
+      return {
+        ...cons,
+        valor: cons.valorAdministrativo,
+        projeto: 'ADMINISTRAÇÃO',
+        isConsolidated: true
+      };
+    }
+
+    if (isFiltroAdmPresente && !filterProjetos.includes(ccFinal)) {
+      return {
+        ...cons,
+        valor: cons.valorAdministrativo,
+        projeto: 'ADMINISTRAÇÃO',
+        isConsolidated: true
+      };
+    }
+
+    return {
+      ...cons,
+      valor: cons.valorDireto + cons.valorAdministrativo + cons.valorOutrasEntradas,
+      projeto: ccFinal,
+      isConsolidated: true
+    };
+  }).filter(Boolean);
 
   return [...nonConsolidatable, ...processedConsolidated].map(normalizeDateTimestamp);
 }
