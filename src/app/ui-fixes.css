@@ -103,6 +103,13 @@
   pointer-events: auto;
 }
 
+.card-help-popover-portal {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  z-index: 2147483000;
+}
+
 .card-help-popover[hidden] {
   display: none !important;
 }
@@ -128,7 +135,6 @@
   margin-bottom: 0;
 }
 
-/* Grids financeiros devem encolher sem empurrar texto ou gráfico para fora do card. */
 .finance-responsive-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
@@ -161,7 +167,7 @@
 }
 
 @media (max-width: 900px) {
-  .card-help-popover {
+  .card-help-popover:not(.card-help-popover-portal) {
     position: fixed;
     top: 16px;
     right: 16px;
