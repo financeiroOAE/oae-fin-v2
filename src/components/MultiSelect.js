@@ -68,6 +68,13 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
     else onChange([...actualValue, opt]);
   };
 
+  const allSelected = options.length > 0 && options.every((opt) => actualValue.includes(opt));
+
+  const toggleAll = () => {
+    if (allSelected) onChange([]);
+    else onChange([...options]);
+  };
+
   const clear = (event) => {
     event.stopPropagation();
     onChange([]);
@@ -76,6 +83,19 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
   const filteredOptions = options.filter((opt) =>
     String(opt).toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const checkboxStyle = (checked) => ({
+    width: '14px',
+    height: '14px',
+    marginTop: '2px',
+    border: `2px solid ${checked ? 'var(--primary)' : 'var(--border-color)'}`,
+    borderRadius: '3px',
+    background: checked ? 'var(--primary)' : 'transparent',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  });
 
   const menu = open && typeof document !== 'undefined' ? createPortal(
     <div
@@ -113,6 +133,32 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
         </div>
       </div>
 
+      {options.length > 0 && (
+        <div
+          role="option"
+          aria-selected={allSelected}
+          onClick={toggleAll}
+          style={{
+            padding: '0.55rem 0.75rem',
+            borderBottom: '1px solid var(--border-color)',
+            fontSize: '12px',
+            fontWeight: '700',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.5rem',
+            color: allSelected ? 'var(--primary)' : 'var(--text-main)',
+            background: allSelected ? 'rgba(56,189,248,0.08)' : 'rgba(255,255,255,0.015)',
+            flexShrink: 0,
+          }}
+        >
+          <div style={checkboxStyle(allSelected)}>
+            {allSelected && <span style={{ color: '#fff', fontSize: '9px', fontWeight: '900' }}>✓</span>}
+          </div>
+          <span>{allSelected ? 'Desmarcar todas as opções' : 'Selecionar todas as opções'}</span>
+        </div>
+      )}
+
       <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, paddingBottom: '0.25rem' }}>
         {filteredOptions.length === 0 ? (
           <div style={{ padding: '0.75rem', fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center' }}>
@@ -136,12 +182,7 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
               lineHeight: 1.35,
             }}
           >
-            <div style={{
-              width: '14px', height: '14px', marginTop: '2px',
-              border: `2px solid ${actualValue.includes(opt) ? 'var(--primary)' : 'var(--border-color)'}`,
-              borderRadius: '3px', background: actualValue.includes(opt) ? 'var(--primary)' : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            }}>
+            <div style={checkboxStyle(actualValue.includes(opt))}>
               {actualValue.includes(opt) && <span style={{ color: '#fff', fontSize: '9px', fontWeight: '900' }}>✓</span>}
             </div>
             <span title={opt} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: 0 }}>{opt}</span>
@@ -178,6 +219,10 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
         >
           {actualValue.length === 0 ? (
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', userSelect: 'none', flex: 1, minWidth: 0 }}>{placeholder || 'Todos'}</span>
+          ) : allSelected ? (
+            <span style={{ fontSize: '12px', color: 'var(--text-main)', fontWeight: '600', flex: 1, minWidth: 0, lineHeight: 1.3 }}>
+              Todas as opções selecionadas
+            </span>
           ) : actualValue.length > 1 ? (
             <span style={{ fontSize: '12px', color: 'var(--text-main)', fontWeight: '600', flex: 1, minWidth: 0, lineHeight: 1.3 }}>
               {actualValue.length} opções selecionadas
