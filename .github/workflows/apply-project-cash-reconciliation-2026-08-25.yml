@@ -1,0 +1,34 @@
+name: Apply Project Cash Reconciliation 2026-08-25
+
+on:
+  push:
+    branches:
+      - fix-dre-projects-ui-2026-08-25
+    paths:
+      - scripts/apply-project-cash-reconciliation-2026-08-25.py
+      - .github/workflows/apply-project-cash-reconciliation-2026-08-25.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-dre-projects-ui-2026-08-25
+          fetch-depth: 0
+      - name: Reconciliar consolidado de caixa
+        run: python3 scripts/apply-project-cash-reconciliation-2026-08-25.py
+      - name: Commitar alteracoes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/projetos/page.js
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteracao nova."
+            exit 0
+          fi
+          git commit -m "fix: reconciliar recebido e a receber com CR_GERAL"
+          git push origin HEAD:fix-dre-projects-ui-2026-08-25
