@@ -6,115 +6,107 @@ function normalizeText(value) {
     .toUpperCase();
 }
 
-function accountCode(item) {
-  return String(item?.contaCodigo || '').replace(/\D/g, '');
+export function normalizeAccountCode(item) {
+  const explicit = String(item?.contaCodigo || '').trim();
+  if (explicit) return explicit.replace(/\D/g, '');
+  const raw = String(item?.contaDescricao || item?.contaNome || item?.conta || '').trim();
+  return raw.match(/^(\d+)/)?.[1] || '';
+}
+
+function combinedText(item) {
+  return normalizeText([
+    item?.contaCodigo,
+    item?.contaNome,
+    item?.contaDescricao,
+    item?.dreDescricao,
+    item?.dreClasse,
+    item?.drePacote,
+    item?.dreLinha,
+    item?.documento,
+    item?.nome,
+  ].filter(Boolean).join(' '));
 }
 
 export function classifyFinancialEntry(item) {
-  if (!item || item.natureza !== 'Entrada') {
-    return {
-      label: item?.natureza === 'Saída' ? 'Saída / Pagamento' : 'Não classificado',
-      type: item?.natureza === 'Saída' ? 'saida' : 'outro',
-      isRevenue: false,
-    };
+  const code = normalizeAccountCode(item);
+  const text = combinedText(item);
+
+  if (code === '1020101' || text.includes('APORTE DE SOCIO')) {
+    return { type: 'aporte', label: 'Aporte de sócio' };
   }
-
-  const code = accountCode(item);
-  const text = normalizeText(`${item.contaNome || ''} ${item.contaDescricao || ''} ${item.dreClasse || ''} ${item.drePacote || ''} ${item.dreLinha || ''}`);
-
-  if (code === '1020101' || text.includes('APORTE')) {
-    return { label: 'Aportes', type: 'aporte', isRevenue: false };
+  if (code === '1020202' || text.includes('CAPITAL DE GIRO') || text.includes('EMPREST') || text.includes('FINANCIAMENTO')) {
+    return { type: 'emprestimo', label: 'Empréstimo / financiamento' };
   }
-
-  if (
-    code === '1020202'
-    || text.includes('CAPITAL DE GIRO')
-    || text.includes('EMPREST')
-    || text.includes('FINANCIAMENTO')
-  ) {
-    return { label: 'Empréstimos / Financiamentos', type: 'emprestimo', isRevenue: false };
+  if (code === '1030101' || text.includes('RESGATE DE APLIC') || text.includes('TRANSFERENCIA ENTRE CONTAS')) {
+    return { type: 'movimentacao_financeira', label: 'Movimentação financeira' };
   }
-
-  if (
-    code === '1030101'
-    || text.includes('RESGATE APLIC')
-    || text.includes('APLICACOES FINANCEIRAS')
-  ) {
-    return { label: 'Movimentações Financeiras', type: 'movimentacao_financeira', isRevenue: false };
-  }
-
   if (code === '1010107' || text.includes('REC. ADMINISTRATIVO') || text.includes('REC ADMINISTRATIVO')) {
-    return { label: 'Receitas Administrativas', type: 'receita_administrativa', isRevenue: true };
+    return { type: 'receita_administrativa', label: 'Receita administrativa' };
   }
-
   if (code === '1010101' || text.includes('REC. FATURAMENTO') || text.includes('REC FATURAMENTO')) {
-    return { label: 'Receita de Projetos', type: 'receita_projeto', isRevenue: true };
+    return { type: 'receita_projeto', label: 'Receita de projeto' };
   }
-
-  if (
-    text.includes('ESTORNO')
-    || text.includes('REC. OPERACIONAL')
-    || text.includes('REC OPERACIONAL')
-    || code.startsWith('101')
-  ) {
-    return { label: 'Outras Receitas', type: 'outra_receita', isRevenue: true };
+  if (code === '10302' || text.includes('ACRESCIMOS RECEBIDOS')) {
+    return { type: 'acrescimo_recebido', label: 'Acréscimo recebido' };
   }
+  if (String(item?.natureza || '').toUpperCase() === 'ENTRADA') {
+    return { type: 'outra_receita', label: 'Outra entrada' };
+  }
+  return { type: 'saida', label: 'Saída' };
+}
 
-  return { label: 'Outras Entradas', type: 'outra_entrada', isRevenue: false };
+export function isProjectRevenue(item) {
+  const classification = classifyFinancialEntry(item);
+  return classification.type === 'receita_projeto' || classification.type === 'receita_administrativa';
+}
+
+export function isCapitalEntry(item) {
+  const type = classifyFinancialEntry(item).type;
+  return type === 'emprestimo' || type === 'aporte' || type === 'movimentacao_financeira';
 }
 
 export function isPartnerWithdrawal(item) {
-  const code = accountCode(item);
-  const text = normalizeText(`${item?.contaNome || ''} ${item?.contaDescricao || ''}`);
-  return code === '2010522' || (text.includes('RETIRADA') && text.includes('SOCIO'));
+  const code = normalizeAccountCode(item);
+  const text = combinedText(item);
+  return code === '2050101' || text.includes('RETIRADA DOS SOCIOS') || text.includes('RETIRADA DE SOCIO');
 }
 
 export function isTeamExpense(item) {
-  const text = normalizeText(`${item?.contaNome || ''} ${item?.contaDescricao || ''} ${item?.dreClasse || ''} ${item?.drePacote || ''} ${item?.dreLinha || ''}`);
-  return text.includes('EQUIPE');
-}
+  const code = normalizeAccountCode(item);
+  const text = combinedText(item);
 
-export function isSupplierTax(item) {
-  const code = accountCode(item);
-  const text = normalizeText(`${item?.contaNome || ''} ${item?.contaDescricao || ''} ${item?.dreClasse || ''} ${item?.drePacote || ''} ${item?.dreLinha || ''}`);
-  return code === '2030303' || text.includes('RETENCOES FORNECEDORES') || text.includes('RETENCAO FORNECEDOR');
+  // Na base oficial, as contas de equipe aparecem como "EQUIP. TÉC." e não como "EQUIPE".
+  // 201000x = disciplinas técnicas; 20103xx = Big Room/ADM/Coord/Terceiros.
+  return code.startsWith('201000') ||
+    code.startsWith('20103') ||
+    /\bEQUIP\.?\s*TEC\b/.test(text) ||
+    text.includes('EQUIPE TECNICA') ||
+    text.includes('EQUIPE');
 }
 
 export function isRevenueTax(item) {
-  if (!item || item.natureza !== 'Saída' || isSupplierTax(item)) return false;
+  const code = normalizeAccountCode(item);
+  const text = combinedText(item);
 
-  const code = accountCode(item);
-  const text = normalizeText(`${item.contaNome || ''} ${item.contaDescricao || ''} ${item.dreClasse || ''} ${item.drePacote || ''} ${item.dreLinha || ''}`);
+  if (code === '2030303' || text.includes('RETENCOES FORNECEDORES')) return false;
 
-  return (
-    ['2030101', '2030102', '2030103', '2030104', '2030105', '2030107'].includes(code)
-    || text.includes('IMPOSTOS SOBRE FATURAMENTO')
-    || text.includes('DEDUCOES DA RECEITA')
-    || text.includes('IMPOSTOS RETIDOS NO FAT')
-    || text.includes('IRPJ')
-    || text.includes('CSLL')
-  );
+  return ['2030101', '2030102', '2030103', '2030104', '2030105', '2030107'].includes(code) ||
+    text.includes('PIS') ||
+    text.includes('COFINS') ||
+    text.includes('ISS') ||
+    text.includes('IRPJ') ||
+    text.includes('CSLL') ||
+    text.includes('IMPOSTOS RETIDOS NO FAT');
 }
 
 export function getRevenueTaxLabel(item) {
-  const code = accountCode(item);
-  const text = normalizeText(`${item?.contaNome || ''} ${item?.contaDescricao || ''}`);
-  if (code === '2030101' || /(^|\s)PIS(\s|$)/.test(text)) return 'PIS';
+  const code = normalizeAccountCode(item);
+  const text = combinedText(item);
+  if (code === '2030101' || /\bPIS\b/.test(text)) return 'PIS';
   if (code === '2030102' || text.includes('COFINS')) return 'COFINS';
-  if (code === '2030103' || text.includes('ISS')) return 'ISS';
+  if (code === '2030103' || /\bISS\b/.test(text)) return 'ISS';
   if (code === '2030104' || text.includes('IRPJ')) return 'IRPJ';
   if (code === '2030105' || text.includes('CSLL')) return 'CSLL';
-  if (code === '2030107') return 'Impostos Retidos no Faturamento';
-  return String(item?.contaNome || item?.contaDescricao || 'Imposto não identificado').trim();
-}
-
-export function getAccountGroup(value) {
-  const text = normalizeText(value);
-  if (!text) return 'OUTROS';
-  if (text.includes('C.D.P') || text.includes('CDP')) return 'C.D.P.';
-  if (text.includes('EQUIP')) return 'EQUIPE';
-  if (text.includes('IMPOST') || text.includes('ISS') || text.includes('PIS') || text.includes('COFINS') || text.includes('CSLL') || text.includes('IRPJ')) return 'IMPOSTOS';
-  if (text.includes('DESP')) return 'DESPESAS';
-  if (text.includes('REC')) return 'RECEITAS';
-  return 'OUTROS';
+  if (code === '2030107') return 'Impostos retidos / previsão';
+  return item?.contaNome || item?.contaDescricao || 'Tributos';
 }
