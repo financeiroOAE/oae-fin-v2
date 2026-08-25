@@ -188,7 +188,7 @@ export default function Projetos() {
     });
   }, [projetosCruzados, filterProjetos, filterEmpresas, filterTipos, colFilterProjeto, colFilterEmpresa, colFilterMinFaturadoPerc]);
 
-  const listaProjetos = getActiveProjectNames(projetosBrutos, true);
+  const listaProjetos = Array.from(new Set([...projetosCruzados.map(p => p.nome), 'ADMINISTRAÇÃO'])).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const listaEmpresas = Array.from(new Set(projetosCruzados.flatMap(p => p.empresas))).sort();
   const listaTipos = Array.from(new Set(projetosCruzados.flatMap(p => p.tipos))).sort();
 

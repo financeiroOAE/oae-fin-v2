@@ -69,7 +69,7 @@ function buildProjectIndex(projectCatalog = []) {
   const byAlias = new Map();
 
   projectCatalog.forEach((project) => {
-    const label = String(project.OBRA || '').trim();
+    const label = String(project.OBRA || '').trim().replace(/[.\s]+$/g, '');
     if (!label) return;
 
     const codes = new Set([
@@ -111,7 +111,7 @@ function buildProjectIndex(projectCatalog = []) {
 function buildExactProjectNameIndex(projectCatalog = []) {
   const exact = new Map();
   projectCatalog.forEach((project) => {
-    const label = String(project.OBRA || '').trim();
+    const label = String(project.OBRA || '').trim().replace(/[.\s]+$/g, '');
     if (!label) return;
     const key = normalizeText(label);
     if (!exact.has(key)) exact.set(key, []);

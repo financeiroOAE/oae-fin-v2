@@ -812,7 +812,7 @@ export default function FluxoDeCaixa() {
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
             overflow: 'hidden'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-elevated)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', padding: '1.5rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-elevated)' }}>
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>{modalResumo.title}</h2>
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -830,7 +830,7 @@ export default function FluxoDeCaixa() {
             </div>
             <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
               <div className="table-container">
-                <table style={{ fontSize: '12px' }}>
+                <table style={{ fontSize: '12px', minWidth: '760px', width: '100%' }}>
                   <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                     <tr>
                       <th>{modalResumo.title.includes('Recebimentos') ? 'Cliente / Nome' : 'Fornecedor / Nome'}</th>

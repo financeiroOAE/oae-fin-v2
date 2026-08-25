@@ -182,17 +182,21 @@ export default function VisaoFinanceira() {
   // Top Projetos Entradas / Saídas
   const topProjetosEntradas = useMemo(() => {
     const map = {};
-    filteredData.forEach(item => {
+    filteredData.forEach((item) => {
+      if (item.natureza !== 'Entrada') return;
+      const projectName = String(item.projeto || '').trim();
+      const projectUpper = projectName.toUpperCase();
+      if (!projectName || projectUpper.includes('ADMINISTRA') || projectUpper === 'GRUPO OAE' || projectUpper === 'SEM PROJETO') return;
+      if (!activeProjectKeys.has(getProjectKey(projectName))) return;
+
       const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
-      rows.forEach(row => {
+      const projectRevenue = rows.reduce((sum, row) => {
         const classification = classifyFinancialEntry(row);
-        if (classification.type !== 'receita_projeto') return;
-        const projectName = String(row.projeto || '').trim();
-        const projectUpper = projectName.toUpperCase();
-        if (!projectName || projectUpper.includes('ADMINISTRA') || projectUpper === 'GRUPO OAE' || projectUpper === 'SEM PROJETO') return;
-        if (!activeProjectKeys.has(getProjectKey(projectName))) return;
-        map[projectName] = (map[projectName] || 0) + (Number(row.valor) || 0);
-      });
+        if (classification.type !== 'receita_projeto' && classification.type !== 'receita_administrativa') return sum;
+        return sum + (Number(row.valor) || 0);
+      }, 0);
+      if (projectRevenue <= 0) return;
+      map[projectName] = (map[projectName] || 0) + projectRevenue;
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
   }, [filteredData, activeProjectKeys]);
@@ -260,13 +264,19 @@ export default function VisaoFinanceira() {
   }, [filteredData, activeProjectKeys]);
 
   const abcDonutData = useMemo(() => {
-    const projects = activeProjects
-      .map(project => ({
-        nome: String(project.OBRA || '').trim(),
-        contratado: Number(project.CONTRATO) || 0,
-        faturado: Number(project['NF FATURADAS']) || 0,
-      }))
-      .filter(project => project.nome && project.contratado > 0)
+    const aggregated = new Map();
+    activeProjects.forEach((project) => {
+      const key = getProjectKey(project.ID || project.OBRA);
+      const name = String(project.OBRA || '').trim().replace(/[.\s]+$/g, '');
+      if (!key || !name) return;
+      if (!aggregated.has(key)) aggregated.set(key, { nome: name, contratado: 0, faturado: 0 });
+      const current = aggregated.get(key);
+      current.contratado += Number(project.CONTRATO) || 0;
+      current.faturado += Number(project['NF FATURADAS']) || 0;
+    });
+
+    const projects = [...aggregated.values()]
+      .filter(project => project.contratado > 0)
       .sort((a, b) => b.contratado - a.contratado);
 
     const classes = [
@@ -275,10 +285,15 @@ export default function VisaoFinanceira() {
       { name: 'Classe C', color: 'var(--danger)', rule: 'Contratos abaixo de R$ 100 mil', test: (value) => value < 100000 },
     ];
 
-    return classes.map(def => {
-      const classProjects = projects.filter(project => def.test(project.contratado));
-      return { ...def, value: classProjects.reduce((sum, project) => sum + project.contratado, 0), count: classProjects.length, projects: classProjects };
-    }).filter(item => item.count > 0);
+    return classes.map((definition) => {
+      const classProjects = projects.filter((project) => definition.test(project.contratado));
+      return {
+        ...definition,
+        value: classProjects.reduce((sum, project) => sum + project.contratado, 0),
+        count: classProjects.length,
+        projects: classProjects,
+      };
+    }).filter((item) => item.count > 0);
   }, [activeProjects]);
 
   const topContasSaidas = useMemo(() => {
