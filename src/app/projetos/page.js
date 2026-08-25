@@ -753,8 +753,8 @@ export default function Projetos() {
       </div>
 
       {/* 5. Composição Financeira + Resultado */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '1rem', marginBottom: '2rem', alignItems: 'start' }}>
-        <div className="card" style={{ padding: '1.5rem', borderTop: '2px solid var(--primary)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '1rem', marginBottom: '2rem', alignItems: 'stretch' }}>
+        <div className="card" style={{ padding: '1.5rem', borderTop: '2px solid var(--primary)', height: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -805,7 +805,7 @@ export default function Projetos() {
           )}
         </div>
 
-        <div className="card" style={{ padding: '1.5rem', borderTop: '2px solid var(--primary)', display: 'flex', flexDirection: 'column' }}>
+        <div className="card" style={{ padding: '1.5rem', borderTop: '2px solid var(--primary)', display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -929,15 +929,15 @@ export default function Projetos() {
       </div>
 
 
-      <div className="card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
+      <div data-report-control data-report-exclude className="card" style={{ padding: '1.5rem', marginBottom: '2rem', display: isReportMode ? 'none' : 'block' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
           <div>
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Custo de Equipe por Projeto</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Contas EQUIP. TÉC. somadas nos projetos exibidos. Ao filtrar uma obra, os valores passam a representar somente aquela obra. Este painel fica somente em Projetos e não é oferecido no Relatório Executivo.</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Custos de equipe técnica somados por projeto no período e filtros selecionados.</p>
           </div>
         </div>
         <div style={{ minHeight: '280px' }}>
-          <RankingBarChart data={teamCostsChartData} dataKey="Valor" color="var(--warning)" emptyMessage="Sem contas de equipe identificadas para os projetos filtrados." />
+          <RankingBarChart data={teamCostsChartData} dataKey="Valor" color="var(--warning)" emptyMessage="Sem dados de equipe no período." />
         </div>
       </div>
 
