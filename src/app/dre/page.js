@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import MultiSelect from "@/components/MultiSelect";
 import InfoTooltip from "@/components/InfoTooltip";
+import { classifyFinancialEntry, normalizeAccountCode } from "@/lib/financialClassification";
 import { getActiveProjectNames } from "@/lib/projectRules";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import {
@@ -152,18 +153,57 @@ function getPendingReason(item) {
   return 'O DEPARA existe, mas a classe/linha informada não corresponde a uma linha reconhecida da DRE.';
 }
 
+function classifyOutsideDre(item) {
+  const code = normalizeAccountCode(item);
+  const financialType = classifyFinancialEntry(item).type;
+  const text = [item.contaNome, item.contaDescricao, item.dreClasse, item.drePacote, item.dreLinha, item.planoFinanceiro]
+    .filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
+  if (financialType === 'emprestimo' || ['2020402', '2020104'].includes(code) || text.includes('EMPREST') || text.includes('FINANCIAMENTO')) {
+    return { category: 'Empréstimos / Financiamentos', reason: code === '2020104' ? 'Principal de empréstimo é patrimonial; somente os juros segregados pertencem ao resultado financeiro.' : 'Captação ou amortização de principal altera caixa e passivo, mas não representa receita/despesa operacional da DRE.', intentional: true };
+  }
+  if (financialType === 'aporte' || code === '1020101' || text.includes('APORTE DE SOCIO')) {
+    return { category: 'Aportes de Sócios', reason: 'Aporte é movimentação de patrimônio líquido, não receita operacional.', intentional: true };
+  }
+  if (code === '2020304' || text.includes('ADIANTAMENTO CREDOR')) {
+    return { category: 'Adiantamentos', reason: 'Adiantamento é movimentação patrimonial/financeira até sua apropriação definitiva.', intentional: true };
+  }
+  if (code === '2090105' || text.includes('IRRF')) {
+    return { category: 'Retenções Tributárias', reason: 'Retenção compensável é tratada como ativo/crédito tributário e não como despesa da DRE neste momento.', intentional: true };
+  }
+  if (code === '2020202' || code.startsWith('20107') || code === '2010802' || text.includes('CAPEX') || text.includes('IMOBILIZADO') || text.includes('INVESTIMENTO EM')) {
+    return { category: 'Investimentos / CAPEX', reason: 'Aquisição de ativo ou intangível é investimento patrimonial; o efeito na DRE ocorre por depreciação/amortização quando aplicável.', intentional: true };
+  }
+  if (financialType === 'movimentacao_financeira' || text.includes('TRANSFERENCIA ENTRE CONTAS') || text.includes('RESGATE DE APLIC')) {
+    return { category: 'Movimentações Financeiras', reason: 'Transferência ou movimentação entre contas não gera receita nem despesa econômica.', intentional: true };
+  }
+
+  const classe = String(item.dreClasse || '').toUpperCase();
+  const linha = String(item.dreLinha || '').toUpperCase();
+  const intentionalByDepara = classe.includes('FORA DA DRE') || linha.includes('FORA DA DRE') || classe.includes('PATRIMONIAL') || linha.includes('PATRIMONIAL');
+  if (intentionalByDepara) {
+    return { category: 'Fora da DRE — regra contábil', reason: 'O DEPARA marcou esta conta deliberadamente como patrimonial/fora da DRE.', intentional: true };
+  }
+
+  return { category: 'Pendente de Classificação', reason: getPendingReason(item), intentional: false };
+}
+
+function isIntentionalOutsideDre(item) {
+  return classifyOutsideDre(item).intentional;
+}
+
 function PendingClassificationDrawer({ items, onClose }) {
   const summary = Object.values((items || []).reduce((map, item) => {
     const code = String(item.contaCodigo || '').trim() || 'SEM-CODIGO';
     const plan = String(item.planoFinanceiro || '').trim() || `${code} - ${item.contaNome || item.contaDescricao || 'Plano não identificado'}`;
     const nomenclature = item.contaNome || item.contaDescricao || 'Sem nomenclatura';
-    const reason = getPendingReason(item);
-    const key = `${code}|${plan}|${reason}`;
-    if (!map[key]) map[key] = { code, plan, nomenclature, reason, total: 0, count: 0 };
+    const classification = classifyOutsideDre(item);
+    const key = `${classification.category}|${code}|${plan}|${classification.reason}`;
+    if (!map[key]) map[key] = { code, plan, nomenclature, category: classification.category, reason: classification.reason, intentional: classification.intentional, total: 0, count: 0 };
     map[key].total += Math.abs(Number(item.valor) || 0);
     map[key].count += 1;
     return map;
-  }, {})).sort((a, b) => a.total - b.total || a.plan.localeCompare(b.plan, 'pt-BR'));
+  }, {})).sort((a, b) => a.total - b.total || a.category.localeCompare(b.category, 'pt-BR') || a.plan.localeCompare(b.plan, 'pt-BR'));
 
   const detailRows = [...(items || [])].sort((a, b) => Math.abs(Number(a.valor) || 0) - Math.abs(Number(b.valor) || 0));
   const total = summary.reduce((sum, row) => sum + row.total, 0);
@@ -173,8 +213,8 @@ function PendingClassificationDrawer({ items, onClose }) {
       <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(1100px, 100vw)', height: '100vh', background: 'var(--bg-main)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-18px 0 44px rgba(0,0,0,0.45)' }}>
         <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-elevated)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
           <div>
-            <h2 style={{ fontSize: '16px', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Pendências de Classificação</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Resumo por plano financeiro, do menor para o maior valor. Total fora da DRE: <strong style={{ color: 'var(--warning)' }}>{fmt(total)}</strong>.</p>
+            <h2 style={{ fontSize: '16px', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Itens fora da DRE</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Classificação dos itens que não entram no resultado — incluindo investimentos, empréstimos, aportes e pendências reais. Total fora da DRE: <strong style={{ color: 'var(--warning)' }}>{fmt(total)}</strong>.</p>
           </div>
           <button type="button" className="btn" onClick={onClose} style={{ padding: '0.4rem', background: 'transparent', border: 0 }}><X size={18} /></button>
         </div>
@@ -186,10 +226,11 @@ function PendingClassificationDrawer({ items, onClose }) {
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ minWidth: '900px', fontSize: '12px' }}>
-                <thead><tr><th>Plano Financeiro</th><th>Nomenclatura</th><th>Por que não entra na DRE</th><th style={{ textAlign: 'center' }}>Lanç.</th><th style={{ textAlign: 'right' }}>Valor</th></tr></thead>
+                <thead><tr><th>Classificação</th><th>Plano Financeiro</th><th>Nomenclatura</th><th>Por que não entra na DRE</th><th style={{ textAlign: 'center' }}>Lanç.</th><th style={{ textAlign: 'right' }}>Valor</th></tr></thead>
                 <tbody>
                   {summary.map((row) => (
-                    <tr key={`${row.code}-${row.plan}`}>
+                    <tr key={`${row.category}-${row.code}-${row.plan}`}>
+                      <td style={{ fontWeight: 700, color: row.intentional ? 'var(--primary)' : 'var(--warning)', minWidth: '180px' }}>{row.category}</td>
                       <td style={{ fontWeight: 600, color: 'var(--text-main)', maxWidth: '300px' }}>{row.plan}</td>
                       <td style={{ color: 'var(--text-secondary)' }}>{row.nomenclature}</td>
                       <td style={{ color: 'var(--warning)', maxWidth: '360px' }}>{row.reason}</td>
@@ -204,15 +245,16 @@ function PendingClassificationDrawer({ items, onClose }) {
 
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '0.9rem 1rem', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-color)' }}>
-              <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>Lançamentos que compõem as pendências</strong>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Detalhamento abaixo para auditoria e ajuste do DEPARA.</p>
+              <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>Lançamentos fora da DRE</strong>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Detalhamento para auditoria. Somente itens classificados como Pendente de Classificação exigem ajuste do DEPARA.</p>
             </div>
             <div style={{ overflowX: 'auto', maxHeight: '48vh', overflowY: 'auto' }}>
               <table style={{ minWidth: '1050px', fontSize: '12px' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}><tr><th>Data</th><th>Projeto</th><th>Plano Financeiro</th><th>Nomenclatura</th><th>Nome</th><th>Status</th><th style={{ textAlign: 'right' }}>Valor</th></tr></thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}><tr><th>Classificação</th><th>Data</th><th>Projeto</th><th>Plano Financeiro</th><th>Nomenclatura</th><th>Nome</th><th>Status</th><th style={{ textAlign: 'right' }}>Valor</th></tr></thead>
                 <tbody>
                   {detailRows.map((item, idx) => (
                     <tr key={idx}>
+                      <td style={{ fontWeight: 700, color: classifyOutsideDre(item).intentional ? 'var(--primary)' : 'var(--warning)' }}>{classifyOutsideDre(item).category}</td>
                       <td>{item.data || '—'}</td>
                       <td>{item.projeto || '—'}</td>
                       <td>{item.planoFinanceiro || item.contaCodigo || '—'}</td>
@@ -523,6 +565,7 @@ export default function Dre() {
   const [expandedGroups, setExpandedGroups] = useState(DEFAULT_EXPANDED_GROUPS);
   const [auditDrawer, setAuditDrawer] = useState(null); // { items, title }
   const [pendingDrawerOpen, setPendingDrawerOpen] = useState(false);
+  const [includeRetroactive, setIncludeRetroactive] = useState(false);
   // A ordem contábil é fixa para preservar a sequência correta dos resultados.
   const customOrder = DRE_ORDER;
 
@@ -615,11 +658,90 @@ export default function Dre() {
     return items;
   }, [baseData, effectiveDataInicial, effectiveDataFinal, filterProjetos, visao]);
 
-  const meses = useMemo(() => buildMeses(effectiveDataInicial, effectiveDataFinal), [effectiveDataInicial, effectiveDataFinal]);
+  // Projetos com movimentacao realizada em 2025 podem trazer esse historico em
+  // uma unica coluna chamada Retroativo 2026. O retroativo so aparece quando ha
+  // projeto selecionado e nunca entra automaticamente no resultado.
+  const retroactiveItems = useMemo(() => {
+    if (filterProjetos.length === 0) return [];
+    const { filterDreItems } = require("@/lib/dreEngine");
+    let items = filterDreItems(baseData, {
+      filterDataInicial: '2025-01-01', filterDataFinal: '2025-12-31',
+      filterProjetos: [], filterEmpresas: [], filterCCs: [], visao: 'REALIZADO'
+    });
+
+    const entradas = items.filter((item) => item.natureza === 'Entrada');
+    const saidas = items.filter((item) => item.natureza === 'Saída');
+    const consolidated = consolidateFinancialData(entradas, {
+      filterProjetos,
+      isProjetosPage: false,
+      incluirRateioAdm: true,
+    });
+    const somenteAdm = filterProjetos.length === 1 && filterProjetos[0].toUpperCase().includes('ADMINISTRA');
+    const entradasFiltradas = consolidated.filter((item) => {
+      const proj = String(item.projeto || '');
+      if (somenteAdm) return proj.toUpperCase().includes('ADMINISTRA') && Math.abs(Number(item.valor) || 0) > 0;
+      return filterProjetos.some((project) => proj === project || proj.toUpperCase().includes(project.toUpperCase()));
+    });
+    const saidasFiltradas = saidas.filter((item) => {
+      const proj = String(item.projeto || '');
+      return filterProjetos.some((project) => proj === project || proj.toUpperCase().includes(project.toUpperCase()));
+    });
+    return [...entradasFiltradas, ...saidasFiltradas];
+  }, [baseData, filterProjetos]);
+
+  useEffect(() => {
+    if (includeRetroactive && retroactiveItems.length === 0) setIncludeRetroactive(false);
+  }, [includeRetroactive, retroactiveItems.length]);
+
+  const baseMeses = useMemo(() => buildMeses(effectiveDataInicial, effectiveDataFinal), [effectiveDataInicial, effectiveDataFinal]);
+  const meses = useMemo(() => includeRetroactive && retroactiveItems.length > 0
+    ? [{ key: 'RETRO-2026', label: 'Retroativo 2026', retroactive: true }, ...baseMeses]
+    : baseMeses, [baseMeses, includeRetroactive, retroactiveItems.length]);
   const showMonths = meses.length > 1;
 
-  const taggedItems = useMemo(() => tagItemsWithMesKey(filteredItems), [filteredItems]);
+  const taggedItems = useMemo(() => {
+    const current = tagItemsWithMesKey(filteredItems);
+    if (!includeRetroactive || retroactiveItems.length === 0) return current;
+    const retroactive = retroactiveItems.map((item) => ({ ...item, mesKey: 'RETRO-2026', isRetroactive2026: true }));
+    return [...retroactive, ...current];
+  }, [filteredItems, retroactiveItems, includeRetroactive]);
   const dreData = useMemo(() => buildDreStructure(taggedItems, meses), [taggedItems, meses]);
+
+  const intentionalOutsideItems = useMemo(() => {
+    const start = effectiveDataInicial ? new Date(effectiveDataInicial + 'T00:00:00').getTime() : 0;
+    const end = effectiveDataFinal ? new Date(effectiveDataFinal + 'T23:59:59').getTime() : Infinity;
+    return baseData.filter((item) => {
+      if (!isIntentionalOutsideDre(item)) return false;
+      const status = String(item.status || '').toUpperCase();
+      const isRealizado = status.includes('REALIZADO') || status.includes('PAGO') || status.includes('RECEBIDO') || status === 'EFETIVADO';
+      const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A RECEBER') || status.includes('A PAGAR') || status.includes('PREVISTO'));
+      if (visao === 'REALIZADO' && !isRealizado) return false;
+      if (visao === 'SOMENTE_PREVISAO' && !isPrevisto) return false;
+      if (visao === 'REALIZADO_PREVISAO' && !isRealizado && !isPrevisto) return false;
+      if ((item.dataTimestamp || 0) < start || (item.dataTimestamp || 0) > end) return false;
+      if (filterProjetos.length > 0) {
+        const proj = String(item.projeto || '');
+        if (!filterProjetos.some((project) => proj === project || proj.toUpperCase().includes(project.toUpperCase()))) return false;
+      }
+      return true;
+    });
+  }, [baseData, effectiveDataInicial, effectiveDataFinal, filterProjetos, visao]);
+
+  const outsideDreItems = useMemo(() => {
+    const map = new Map();
+    [...dreData.naoClassificados.items, ...intentionalOutsideItems].forEach((item) => {
+      // A mesma movimentacao pode ter sido capturada como nao classificada pelo
+      // motor e tambem reconhecida pela regra patrimonial. A chave nao inclui a
+      // origem da captura para impedir duplicidade no resumo.
+      const key = [item.data, item.documento, item.lancamento, item.contaCodigo, item.projeto, item.valor].join('|');
+      if (!map.has(key)) map.set(key, item);
+    });
+    return [...map.values()];
+  }, [dreData.naoClassificados.items, intentionalOutsideItems]);
+
+  const outsideDreTotal = useMemo(() => outsideDreItems.reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0), [outsideDreItems]);
+  const pendingCount = useMemo(() => outsideDreItems.filter((item) => !classifyOutsideDre(item).intentional).length, [outsideDreItems]);
+  const intentionalCount = outsideDreItems.length - pendingCount;
 
   // Toggle groups
   const toggleGroup = useCallback((id) => {
@@ -639,9 +761,10 @@ export default function Dre() {
     setFilterDataInicial(range.start);
     setFilterDataFinal(range.end);
     setFilterProjetos([]);
+    setIncludeRetroactive(false);
   };
 
-  const hasActiveFilters = filterProjetos.length > 0;
+  const hasActiveFilters = filterProjetos.length > 0 || includeRetroactive;
 
   // KPIs
   const receitaBruta = dreData.groups["RECEITA_BRUTA"]?.total || 0;
@@ -656,6 +779,7 @@ export default function Dre() {
     "Data inicial": effectiveDataInicial || "Todas",
     "Data final": effectiveDataFinal || "Todas",
     Projetos: filterProjetos.length ? filterProjetos : "Todos",
+    "Retroativo 2026": includeRetroactive ? "Incluído" : "Não incluído",
   };
 
   const dreReportDataSets = useMemo(() => {
@@ -714,16 +838,20 @@ export default function Dre() {
     { key: "Total", label: showMonths ? "TOTAL" : "VALOR", format: "currency" },
   ], [meses, showMonths]);
 
-  const drePendingRows = useMemo(() => dreData.naoClassificados.items.map((item) => ({
-    Data: item.data,
-    Projeto: item.projeto,
-    "Plano Financeiro": item.planoFinanceiro || item.contaCodigo || 'Não identificado',
-    Nomenclatura: item.contaNome || item.contaDescricao,
-    Motivo: getPendingReason(item),
-    Nome: item.nome,
-    Situação: item.status,
-    Valor: Math.abs(item.valor || 0),
-  })).sort((a, b) => a.Valor - b.Valor), [dreData.naoClassificados.items]);
+  const drePendingRows = useMemo(() => outsideDreItems.map((item) => {
+    const classification = classifyOutsideDre(item);
+    return {
+      Classificação: classification.category,
+      Data: item.data,
+      Projeto: item.projeto,
+      "Plano Financeiro": item.planoFinanceiro || item.contaCodigo || 'Não identificado',
+      Nomenclatura: item.contaNome || item.contaDescricao,
+      Motivo: classification.reason,
+      Nome: item.nome,
+      Situação: item.status,
+      Valor: Math.abs(item.valor || 0),
+    };
+  }).sort((a, b) => a.Valor - b.Valor), [outsideDreItems]);
 
   return (
     <div style={{ padding: "1.5rem", maxWidth: "100%", minHeight: "100vh", background: "var(--bg-main)" }}>
@@ -809,6 +937,17 @@ export default function Dre() {
             <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>Projeto / Obra</label>
             <MultiSelect options={projetosDisponiveis} selected={filterProjetos} onChange={setFilterProjetos} placeholder="Todos os projetos" />
           </div>
+          {retroactiveItems.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', minWidth: '190px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                Retroativo 2026
+                <InfoTooltip title="Retroativo 2026" content={`Existem ${retroactiveItems.length} movimentações realizadas em 2025 para o(s) projeto(s) selecionado(s). Ao ativar, elas aparecem consolidadas em uma coluna “Retroativo 2026” e passam a compor os resultados da DRE.`} />
+              </label>
+              <button type="button" onClick={() => setIncludeRetroactive((value) => !value)} style={{ height: '38px', padding: '0 0.8rem', borderRadius: '6px', border: `1px solid ${includeRetroactive ? 'var(--primary)' : 'var(--border-color)'}`, background: includeRetroactive ? 'rgba(57,198,198,0.15)' : 'var(--bg-elevated)', color: includeRetroactive ? 'var(--primary)' : 'var(--text-main)', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                {includeRetroactive ? '✓ Incluído no resultado' : '+ Incluir retroativo'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -911,26 +1050,26 @@ export default function Dre() {
         </div>
       </div>
 
-      {/* ── Pendências de Classificação ── */}
-      {dreData.naoClassificados.items.length > 0 && (
+      {/* ── Itens fora da DRE ── */}
+      {outsideDreItems.length > 0 && (
         <div className="card" style={{ padding: "1.25rem", borderLeft: "3px solid var(--warning)", background: "rgba(245,158,11,0.03)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: '1rem', flexWrap: 'wrap' }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <AlertCircle size={20} color="var(--warning)" />
               <div>
-                <h3 style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-main)", marginBottom: "0.25rem" }}>Pendências de Classificação</h3>
+                <h3 style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-main)", marginBottom: "0.25rem" }}>Itens fora da DRE</h3>
                 <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                  Existem {dreData.naoClassificados.items.length} lançamentos sem DEPARA válido ou sem linha DRE reconhecida. Eles <strong>NÃO</strong> estão somando no resultado acima.
+                  {intentionalCount} exclusão(ões) intencional(is) (investimentos, empréstimos, aportes, retenções etc.) e {pendingCount} pendência(s) real(is) de classificação. Nenhum desses itens soma no resultado acima.
                 </p>
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-              <span style={{ fontSize: "16px", fontWeight: "800", color: "var(--warning)" }}>{fmt(dreData.naoClassificados.total)}</span>
+              <span style={{ fontSize: "16px", fontWeight: "800", color: "var(--warning)" }}>{fmt(outsideDreTotal)}</span>
               <button
                 onClick={() => setPendingDrawerOpen(true)}
                 style={{ background: "rgba(245,158,11,0.15)", color: "var(--warning)", border: "none", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}
               >
-                Revisar contas
+                Ver classificação e motivo
               </button>
             </div>
           </div>
@@ -938,7 +1077,7 @@ export default function Dre() {
       )}
 
       {/* ── Drawers de Auditoria ── */}
-      {pendingDrawerOpen && <PendingClassificationDrawer items={dreData.naoClassificados.items} onClose={() => setPendingDrawerOpen(false)} />}
+      {pendingDrawerOpen && <PendingClassificationDrawer items={outsideDreItems} onClose={() => setPendingDrawerOpen(false)} />}
       {auditDrawer && <AuditDrawer items={auditDrawer.items} title={auditDrawer.title} onClose={() => setAuditDrawer(null)} />}
     </div>
   );

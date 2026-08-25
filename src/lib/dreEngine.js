@@ -1,4 +1,4 @@
-import { isTeamExpense } from '@/lib/financialClassification';
+import { isTeamExpense, normalizeAccountCode } from '@/lib/financialClassification';
 
 /**
  * dreEngine.js — Motor da DRE Gerencial OAE_FIN V2
@@ -46,6 +46,12 @@ export function mapClasseToDreId(item) {
   const dreClasse = item.dreClasseLabel || item.dreClasse || '';
   const dreLinha = item.dreLinhaLabel || item.dreLinha || '';
   const projeto = String(item.projeto || '').toUpperCase();
+  const accountCode = normalizeAccountCode(item);
+
+  // Fonte de verdade da receita de projetos: CR_GERAL 1010101 + 1010107.
+  // A classificacao da DRE nao pode eliminar receita por nome de obra, status do
+  // catalogo de projetos ou eventual falha textual no DEPARA.
+  if (item.natureza === 'Entrada' && (accountCode === '1010101' || accountCode === '1010107')) return 'RECEITA_BRUTA';
 
   // Equipe vinculada ao centro de custo administrativo é despesa administrativa,
   // nunca custo direto de projeto.
