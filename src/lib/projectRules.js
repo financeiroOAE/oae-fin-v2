@@ -37,18 +37,11 @@ export function isProjectOngoing(project) {
     if (/(ATIV|ANDAMENTO|EM EXECUCAO|EXECUCAO|ABERTO)/.test(explicitStatus)) return true;
   }
 
-  const contract = Number(project.CONTRATO) || 0;
-  const billed = Number(project['NF FATURADAS']) || 0;
-  const balance = Number(project['SALDO CONTRATUAL']) || 0;
-
-  // A planilha PROJETOS_2026 atualmente não tem coluna de status.
-  // Enquanto isso, consideramos em andamento o contrato com saldo aberto,
-  // faturamento ainda inferior ao contratado ou cadastro novo sem contrato informado.
-  if (balance > 0.005) return true;
-  if (contract > 0 && billed + 0.005 < contract) return true;
-  if (contract <= 0 && billed <= 0) return true;
-
-  return false;
+  // A PROJETOS_2026 atualmente não possui uma coluna de status.
+  // Portanto, a própria presença na relação oficial é o critério de projeto corrente.
+  // Não usamos 100% faturado ou saldo contratual zero como sinônimo de encerramento,
+  // pois isso poderia ocultar obras ainda administrativamente em andamento.
+  return true;
 }
 
 export function getActiveProjects(projects = []) {
