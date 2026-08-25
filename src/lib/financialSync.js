@@ -77,7 +77,7 @@ async function performFullSync(triggeredBy) {
   });
 
   const cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap);
-  const crProcessed = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap);
+  const crProcessed = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos);
 
   const stats = {
     EMPRESAS: empresas.length,
@@ -126,7 +126,6 @@ async function performFullSync(triggeredBy) {
     message: 'Sincronização concluída com sucesso!',
   };
 
-  // O histórico é auditoria, não pode impedir a atualização dos números.
   await prisma.syncHistory.create({
     data: {
       triggeredBy,
@@ -146,8 +145,6 @@ export async function readCurrentSnapshot() {
     where: { id: SNAPSHOT_ID },
   });
 
-  // Migração suave da regra anterior por sessão: reutiliza o snapshot mais recente
-  // sem consultar novamente o Google Sheets.
   if (!snapshot) {
     const latestLegacySnapshot = await prisma.financialSnapshot.findFirst({
       orderBy: { updatedAt: 'desc' },
