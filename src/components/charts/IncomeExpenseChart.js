@@ -4,7 +4,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 
 export default function IncomeExpenseChart({ data }) {
   if (!data || data.length === 0) {
-    return <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>Sem dados suficientes.</div>;
+    return <div style={{ height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>Sem dados suficientes.</div>;
   }
 
   const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', {
@@ -12,12 +12,12 @@ export default function IncomeExpenseChart({ data }) {
   }).format(val || 0);
 
   return (
-    <div style={{ width: '100%', height: '300px', marginTop: '1rem' }}>
-      <ResponsiveContainer>
-        <BarChart data={data} margin={{ top: 20, right: 10, left: 85, bottom: 0 }}>
+    <div style={{ width: '100%', height: '320px', marginTop: '0.25rem', minWidth: 0 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
           <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--text-secondary)' }} dy={10} />
-          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-secondary)' }} tickFormatter={formatCurrency} width={105} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-secondary)' }} tickFormatter={formatCurrency} width={96} />
           <Tooltip
             contentStyle={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-main)', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}
             formatter={(value, name) => [formatCurrency(value), name]}
@@ -25,7 +25,7 @@ export default function IncomeExpenseChart({ data }) {
             itemStyle={{ padding: '2px 0' }}
             cursor={{ fill: 'rgba(255,255,255,0.02)' }}
           />
-          <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '15px' }} iconType="circle" />
+          <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} iconType="circle" />
           <Bar dataKey="Entradas" name="Entradas" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={40} />
           <Bar dataKey="Saídas" name="Saídas" fill="var(--danger)" radius={[4, 4, 0, 0]} maxBarSize={40} />
         </BarChart>
