@@ -7,6 +7,7 @@ export const prisma = globalForPrisma.__oaePrisma || new PrismaClient();
 if (process.env.NODE_ENV !== 'production') globalForPrisma.__oaePrisma = prisma;
 
 const SNAPSHOT_ID = 'current';
+const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA'];
 
 function parseSortDate(value) {
   if (!value) return 0;
@@ -31,6 +32,13 @@ function parseSortDate(value) {
 async function performFullSync(triggeredBy) {
   const startedAt = Date.now();
   const sheetsData = await batchReadSheets();
+
+  for (const sheetName of REQUIRED_SHEETS) {
+    if (!Array.isArray(sheetsData[sheetName]) || sheetsData[sheetName].length === 0) {
+      throw new Error(`Sincronização interrompida: a aba obrigatória ${sheetName} está vazia ou indisponível.`);
+    }
+  }
+
   const rawEmpresas = sheetsData.EMPRESAS || [];
 
   const cadastroEmpresas = {};
@@ -76,7 +84,8 @@ async function performFullSync(triggeredBy) {
     if (code) deparaMap[code] = row;
   });
 
-  const cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap);
+  // O catálogo oficial é usado tanto no CP quanto no CR para padronizar o nome da obra.
+  const cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap, projetos);
   const crProcessed = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos);
 
   const stats = {
@@ -90,25 +99,22 @@ async function performFullSync(triggeredBy) {
   };
 
   const totalRecords = Object.values(stats).reduce((a, b) => a + b, 0);
-  if (totalRecords === 0) {
-    throw new Error('Sincronização falhou: Todas as abas retornaram 0 registros.');
-  }
-
   const allData = [...cpProcessed, ...crProcessed];
   allData.sort((a, b) => parseSortDate(b.data) - parseSortDate(a.data));
 
   const somaCP = cpProcessed.reduce((acc, row) => acc + row.valor, 0);
   const somaCR = crProcessed.reduce((acc, row) => acc + row.valor, 0);
-  const somaProjetosSaldo = projetos.reduce(
-    (acc, row) => acc + row['SALDO CONTRATUAL'],
-    0
-  );
+  const somaProjetosContrato = projetos.reduce((acc, row) => acc + row.CONTRATO, 0);
+  const somaProjetosFaturado = projetos.reduce((acc, row) => acc + row['NF FATURADAS'], 0);
+  const somaProjetosSaldo = projetos.reduce((acc, row) => acc + row['SALDO CONTRATUAL'], 0);
 
   console.log('--- Resumo Financeiro da Sincronização ---');
   console.log(`Disparado por: ${triggeredBy}`);
   console.log(`Quantidade de registros processados (CP + CR): ${allData.length}`);
   console.log(`Soma de CP_GERAL.Valor (Saídas): ${somaCP}`);
   console.log(`Soma de CR_GERAL.Valor (Entradas): ${somaCR}`);
+  console.log(`Soma de PROJETOS_2026.CONTRATO: ${somaProjetosContrato}`);
+  console.log(`Soma de PROJETOS_2026.NF FATURADAS: ${somaProjetosFaturado}`);
   console.log(`Soma de PROJETOS_2026.SALDO CONTRATUAL: ${somaProjetosSaldo}`);
   console.log(`Tempo de processamento: ${Date.now() - startedAt}ms`);
   console.log('------------------------------------------');
@@ -120,6 +126,8 @@ async function performFullSync(triggeredBy) {
     stats,
     projetos,
     saldosBancarios: empresas,
+    somaProjetosContrato,
+    somaProjetosFaturado,
     somaProjetosSaldo,
     recordsCount: totalRecords,
     syncedAt,
@@ -131,7 +139,7 @@ async function performFullSync(triggeredBy) {
       triggeredBy,
       status: 'SUCCESS',
       recordsCount: totalRecords,
-      details: JSON.stringify({ ...stats, syncedAt }),
+      details: JSON.stringify({ ...stats, syncedAt, somaProjetosContrato, somaProjetosFaturado, somaProjetosSaldo }),
     },
   }).catch((historyError) => {
     console.error('Falha ao gravar histórico de sincronização:', historyError?.message || historyError);
