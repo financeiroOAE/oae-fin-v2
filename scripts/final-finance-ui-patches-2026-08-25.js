@@ -48,17 +48,14 @@ function replaceOrFail(src, search, replacement, label) {
   fs.writeFileSync(file, src);
 }
 
-// Fluxo: valores do eixo anual tambem devem aparecer completos.
+// Fluxo: remover todas as abreviacoes monetarias em milhares do eixo.
 {
   const file = 'src/app/fluxo-caixa/page.js';
   let src = fs.readFileSync(file, 'utf8');
-  const oldAxis = '<YAxis stroke="var(--text-secondary)" fontSize={12} tickFormatter={(val) => `R$ ${(val / 1000)}k`} axisLine={false} tickLine={false} />';
-  const newAxis = '<YAxis stroke="var(--text-secondary)" fontSize={10} width={110} tickFormatter={(val) => formatCurrency(val)} axisLine={false} tickLine={false} />';
-  if (src.includes(oldAxis)) src = src.replace(oldAxis, newAxis);
+  const shortFormatter = 'tickFormatter={(val) => `R$ ${(val / 1000)}k`}';
+  src = src.split(shortFormatter).join('tickFormatter={(val) => formatCurrency(val)}');
   src = src.replace('Projeto / CC', 'Projeto / Obra');
-  if (src.includes('tickFormatter={(val) => `R$ ${(val / 1000)}k`}')) {
-    throw new Error('Ainda existe valor abreviado no eixo anual do Fluxo.');
-  }
+  if (src.includes(shortFormatter)) throw new Error('Ainda existe valor abreviado no Fluxo.');
   fs.writeFileSync(file, src);
 }
 
