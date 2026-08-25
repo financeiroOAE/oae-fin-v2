@@ -6,6 +6,10 @@ export function normalizeProjectText(value) {
     .toUpperCase();
 }
 
+export function cleanOfficialProjectName(value) {
+  return String(value || '').trim().replace(/[.\s]+$/g, '');
+}
+
 export function getProjectKey(value) {
   const normalized = normalizeProjectText(value);
   const code = normalized.match(/^(\d+(?:A\d+)?)/)?.[1];
@@ -17,6 +21,11 @@ export function isAdministrativeProject(value) {
   return normalized.includes('ADMINISTRA');
 }
 
+export function isGeneralProjectsBucket(value) {
+  const normalized = normalizeProjectText(value);
+  return normalized === 'PROJETOS' || normalized === 'PROJETO' || normalized === 'PROJETOS GERAL' || normalized === 'PROJETOS GERAIS';
+}
+
 export function isGenericProject(value) {
   const normalized = normalizeProjectText(value);
   return !normalized || normalized === 'GRUPO OAE' || normalized === 'SEM PROJETO';
@@ -25,7 +34,7 @@ export function isGenericProject(value) {
 export function isProjectOngoing(project) {
   if (!project) return false;
 
-  const name = String(project.OBRA || '').trim();
+  const name = cleanOfficialProjectName(project.OBRA);
   if (!name || isAdministrativeProject(name)) return false;
 
   const explicitStatus = normalizeProjectText(
@@ -39,8 +48,6 @@ export function isProjectOngoing(project) {
 
   // A PROJETOS_2026 atualmente não possui uma coluna de status.
   // Portanto, a própria presença na relação oficial é o critério de projeto corrente.
-  // Não usamos 100% faturado ou saldo contratual zero como sinônimo de encerramento,
-  // pois isso poderia ocultar obras ainda administrativamente em andamento.
   return true;
 }
 
@@ -50,11 +57,32 @@ export function getActiveProjects(projects = []) {
 
 export function getActiveProjectNames(projects = [], includeAdministration = true) {
   const names = getActiveProjects(projects)
-    .map((project) => String(project.OBRA || '').trim())
+    .map((project) => cleanOfficialProjectName(project.OBRA))
     .filter(Boolean);
 
   if (includeAdministration) names.push('ADMINISTRAÇÃO');
   return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
+export function buildOfficialProjectNameMap(projects = []) {
+  const map = new Map();
+  for (const project of projects || []) {
+    const name = cleanOfficialProjectName(project?.OBRA);
+    if (!name) continue;
+    const key = getProjectKey(name);
+    if (!key) continue;
+
+    const current = map.get(key);
+    if (!current || name.length < current.length) map.set(key, name);
+  }
+  return map;
+}
+
+export function getOfficialProjectName(value, projects = []) {
+  if (isAdministrativeProject(value)) return 'ADMINISTRAÇÃO';
+  if (isGeneralProjectsBucket(value)) return 'PROJETOS';
+  const key = getProjectKey(value);
+  return buildOfficialProjectNameMap(projects).get(key) || cleanOfficialProjectName(value);
 }
 
 export function isProjectRevenueType(classificationType) {

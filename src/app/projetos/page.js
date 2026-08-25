@@ -16,11 +16,16 @@ import InfoTooltip from "@/components/InfoTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
-import { getRolling30DayRange } from "@/lib/dateRange";
 import { isRevenueTax, getRevenueTaxLabel, classifyFinancialEntry, isTeamExpense } from "@/lib/financialClassification";
-import { getProjectKey, isProjectOngoing, getActiveProjectNames } from "@/lib/projectRules";
+import { getProjectKey, isProjectOngoing, getActiveProjectNames, isGeneralProjectsBucket } from "@/lib/projectRules";
 
 const TABLE_PAGE_SIZE = 15;
+
+const getYearToDateRange = () => {
+  const today = new Date();
+  const localDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return { start: `${today.getFullYear()}-01-01`, end: localDate(today) };
+};
 
 export default function Projetos() {
   const { isReportMode, openReportBuilder, exitReportMode } = useReport();
@@ -31,8 +36,8 @@ export default function Projetos() {
   const [lastSync, setLastSync] = useState(null);
 
   // Filtros Globais (multi-select arrays — array vazio = Todos)
-  const [filterDataInicial, setFilterDataInicial] = useState(() => getRolling30DayRange().start);
-  const [filterDataFinal, setFilterDataFinal] = useState(() => getRolling30DayRange().end);
+  const [filterDataInicial, setFilterDataInicial] = useState(() => getYearToDateRange().start);
+  const [filterDataFinal, setFilterDataFinal] = useState(() => getYearToDateRange().end);
   const [filterProjetos, setFilterProjetos] = useState([]);
   const [filterEmpresas, setFilterEmpresas] = useState([]);
   const [filterTipos, setFilterTipos] = useState([]);
@@ -48,7 +53,7 @@ export default function Projetos() {
   
   // Drawer e Toggle
   const [selectedProject, setSelectedProject] = useState(null);
-  const [incluirRateioAdm, setIncluirRateioAdm] = useState(false);
+  const [incluirRateioAdm, setIncluirRateioAdm] = useState(true);
 
   const fetchDados = async (force = false) => {
     setIsSyncing(true);
@@ -79,83 +84,103 @@ export default function Projetos() {
   const realizadoIni = dIni;
   const realizadoFim = dFim;
 
-  const baseData = useMemo(() => {
-    return consolidateFinancialData(data, {
-      isProjetosPage: true,
-      incluirRateioAdm
-    });
-  }, [data, incluirRateioAdm]);
+  const projectCashData = useMemo(() => consolidateFinancialData(data, {
+    isProjetosPage: true,
+    incluirRateioAdm: true
+  }), [data]);
+
+  const baseData = useMemo(() => consolidateFinancialData(data, {
+    isProjetosPage: true,
+    incluirRateioAdm
+  }), [data, incluirRateioAdm]);
 
   const projetosCruzados = useMemo(() => {
     const mapaProjetos = {};
-    projetosBrutos.forEach(p => {
+
+    projetosBrutos.forEach((p) => {
       const nomeObra = String(p.OBRA || '').trim();
       if (!nomeObra || nomeObra.toUpperCase().includes('ADMINISTRATIVO') || !isProjectOngoing(p)) return;
       const projectKey = getProjectKey(p.ID || nomeObra);
-      mapaProjetos[projectKey] = {
-        projectKey,
-        nome: nomeObra,
-        empresa: p.EMPRESA || 'N/A',
-        tipo: p.TIPO || 'N/A',
-        contratado: Number(p.CONTRATO) || 0,
-        faturado: Number(p['NF FATURADAS']) || 0,
-        saldoContratual: Number(p['SALDO CONTRATUAL']) || 0,
-        recebido: 0, aReceber: 0, pago: 0, aPagar: 0,
-        receitaDireta: 0, receitaAdm: 0, // Apenas para exibição do InfoTooltip
-        titulosAdmAssociados: []
-      };
+      if (!projectKey) return;
+
+      if (!mapaProjetos[projectKey]) {
+        mapaProjetos[projectKey] = {
+          projectKey,
+          nome: nomeObra.replace(/[.\s]+$/g, ''),
+          empresas: [],
+          tipos: [],
+          contratado: 0,
+          faturado: 0,
+          saldoContratual: 0,
+          recebido: 0,
+          aReceber: 0,
+          pago: 0,
+          aPagar: 0,
+          receitaDireta: 0,
+          receitaAdm: 0,
+          titulosAdmAssociados: []
+        };
+      }
+
+      const projeto = mapaProjetos[projectKey];
+      const empresa = String(p.EMPRESA || 'N/A').trim();
+      const tipo = String(p.TIPO || 'N/A').trim();
+      if (empresa && !projeto.empresas.includes(empresa)) projeto.empresas.push(empresa);
+      if (tipo && !projeto.tipos.includes(tipo)) projeto.tipos.push(tipo);
+      projeto.contratado += Number(p.CONTRATO) || 0;
+      projeto.faturado += Number(p['NF FATURADAS']) || 0;
+      projeto.saldoContratual += Number(p['SALDO CONTRATUAL']) || 0;
     });
 
-    baseData.forEach(item => {
+    projectCashData.forEach((item) => {
+      const projectKey = getProjectKey(item.projeto);
+      const projeto = mapaProjetos[projectKey];
+      if (!projeto) return;
+
       let ts = 0;
       if (item.data) {
-        const parts = item.data.split('/');
+        const parts = String(item.data).split('/');
         if (parts.length === 3) ts = new Date(parts[2], parts[1] - 1, parts[0]).getTime();
       }
-      const projetoNome = item.projeto;
-      const projectKey = getProjectKey(projetoNome);
-      
-      if (projetoNome && mapaProjetos[projectKey]) {
-        const projeto = mapaProjetos[projectKey];
-        const st = String(item.status || '').toUpperCase();
-        const isRealizado = st.includes('REALIZADO') || st.includes('RECEBIDO') || st.includes('PAGO') || st.includes('EFETIVADO');
-        const isPrevisto = !isRealizado && (st.includes('A REALIZAR') || st.includes('A RECEBER') || st.includes('A PAGAR') || st.includes('PREVISTO'));
-        if (isRealizado && (ts < realizadoIni || ts > realizadoFim)) return;
-        if (isPrevisto && (ts < dIni || ts > dFim)) return;
-        if (!isRealizado && !isPrevisto) return;
-        
-        if (item.natureza === 'Entrada') {
-          const classification = classifyFinancialEntry(item);
-          const receitaDiretaItem = Number(item.valorDireto) || (classification.type === 'receita_projeto' ? (Number(item.valor) || 0) : 0);
-          const receitaAdmItem = Number(item.valorAdministrativo) || (classification.type === 'receita_administrativa' ? (Number(item.valor) || 0) : 0);
 
-          if (isRealizado) {
-            projeto.recebido += Number(item.valor) || 0;
-            projeto.receitaDireta += receitaDiretaItem;
-            projeto.receitaAdm += receitaAdmItem;
-          } else {
-            projeto.aReceber += Number(item.valor) || 0;
-          }
-        } else if (item.natureza === 'Saída') {
-          if (isRealizado) projeto.pago += item.valor;
-          else projeto.aPagar += item.valor;
+      const status = String(item.status || '').toUpperCase();
+      const isRealizado = status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('PAGO') || status.includes('EFETIVADO');
+      const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A RECEBER') || status.includes('A PAGAR') || status.includes('PREVISTO'));
+      if (!isRealizado && !isPrevisto) return;
+
+      // Realizados seguem o período; títulos em aberto são posição atual e não
+      // desaparecem só porque vencem depois da Data Final.
+      if (isRealizado && (ts < realizadoIni || ts > realizadoFim)) return;
+
+      if (item.natureza === 'Entrada') {
+        if (isRealizado) {
+          projeto.recebido += Number(item.valor) || 0;
+          projeto.receitaDireta += Number(item.valorDireto) || 0;
+          projeto.receitaAdm += Number(item.valorAdministrativo) || 0;
+        } else {
+          projeto.aReceber += Number(item.valor) || 0;
         }
+      } else if (item.natureza === 'Saída') {
+        if (isRealizado) projeto.pago += Math.abs(Number(item.valor) || 0);
+        else projeto.aPagar += Math.abs(Number(item.valor) || 0);
       }
     });
 
-    return Object.values(mapaProjetos).map(p => ({
+    return Object.values(mapaProjetos).map((p) => ({
       ...p,
-      percentFaturado: p.contratado > 0 ? (p.faturado / p.contratado) : 0,
+      empresa: p.empresas.join(' / ') || 'N/A',
+      tipo: p.tipos.join(' / ') || 'N/A',
+      percentFaturado: p.contratado > 0 ? p.faturado / p.contratado : 0,
       resultadoCaixa: p.recebido - p.pago,
-      receitaConsideradaTooltip: p.receitaDireta + (incluirRateioAdm ? p.receitaAdm : 0)
+      receitaConsideradaTooltip: p.receitaDireta + p.receitaAdm
     }));
-  }, [projetosBrutos, baseData, dIni, dFim, realizadoIni, realizadoFim, incluirRateioAdm]);
+  }, [projetosBrutos, projectCashData, realizadoIni, realizadoFim]);
 
   const filteredProjetos = useMemo(() => {
     return projetosCruzados.filter(p => {
       if (filterProjetos.length > 0 && !filterProjetos.includes(p.nome)) return false;
-      if (filterEmpresas.length > 0 && !filterEmpresas.includes(p.empresa)) return false;
-      if (filterTipos.length > 0 && !filterTipos.includes(p.tipo)) return false;
+      if (filterEmpresas.length > 0 && !p.empresas.some((empresa) => filterEmpresas.includes(empresa))) return false;
+      if (filterTipos.length > 0 && !p.tipos.some((tipo) => filterTipos.includes(tipo))) return false;
       if (colFilterProjeto && !p.nome.toLowerCase().includes(colFilterProjeto.toLowerCase())) return false;
       if (colFilterEmpresa && !p.empresa.toLowerCase().includes(colFilterEmpresa.toLowerCase())) return false;
       if (colFilterMinFaturadoPerc && (p.percentFaturado * 100) < Number(colFilterMinFaturadoPerc)) return false;
@@ -163,9 +188,9 @@ export default function Projetos() {
     });
   }, [projetosCruzados, filterProjetos, filterEmpresas, filterTipos, colFilterProjeto, colFilterEmpresa, colFilterMinFaturadoPerc]);
 
-  const listaProjetos = getActiveProjectNames(projetosBrutos, true);
-  const listaEmpresas = Array.from(new Set(projetosCruzados.map(p => p.empresa))).sort();
-  const listaTipos = Array.from(new Set(projetosCruzados.map(p => p.tipo))).sort();
+  const listaProjetos = Array.from(new Set([...projetosCruzados.map(p => p.nome), 'ADMINISTRAÇÃO'])).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const listaEmpresas = Array.from(new Set(projetosCruzados.flatMap(p => p.empresas))).sort();
+  const listaTipos = Array.from(new Set(projetosCruzados.flatMap(p => p.tipos))).sort();
 
   const sortedProjetos = useMemo(() => {
     const sortable = [...filteredProjetos];
@@ -225,7 +250,18 @@ export default function Projetos() {
   const totalRecebido = filteredProjetos.reduce((acc, p) => acc + p.recebido, 0);
   const totalAReceber = filteredProjetos.reduce((acc, p) => acc + p.aReceber, 0);
   const totalPago = filteredProjetos.reduce((acc, p) => acc + p.pago, 0);
-  const totalAPagar = filteredProjetos.reduce((acc, p) => acc + p.aPagar, 0);
+
+  const previsaoProjetosGeral = useMemo(() => data
+    .filter((item) => {
+      const status = String(item.status || '').toUpperCase();
+      return item.natureza === 'Saída'
+        && (status.includes('A REALIZAR') || status.includes('A PAGAR') || status.includes('PREVISTO'))
+        && isGeneralProjectsBucket(item.projeto);
+    })
+    .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0), [data]);
+
+  const incluirPrevisaoGeral = filterProjetos.length === 0 && filterEmpresas.length === 0 && filterTipos.length === 0;
+  const totalAPagar = filteredProjetos.reduce((acc, p) => acc + p.aPagar, 0) + (incluirPrevisaoGeral ? previsaoProjetosGeral : 0);
   const totalResultado = totalRecebido - totalPago;
   
   const totalRecebidoAdmGlobal = filteredProjetos.reduce((acc, p) => acc + (p.receitaAdm || 0), 0);
@@ -238,73 +274,70 @@ export default function Projetos() {
   }
 
   const dreStats = useMemo(() => {
-    // Receita: usar a mesma lógica de consolidação 80/20 já validada
-    const receitaConsolidada = consolidateFinancialData(
-      data.filter(item => {
-        let ts = 0;
-        if (item.data) {
-          const parts = item.data.split('/');
-          if (parts.length === 3) ts = new Date(parts[2], parts[1] - 1, parts[0]).getTime();
-        }
-        if (item.natureza !== 'Entrada') return false;
-        const st = String(item.status || '').toUpperCase();
-        const isRealizado = st.includes('REALIZADO') || st.includes('RECEBIDO') || st.includes('EFETIVADO');
-        const isPrevisto = !isRealizado && (st.includes('A REALIZAR') || st.includes('A RECEBER') || st.includes('PREVISTO'));
-        if (isRealizado) return ts >= realizadoIni && ts <= realizadoFim;
-        if (isPrevisto) return ts >= dIni && ts <= dFim;
-        return false;
-      }),
-      { isProjetosPage: true, incluirRateioAdm }
-    );
+    const allowedProjects = new Set(filteredProjetos.map((p) => p.projectKey));
+    const receitaConsolidada = consolidateFinancialData(data, { isProjetosPage: true, incluirRateioAdm });
 
-    const allowedProjects = new Set(filteredProjetos.map(p => p.projectKey));
-
-    let recReceita = 0, recAReceber = 0;
-    receitaConsolidada.forEach(item => {
-      if (!allowedProjects.has(getProjectKey(item.projeto))) return;
-      const st = String(item.status || '').toUpperCase();
-      const isRealizado = st.includes('REALIZADO') || st.includes('RECEBIDO') || st.includes('PAGO') || st.includes('EFETIVADO');
-      if (isRealizado) recReceita += item.valor || 0;
-      else recAReceber += item.valor || 0;
-    });
-
-    // Custos e Despesas: usar a classificação gerencial da DRE (DEPARA)
-    let cPago = 0, cAPagar = 0, dPago = 0, dAPagar = 0, nc = 0;
-    const naoClassificados = [];
-    
-    data.forEach(item => {
-      if (item.natureza !== 'Saída') return;
-      if (!allowedProjects.has(getProjectKey(item.projeto))) return;
-      if (item.projeto && String(item.projeto).toUpperCase().includes('ADMINISTRA')) return; // Não trazer custos do CC ADMINISTRAÇÃO
+    let recReceita = 0;
+    let recAReceber = 0;
+    receitaConsolidada.forEach((item) => {
+      if (item.natureza !== 'Entrada' || !allowedProjects.has(getProjectKey(item.projeto))) return;
+      const status = String(item.status || '').toUpperCase();
+      const isRealizado = status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO');
+      const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A RECEBER') || status.includes('PREVISTO'));
 
       let ts = 0;
       if (item.data) {
-        const parts = item.data.split('/');
+        const parts = String(item.data).split('/');
         if (parts.length === 3) ts = new Date(parts[2], parts[1] - 1, parts[0]).getTime();
       }
-      const valor = Math.abs(item.valor || 0);
-      const st = String(item.status || '').toUpperCase();
-      const isRealizado = st.includes('REALIZADO') || st.includes('PAGO') || st.includes('EFETIVADO');
-      const isPrevisto = !isRealizado && (st.includes('A REALIZAR') || st.includes('A PAGAR') || st.includes('PREVISTO'));
+      if (isRealizado && ts >= realizadoIni && ts <= realizadoFim) recReceita += Number(item.valor) || 0;
+      if (isPrevisto) recAReceber += Number(item.valor) || 0;
+    });
 
-      // Se não for nem realizado nem previsto, ignora (ex: Cancelado)
+    let cPago = 0;
+    let cAPagar = 0;
+    let dPago = 0;
+    let dAPagar = 0;
+    let tributos = 0;
+    let tributosAPagar = 0;
+    let nc = 0;
+    const naoClassificados = [];
+
+    data.forEach((item) => {
+      if (item.natureza !== 'Saída' || !allowedProjects.has(getProjectKey(item.projeto))) return;
+      const projetoNome = String(item.projeto || '').toUpperCase();
+      if (projetoNome.includes('ADMINISTRA')) return;
+
+      let ts = 0;
+      if (item.data) {
+        const parts = String(item.data).split('/');
+        if (parts.length === 3) ts = new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+      }
+
+      const status = String(item.status || '').toUpperCase();
+      const isRealizado = status.includes('REALIZADO') || status.includes('PAGO') || status.includes('EFETIVADO');
+      const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A PAGAR') || status.includes('PREVISTO'));
       if (!isRealizado && !isPrevisto) return;
       if (isRealizado && (ts < realizadoIni || ts > realizadoFim)) return;
-      if (isPrevisto && (ts < dIni || ts > dFim)) return;
 
-      const dreInfo = `${item.dreClasse || ''} ${item.dreLinha || ''} ${item.contaDescricao || ''}`.toLowerCase();
-      
-      if (dreInfo.includes('custo')) {
-        if (isRealizado) cPago += valor;
-        else if (isPrevisto) cAPagar += valor;
-      } else if (dreInfo.includes('despesa')) {
-        if (isRealizado) dPago += valor;
-        else if (isPrevisto) dAPagar += valor;
-      } else {
+      const valor = Math.abs(Number(item.valor) || 0);
+      const dreInfo = [item.dreClasse, item.dreLinha, item.dreDescricao].filter(Boolean).join(' ').toUpperCase();
+      const isPendingDre = !dreInfo.trim() || dreInfo.includes('PENDENTE DE CLASSIFICAÇÃO');
+
+      if (isRevenueTax(item)) {
+        if (isRealizado) tributos += valor;
+        else tributosAPagar += valor;
+      } else if (isPendingDre) {
         if (isRealizado) {
           nc += valor;
           naoClassificados.push(item);
         }
+      } else if (dreInfo.includes('CUSTO')) {
+        if (isRealizado) cPago += valor;
+        else cAPagar += valor;
+      } else {
+        if (isRealizado) dPago += valor;
+        else dAPagar += valor;
       }
     });
 
@@ -315,10 +348,12 @@ export default function Projetos() {
       custoAPagar: cAPagar,
       despesa: dPago,
       despesaAPagar: dAPagar,
+      tributos,
+      tributosAPagar,
       naoClassificado: nc,
       naoClassificados
     };
-  }, [data, filteredProjetos, dIni, dFim, realizadoIni, realizadoFim, incluirRateioAdm]);
+  }, [data, filteredProjetos, realizadoIni, realizadoFim, incluirRateioAdm]);
 
   const taxesData = useMemo(() => {
     const taxesMap = {};
@@ -349,8 +384,8 @@ export default function Projetos() {
     return { list: arr, total: totalTaxes };
   }, [data, filteredProjetos, realizadoIni, realizadoFim]);
 
-  const margemFinanceira = dreStats.receita > 0 ? ((dreStats.receita - dreStats.custo - dreStats.despesa) / dreStats.receita) * 100 : null;
-  const resultadoGerencial = dreStats.receita - dreStats.custo - dreStats.despesa;
+  const margemFinanceira = dreStats.receita > 0 ? ((dreStats.receita - dreStats.custo - dreStats.despesa - dreStats.tributos) / dreStats.receita) * 100 : null;
+  const resultadoGerencial = dreStats.receita - dreStats.custo - dreStats.despesa - dreStats.tributos;
   const taxPercentage = dreStats.receita > 0 ? (taxesData.total / dreStats.receita) * 100 : 0;
 
   const abcDonutData = useMemo(() => {
@@ -372,8 +407,8 @@ export default function Projetos() {
     [filteredProjetos]);
 
   const topEntradasData = useMemo(() =>
-    [...filteredProjetos].filter(p => p.receitaDireta > 0).sort((a, b) => b.receitaDireta - a.receitaDireta).slice(0, 5)
-      .map(p => ({ nome: p.nome, Valor: p.receitaDireta })),
+    [...filteredProjetos].filter(p => p.recebido > 0).sort((a, b) => b.recebido - a.recebido).slice(0, 5)
+      .map(p => ({ nome: p.nome, Valor: p.recebido })),
     [filteredProjetos]);
 
   const topSaidasData = useMemo(() =>
@@ -455,7 +490,7 @@ export default function Projetos() {
 
   const clearAllFilters = () => {
     setFilterProjetos([]); setFilterEmpresas([]); setFilterTipos([]);
-    const range = getRolling30DayRange();
+    const range = getYearToDateRange();
     setFilterDataInicial(range.start); setFilterDataFinal(range.end);
     setColFilterProjeto(''); setColFilterEmpresa(''); setColFilterMinFaturadoPerc('');
     setTablePage(1);
@@ -528,13 +563,13 @@ export default function Projetos() {
           </div>
 
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
-            <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Caixa: Data Inicial</label>
+            <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Data Inicial</label>
             <input type="date" value={filterDataInicial} onChange={(e) => setFilterDataInicial(e.target.value)}
               style={{ width: '100%', height: '34px', fontSize: '13px', color: 'var(--text-main)', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
 
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
-            <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Caixa: Data Final</label>
+            <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Data Final</label>
             <input type="date" value={filterDataFinal} onChange={(e) => setFilterDataFinal(e.target.value)}
               style={{ width: '100%', height: '34px', fontSize: '13px', color: 'var(--text-main)', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
@@ -606,7 +641,7 @@ export default function Projetos() {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)" /> Recebido no período</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)" /> Recebido no período (Obra + ADM)</p>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(totalRecebido)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(16,185,129,0.4)' }}>
@@ -623,16 +658,16 @@ export default function Projetos() {
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--primary)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><Percent size={14} color="var(--primary)" /> Impostos sobre Faturamento</p>
-            <ReportAdder sectionKey="projetos:impostos" title="Impostos sobre Faturamento" componentName="Resumo de Impostos" page="Projetos" type="SUMMARY" data={[{ "Total de Impostos": taxesData.total, "% sobre o Faturamento": taxPercentage }]} filters={reportFilters} />
+            <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><Percent size={14} color="var(--primary)" /> Tributos sobre Receita e Lucro</p>
+            <ReportAdder sectionKey="projetos:impostos" title="Tributos sobre Receita e Lucro" componentName="Resumo de Impostos" page="Projetos" type="SUMMARY" data={[{ "Total de Impostos": taxesData.total, "% sobre o Faturamento": taxPercentage }]} filters={reportFilters} />
           </div>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(taxesData.total)}</p>
-          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}><strong style={{ color: 'var(--primary)' }}>{taxPercentage.toFixed(2).replace('.', ',')}%</strong> do faturamento total</p>
+          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}><strong style={{ color: 'var(--primary)' }}>{taxPercentage.toFixed(2).replace('.', ',')}%</strong> da receita de projetos</p>
         </div>
       </div>
 
       {/* 5. Composição Financeira + Resultado */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.5rem', borderTop: '2px solid var(--primary)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -642,8 +677,8 @@ export default function Projetos() {
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Classificação dos valores realizados em 2026</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <ReportAdder sectionKey="projetos:composicao" title="Composição Financeira" componentName="Composição Financeira - Projetos" page="Projetos" type="SUMMARY" data={[{ "Receita Líquida": dreStats.receita, "Custos Diretos": dreStats.custo, "Despesas Admin.": dreStats.despesa, "Não Classificado": dreStats.naoClassificado }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Composição gerencial da receita, custos e despesas dos projetos selecionados." />
-              <InfoTooltip title="Composição Financeira (DRE)" content={<><p>Receita, Custo e Despesa são classificados através do DEPARA/DRE da conta financeira.</p><ul style={{ paddingLeft: '1rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}><li><strong>Receita:</strong> contas classificadas como Receita. Deduções abatem este valor.</li><li><strong>Custo:</strong> contas classificadas como Custos dos Serviços.</li><li><strong>Despesa:</strong> despesas administrativas/operacionais.</li></ul><p style={{ marginTop: '0.5rem' }}>Movimentações sem classificação ficam em "Não Classificado".</p></>} />
+              <ReportAdder sectionKey="projetos:composicao" title="Composição Financeira" componentName="Composição Financeira - Projetos" page="Projetos" type="SUMMARY" data={[{ "Receita de Projetos": dreStats.receita, "Custos Diretos": dreStats.custo, "Despesas": dreStats.despesa, "Tributos": dreStats.tributos, "Não Classificado": dreStats.naoClassificado }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Composição gerencial da receita, custos e despesas dos projetos selecionados." />
+              <InfoTooltip title="Composição Financeira (DRE)" content={<><p>Receita, Custo, Despesa e Tributos são classificados pelo DEPARA/DRE da conta financeira.</p><ul style={{ paddingLeft: '1rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}><li><strong>Receita:</strong> contas classificadas como Receita. Deduções abatem este valor.</li><li><strong>Custo:</strong> contas classificadas como Custos dos Serviços.</li><li><strong>Despesa:</strong> demais saídas com DEPARA válido vinculadas às obras.</li><li><strong>Tributos:</strong> PIS, COFINS, ISS, IRPJ, CSLL e previsões de impostos vinculadas aos projetos.</li></ul><p style={{ marginTop: '0.5rem' }}>Movimentações sem classificação ficam em "Não Classificado".</p></>} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
@@ -657,16 +692,22 @@ export default function Projetos() {
               {dreStats.receita > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.custo / dreStats.receita) * 100).toFixed(1)}% da Receita</span>}
             </div>
             <div style={{ flex: 1, minWidth: '120px' }}>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Despesas Admin.</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Outras Despesas</p>
               <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--danger)' }}>{formatCurrency(dreStats.despesa)}</p>
               {dreStats.receita > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.despesa / dreStats.receita) * 100).toFixed(1)}% da Receita</span>}
+            </div>
+            <div style={{ flex: 1, minWidth: '120px' }}>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Tributos</p>
+              <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--primary)' }}>{formatCurrency(dreStats.tributos)}</p>
+              {dreStats.receita > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.tributos / dreStats.receita) * 100).toFixed(1)}% da Receita</span>}
             </div>
           </div>
           {dreStats.receita > 0 && (
             <div style={{ width: '100%', height: '12px', background: 'var(--bg-main)', borderRadius: '6px', display: 'flex', overflow: 'hidden' }}>
-              <div style={{ width: `${Math.max(0, 100 - ((dreStats.custo + dreStats.despesa) / dreStats.receita) * 100)}%`, background: 'var(--success)', transition: 'width 0.3s ease' }} />
+              <div style={{ width: `${Math.max(0, 100 - ((dreStats.custo + dreStats.despesa + dreStats.tributos) / dreStats.receita) * 100)}%`, background: 'var(--success)', transition: 'width 0.3s ease' }} />
               <div style={{ width: `${(dreStats.custo / dreStats.receita) * 100}%`, background: 'var(--warning)', transition: 'width 0.3s ease' }} />
               <div style={{ width: `${(dreStats.despesa / dreStats.receita) * 100}%`, background: 'var(--danger)', transition: 'width 0.3s ease' }} />
+              <div style={{ width: `${(dreStats.tributos / dreStats.receita) * 100}%`, background: 'var(--primary)', transition: 'width 0.3s ease' }} />
             </div>
           )}
           {dreStats.naoClassificado > 0 && (
@@ -684,11 +725,11 @@ export default function Projetos() {
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Activity size={16} color="var(--primary)" /> Resultado Gerencial
               </h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Receita - Custos - Despesas</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Receita - Custos - Despesas - Tributos</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <ReportAdder sectionKey="projetos:resultado" title="Resultado Gerencial" componentName="Cards Resultado Gerencial" page="Projetos" type="SUMMARY" data={[{ "Resultado Gerencial": resultadoGerencial, "Margem de Resultado (%)": margemFinanceira }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Resultado após custos diretos e despesas administrativas, com a margem correspondente." />
-              <InfoTooltip title="Resultado e Margem" content={<><p><strong>Fórmula do Resultado:</strong><br />Receita Líquida - Custos Diretos - Despesas Administrativas.</p><p style={{ marginTop: '0.5rem' }}><strong>Fórmula da Margem:</strong><br />(Resultado / Receita Líquida) × 100</p></>} />
+              <ReportAdder sectionKey="projetos:resultado" title="Resultado Gerencial" componentName="Cards Resultado Gerencial" page="Projetos" type="SUMMARY" data={[{ "Resultado Gerencial": resultadoGerencial, "Margem de Resultado (%)": margemFinanceira }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Resultado após custos, despesas e tributos dos projetos, com a margem correspondente." />
+              <InfoTooltip title="Resultado e Margem" content={<><p><strong>Fórmula do Resultado:</strong><br />Receita de Projetos - Custos Diretos - Despesas - Tributos.</p><p style={{ marginTop: '0.5rem' }}><strong>Fórmula da Margem:</strong><br />(Resultado / Receita Líquida) × 100</p></>} />
             </div>
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -755,18 +796,18 @@ export default function Projetos() {
           <RankingBarChart data={topSaidasData} dataKey="Valor" color="var(--danger)" emptyMessage="Sem pagamentos realizados em 2026." />
         </div>
 
-        {/* Impostos sobre Faturamento */}
+        {/* Tributos sobre Receita e Lucro */}
         <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: '1 1 400px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Impostos sobre Faturamento</h2>
+              <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Tributos sobre Receita e Lucro</h2>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
                 Total de Impostos: <strong style={{color:'var(--text-main)'}}>{formatCurrency(taxesData.total)}</strong> ({taxPercentage.toFixed(2).replace('.', ',')}% sobre o faturamento)
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <ReportAdder sectionKey="projetos:impostos-chart" title="Impostos sobre Faturamento" componentName="Gráfico Impostos" page="Projetos" type="TABLE" data={taxesData.list} filters={reportFilters} presetTags={["project-executive"]} />
-              <InfoTooltip title="Impostos sobre Faturamento" content={<><p>Usa as saídas classificadas como deduções/impostos sobre faturamento e vinculadas aos projetos filtrados.</p><p style={{ marginTop: '0.5rem' }}><strong>Não inclui retenções de fornecedor.</strong></p></>} />
+              <ReportAdder sectionKey="projetos:impostos-chart" title="Tributos sobre Receita e Lucro" componentName="Gráfico Impostos" page="Projetos" type="TABLE" data={taxesData.list} filters={reportFilters} presetTags={["project-executive"]} />
+              <InfoTooltip title="Tributos sobre Receita e Lucro" content={<><p>Usa as saídas classificadas como deduções/impostos sobre faturamento e vinculadas aos projetos filtrados.</p><p style={{ marginTop: '0.5rem' }}><strong>Não inclui retenções de fornecedor.</strong></p></>} />
             </div>
           </div>
           <RankingBarChart data={taxesData.list} dataKey="Valor" color="var(--primary)" emptyMessage="Sem impostos registrados no período." onClickItem={(cat) => setTaxDrillDown && setTaxDrillDown(cat.name)} />

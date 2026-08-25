@@ -10,18 +10,19 @@ export function extractAccountCode(contaString) {
   return parts[0].trim().replace(/\D/g, '');
 }
 
-const REQUIRED_COLUMNS_CP = [
+export const REQUIRED_COLUMNS_CP = [
   'Data', 'Documento', 'Status', 'Tipo conta', 'Origem', 'Título', 'Nome',
   'Valor total título', 'Valor', 'Código centro de custo', 'Nome centro de custo', 'Conta'
 ];
 
-const REQUIRED_COLUMNS_CR = [
+export const REQUIRED_COLUMNS_CR = [
   'Data', 'Documento', 'Status', 'Tipo conta', 'Origem', 'Lançamento', 'Nome',
   'Valor total título', 'Valor', 'Código centro de custo', 'Nome centro de custo', 'Conta'
 ];
 
 export function validateHeaders(headers, requiredHeaders) {
-  const missing = requiredHeaders.filter(h => !headers.includes(h));
+  const normalizedHeaders = (headers || []).map((header) => String(header || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim());
+  const missing = requiredHeaders.filter((header) => !normalizedHeaders.includes(header));
   if (missing.length > 0) {
     throw new Error(`COLUNA NÃO MAPEADA ou ausente. Faltam: ${missing.join(', ')}`);
   }
@@ -68,7 +69,7 @@ function buildProjectIndex(projectCatalog = []) {
   const byAlias = new Map();
 
   projectCatalog.forEach((project) => {
-    const label = String(project.OBRA || '').trim();
+    const label = String(project.OBRA || '').trim().replace(/[.\s]+$/g, '');
     if (!label) return;
 
     const codes = new Set([
@@ -100,13 +101,23 @@ function buildProjectIndex(projectCatalog = []) {
       return;
     }
 
-    // Se um código existe em mais de um cadastro, só resolvemos automaticamente
-    // quando exatamente um deles ainda está em andamento na relação oficial.
     const active = distinct.filter((candidate) => candidate.active);
     if (active.length === 1) unique.set(alias, active[0]);
   });
 
   return unique;
+}
+
+function buildExactProjectNameIndex(projectCatalog = []) {
+  const exact = new Map();
+  projectCatalog.forEach((project) => {
+    const label = String(project.OBRA || '').trim().replace(/[.\s]+$/g, '');
+    if (!label) return;
+    const key = normalizeText(label);
+    if (!exact.has(key)) exact.set(key, []);
+    exact.get(key).push({ label, project, code: projectCode(project.ID) || projectCode(label) || '' });
+  });
+  return exact;
 }
 
 function documentProjectCandidates(documento) {
@@ -136,26 +147,50 @@ function resolveProjectFromDocument(documento, projectIndex) {
   return null;
 }
 
+function resolveCanonicalSourceProject(rawNome, rawCodigo, exactIndex, projectIndex) {
+  const normalizedName = normalizeText(rawNome);
+  if (normalizedName) {
+    if (normalizedName.includes('ADMINISTRA')) return { label: 'ADMINISTRAÇÃO', code: rawCodigo, source: 'ADMINISTRACAO' };
+    if (normalizedName === 'PROJETOS' || normalizedName === 'PROJETOS GERAL' || normalizedName === 'PROJETOS GERAIS') {
+      return { label: 'PROJETOS', code: rawCodigo, source: 'PROJETOS_GERAL' };
+    }
+
+    const exactMatches = exactIndex.get(normalizedName) || [];
+    if (exactMatches.length === 1) return { ...exactMatches[0], source: 'NOME_OFICIAL_PROJETOS_2026' };
+
+    const nameCode = projectCode(rawNome);
+    for (const alias of projectAliases(nameCode)) {
+      const candidate = projectIndex.get(alias);
+      if (candidate) return { ...candidate, source: 'CODIGO_NOME_PROJETOS_2026' };
+    }
+  }
+
+  for (const alias of projectAliases(rawCodigo)) {
+    const candidate = projectIndex.get(alias);
+    if (candidate) return { ...candidate, source: 'CODIGO_CC_PROJETOS_2026' };
+  }
+
+  return null;
+}
+
 /**
- * R01: Natureza financeira: CR_GERAL = Entrada; CP_GERAL = Saída.
- * R10: Ignorar linhas sem Data/Conta.
- *
- * Para CR_GERAL, quando o Sienge retorna centro de custo genérico "1 / Grupo OAE",
- * o projeto só é recuperado se o Documento trouxer uma referência explícita P.xxx
- * (ou PCT/CTPA) e ela corresponder de forma única à relação PROJETOS_2026.
+ * CR_GERAL = Entrada; CP_GERAL = Saída.
+ * Linhas sem Data/Conta são ignoradas.
+ * Sempre que a identificação da obra for inequívoca, o nome exibido vem da relação oficial PROJETOS_2026.
  */
 export function processSiengeData(sheetData, type, deparaMap, projectCatalog = []) {
   const isCR = type === 'CR_GERAL';
   const nature = isCR ? 'Entrada' : 'Saída';
-  const projectIndex = isCR ? buildProjectIndex(projectCatalog) : new Map();
+  const projectIndex = buildProjectIndex(projectCatalog);
+  const exactProjectNameIndex = buildExactProjectNameIndex(projectCatalog);
 
   return sheetData
-    .filter(row => {
+    .filter((row) => {
       const hasData = row.Data && String(row.Data).trim() !== '';
       const hasConta = row.Conta && String(row.Conta).trim() !== '';
       return hasData && hasConta;
     })
-    .map(row => {
+    .map((row) => {
       const accountCode = extractAccountCode(row.Conta);
       const dreInfo = deparaMap[accountCode] || {
         'DESCRIÇÃO DRE': 'PENDENTE DE CLASSIFICAÇÃO',
@@ -164,18 +199,25 @@ export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [
         'Linha DRE': 'PENDENTE DE CLASSIFICAÇÃO'
       };
 
-      const rawCodigo = String(row['Código centro de custo'] || '').trim();
-      const rawNome = String(row['Nome centro de custo'] || '').trim();
+      const rawCodigo = String(row['Código centro de custo'] ?? '').trim();
+      const rawNome = String(row['Nome centro de custo'] ?? '').trim();
       let projetoResolvido = rawNome || rawCodigo || 'SEM PROJETO';
       let projetoResolvidoPor = 'CENTRO_CUSTO';
       let projetoCodigoValidado = '';
 
       if (rawCodigo && rawNome === '') {
-        const found = sheetData.find(r =>
-          String(r['Código centro de custo'] || '').trim() === rawCodigo
-          && String(r['Nome centro de custo'] || '').trim() !== ''
+        const found = sheetData.find((sourceRow) =>
+          String(sourceRow['Código centro de custo'] ?? '').trim() === rawCodigo
+          && String(sourceRow['Nome centro de custo'] ?? '').trim() !== ''
         );
         projetoResolvido = found ? String(found['Nome centro de custo']).trim() : rawCodigo;
+      }
+
+      const canonicalSourceProject = resolveCanonicalSourceProject(projetoResolvido, rawCodigo, exactProjectNameIndex, projectIndex);
+      if (canonicalSourceProject) {
+        projetoResolvido = canonicalSourceProject.label;
+        projetoCodigoValidado = canonicalSourceProject.code || '';
+        projetoResolvidoPor = canonicalSourceProject.source;
       }
 
       const centroCustoGenerico = isCR
