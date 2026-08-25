@@ -722,17 +722,7 @@ export default function Projetos() {
             />
             Incluir rateio administrativo da receita
           </label>
-          <InfoTooltip 
-            title="Receita Administrativa Vinculada" 
-            content={
-              <>
-                <p>Parcela da receita de um título lançada em centro de custo administrativo, mas vinculada ao projeto pela correspondência do mesmo Lançamento/Documento/Nome.</p>
-                <p style={{ marginTop: '0.5rem' }}>Esta opção adiciona somente receitas administrativas vinculadas; despesas administrativas não são incorporadas ao projeto.</p>
-                <ul style={{ paddingLeft: '1rem', marginTop: '0.5rem' }}>
-                  <li><strong>Status Atual:</strong> {incluirRateioAdm ? 'Ativado (considerando rateio)' : 'Desativado (somente Receita Direta)'}</li>
-                  <li><strong>Receita Adm. Total Vinculada:</strong> {formatCurrency(totalRecebidoAdmGlobal)}</li>
-                </ul>
-              </>
+          <InfoTooltip title="Receita Administrativa Vinculada" content="Receita administrativa vinculada aos projetos selecionados." />
             } 
           />
         </div>
@@ -776,7 +766,7 @@ export default function Projetos() {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <ReportAdder sectionKey="projetos:composicao" title="Composição Financeira" componentName="Composição Financeira - Projetos" page="Projetos" type="SUMMARY" data={[{ "Receita de Projetos": dreStats.receita, "Custos Diretos": dreStats.custo, "Despesas": dreStats.despesa, "Tributos": dreStats.tributos, "Não Classificado": dreStats.naoClassificado }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Composição gerencial da receita, custos e despesas dos projetos selecionados." />
-              <InfoTooltip title="Composição Financeira (DRE)" content={<><p>Receita, Custo, Despesa e Tributos são classificados pelo DEPARA/DRE da conta financeira.</p><ul style={{ paddingLeft: '1rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}><li><strong>Receita:</strong> contas classificadas como Receita. Deduções abatem este valor.</li><li><strong>Custo:</strong> contas classificadas como Custos dos Serviços.</li><li><strong>Despesa:</strong> demais saídas com DEPARA válido vinculadas às obras.</li><li><strong>Tributos:</strong> PIS, COFINS, ISS, IRPJ, CSLL e previsões de impostos vinculadas aos projetos.</li></ul><p style={{ marginTop: '0.5rem' }}>Movimentações sem classificação ficam em "Não Classificado".</p></>} />
+              <InfoTooltip title="Composição Financeira (DRE)" content="Receita, custos, despesas, tributos e valores não classificados dos projetos selecionados." />} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
@@ -812,7 +802,7 @@ export default function Projetos() {
             <div style={{ marginTop: '1rem', fontSize: '11px', color: 'var(--warning)', padding: '0.5rem', background: 'rgba(245,158,11,0.1)', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Aviso: <strong>{formatCurrency(dreStats.naoClassificado)}</strong> ainda sem classificação DRE válida.</span>
               <button type="button" onClick={() => setShowUnclassified(true)} className="btn" style={{ fontSize: '11px', padding: '0.3rem 0.65rem', background: 'transparent', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.35)' }}>Ver lançamentos</button>
-              <InfoTooltip title="Movimentações Não Classificadas" content="Essas movimentações não entram na composição Receita/Custo/Despesa até terem classificação segura. Isso evita que o resultado gerencial seja calculado incorretamente." />
+              <InfoTooltip title="Movimentações Não Classificadas" content="Movimentações dos projetos selecionados que ainda não possuem classificação DRE válida." />
             </div>
           )}
         </div>
@@ -827,7 +817,7 @@ export default function Projetos() {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <ReportAdder sectionKey="projetos:resultado" title="Resultado Gerencial" componentName="Cards Resultado Gerencial" page="Projetos" type="SUMMARY" data={[{ "Resultado Gerencial": resultadoGerencial, "Margem de Resultado (%)": margemFinanceira }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Resultado após custos, despesas e tributos dos projetos, com a margem correspondente." />
-              <InfoTooltip title="Resultado e Margem" content={<><p><strong>Fórmula do Resultado:</strong><br />Receita de Projetos - Custos Diretos - Despesas - Tributos.</p><p style={{ marginTop: '0.5rem' }}><strong>Fórmula da Margem:</strong><br />(Resultado / Receita Líquida) × 100</p></>} />
+              <InfoTooltip title="Resultado e Margem" content="Resultado gerencial e margem dos projetos selecionados." />Receita de Projetos - Custos Diretos - Despesas - Tributos.</p><p style={{ marginTop: '0.5rem' }}><strong>Fórmula da Margem:</strong><br />(Resultado / Receita Líquida) × 100</p></>} />
             </div>
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -858,7 +848,7 @@ export default function Projetos() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ReportAdder sectionKey="projetos:evolucao-anual" title="Evolução Financeira dos Projetos — 2026" componentName="Gráfico de Evolução Financeira" page="Projetos" type="CHART" data={monthlyFinancialData} filters={reportFilters} captureId="report-projetos-evolucao-anual" presetTags={["project-executive"]} />
-            <InfoTooltip title="Evolução Financeira 2026" content="Linha mensal dos valores realizados: receitas de projetos, custos dos serviços e demais despesas vinculadas às obras. Tributos são exibidos separadamente na composição financeira e não são somados como despesas nesta linha." />
+            <InfoTooltip title="Evolução Financeira 2026" content="Receitas, custos e despesas realizados por mês em 2026." />
           </div>
         </div>
         <ProjectMonthlyFinancialLineChart data={monthlyFinancialData} />
@@ -874,7 +864,7 @@ export default function Projetos() {
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Concentração da Carteira — Curva ABC</h2>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Projetos classificados pelo Valor Contratado. Clique em cada classe para expandir a lista.</p>
             </div>
-            <InfoTooltip title="Curva ABC" content={<><p>Classifica os projetos pelo <strong>valor individual do contrato</strong>.</p><ul style={{ paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}><li><strong style={{ color: 'var(--success)' }}>Classe A:</strong> acima de R$ 500 mil.</li><li><strong style={{ color: 'var(--warning)' }}>Classe B:</strong> de R$ 100 mil a R$ 500 mil.</li><li><strong style={{ color: 'var(--danger)' }}>Classe C:</strong> abaixo de R$ 100 mil.</li></ul></>} />
+            <InfoTooltip title="Curva ABC" content="Distribuição dos projetos nas classes A, B e C pelo valor contratado." />} />
           </div>
           <ABCClassDonut data={abcDonutData} />
         </div>
@@ -888,7 +878,7 @@ export default function Projetos() {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <ReportAdder sectionKey="projetos:top-entradas" title="5 Maiores Fontes de Receita — Projetos" componentName="Gráfico Maiores Entradas" page="Projetos" type="TABLE" data={topEntradasData} filters={reportFilters} presetTags={["project-executive"]} />
-              <InfoTooltip title="5 Maiores Fontes de Receita — Projetos" content={<><p>Exibe os 5 projetos/obras com maior receita recebida no período. Administração não entra neste ranking.</p><p style={{ marginTop: '0.5rem' }}>Não deduz saídas. Foco exclusivo no volume recebido.</p></>} />
+              <InfoTooltip title="5 Maiores Fontes de Receita — Projetos" content="Cinco projetos com maior receita recebida no período selecionado." />} />
             </div>
           </div>
           <RankingBarChart data={topEntradasData} dataKey="Valor" color="var(--success)" emptyMessage="Sem recebimentos realizados em 2026." />
@@ -903,7 +893,7 @@ export default function Projetos() {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <ReportAdder sectionKey="projetos:top-saidas" title="5 Maiores Saídas de Caixa" componentName="Gráfico Maiores Saídas" page="Projetos" type="TABLE" data={topSaidasData} filters={reportFilters} presetTags={["project-executive"]} />
-              <InfoTooltip title="5 Maiores Saídas" content={<><p>Exibe os 5 projetos com maior total de movimentações de <strong>Saída</strong> realizadas em 2026.</p><p style={{ marginTop: '0.5rem' }}>Não inclui previsões a pagar. Foco exclusivo no valor desembolsado.</p></>} />
+              <InfoTooltip title="5 Maiores Saídas" content="Cinco projetos com maior volume pago no período selecionado." />} />
             </div>
           </div>
           <RankingBarChart data={topSaidasData} dataKey="Valor" color="var(--danger)" emptyMessage="Sem pagamentos realizados em 2026." />
@@ -920,7 +910,7 @@ export default function Projetos() {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <ReportAdder sectionKey="projetos:impostos-chart" title="Tributos sobre Receita e Lucro" componentName="Gráfico Impostos" page="Projetos" type="TABLE" data={taxesData.list} filters={reportFilters} presetTags={["project-executive"]} />
-              <InfoTooltip title="Tributos sobre Receita e Lucro" content={<><p>Usa as saídas classificadas como deduções/impostos sobre faturamento e vinculadas aos projetos filtrados.</p><p style={{ marginTop: '0.5rem' }}><strong>Não inclui retenções de fornecedor.</strong></p></>} />
+              <InfoTooltip title="Tributos sobre Receita e Lucro" content="Tributos sobre receita e lucro vinculados aos projetos selecionados." />} />
             </div>
           </div>
           <RankingBarChart data={taxesData.list} dataKey="Valor" color="var(--primary)" emptyMessage="Sem impostos registrados no período." onClickItem={(cat) => setTaxDrillDown && setTaxDrillDown(cat.name)} />
@@ -1099,7 +1089,7 @@ export default function Projetos() {
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           Rateio Administrativo
-                          {selectedProject.receitaAdm > 0 && <InfoTooltip title="Rateio Administrativo Aplicado" content="Valores de receita mapeados do Centro de Custo ADMINISTRAÇÃO com Lançamento correspondente" />}
+                          {selectedProject.receitaAdm > 0 && <InfoTooltip title="Rateio Administrativo Aplicado" content="Receita administrativa vinculada ao projeto selecionado." />}
                         </span>
                         <strong style={{ color: 'var(--success)' }}>{formatCurrency(selectedProject.receitaAdm || 0)}</strong>
                       </div>

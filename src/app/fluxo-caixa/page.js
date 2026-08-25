@@ -500,7 +500,7 @@ export default function FluxoDeCaixa() {
               <ChartHeader
                 title="Saldos Bancários"
                 infoTitle={`Posição bancária em ${dataBase}`}
-                infoContent={`Exibe o total consolidado por empresa. Clique em uma linha para ver o detalhamento das contas e bancos. (Ref: ${dataBase})`}
+                infoContent={`Saldos bancários consolidados por empresa na data de referência ${dataBase}.`}
               />
             );
           })()}
@@ -594,7 +594,7 @@ export default function FluxoDeCaixa() {
           <ChartHeader
             title="Evolução do Fluxo de Caixa"
             infoTitle="Evolução do Fluxo"
-            infoContent="Mostra o fluxo de Entradas, Saídas e Resultado (Entradas - Saídas) de acordo com os filtros selecionados no topo da página."
+            infoContent="Entradas, saídas e resultado ao longo do período selecionado."
           />
           <div style={{ flex: 1, minHeight: '300px', marginTop: '1rem' }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -625,7 +625,7 @@ export default function FluxoDeCaixa() {
           <ChartHeader
             title="Previsão Semanal (Próximos 7 Dias)"
             infoTitle="Previsão Semanal"
-            infoContent="Exibe a previsão de caixa para os próximos 7 dias com base nas datas de vencimento. Clique em uma barra para filtrar a tabela principal e ver os detalhes."
+            infoContent="Entradas e saídas previstas para os próximos 7 dias."
           />
           <div style={{ flex: 1, minHeight: '250px', marginTop: '1rem', cursor: 'pointer' }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -650,7 +650,7 @@ export default function FluxoDeCaixa() {
             <ChartHeader
               title={`Resumo de Hoje — ${formatDateBR(hojeObj)}`}
               infoTitle="Dia Atual"
-              infoContent="Mostra contas a receber e contas a pagar previstas para a data atual. Os valores são calculados a partir dos lançamentos ainda previstos em CR_GERAL e CP_GERAL com vencimento/data correspondente a hoje. Clique nos cards para visualizar os lançamentos que compõem os valores."
+              infoContent="Contas a receber e contas a pagar previstas para hoje."
             />
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.25rem', marginTop: '0.25rem' }}>Movimentações previstas para hoje</p>
 
@@ -773,7 +773,7 @@ export default function FluxoDeCaixa() {
         <ChartHeader
           title="Movimentações Financeiras Anuais — 2026"
           infoTitle="Fluxo Anual 2026"
-          infoContent="Mostra, por mês de 2026, Recebido, A receber, Pago e A pagar. A linha Resultado liga o saldo de cada mês: (Recebido + A receber) - (Pago + A pagar). Esta visão anual não é cortada pelo filtro de datas da página."
+          infoContent="Recebido, a receber, pago, a pagar e resultado por mês de 2026."
         />
         <div style={{ height: '300px', marginTop: '1rem' }}>
           <ResponsiveContainer width="100%" height="100%">

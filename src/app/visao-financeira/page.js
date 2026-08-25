@@ -736,7 +736,7 @@ export default function VisaoFinanceira() {
             <div className="finance-chart-frame"><ProjectFinancialOverviewChart recebido={projectFinancialOverview.receita} saidas={projectFinancialOverview.saidas} resultado={projectFinancialOverview.resultado} /></div>
           </div>
           <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <AccountBarChart data={topContasSaidas} title="Despesas por Plano de Conta" infoContent="Concentração das saídas por plano de conta. Retiradas dos sócios não entram nesta visão." color="var(--danger)" />
+            <AccountBarChart data={topContasSaidas} title="Despesas por Plano de Conta" infoContent="Saídas agrupadas por plano de conta no período selecionado, sem retiradas dos sócios." color="var(--danger)" />
           </div>
         </div>
 
