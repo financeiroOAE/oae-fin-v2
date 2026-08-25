@@ -99,9 +99,20 @@ export function processSiengeData(sheetData, type, deparaMap) {
         ? contaRaw.slice(contaDashIdx + 3).trim()
         : contaRaw;
 
+      // Data de emissão é opcional: só é preenchida quando vier explicitamente
+      // da fonte. Não reutilizamos a coluna Data, pois ela já tem outro papel no fluxo.
+      const dataEmissao = String(
+        row['Data de Emissão']
+        || row['Data de emissão']
+        || row['Data Emissão']
+        || row['Data emissão']
+        || ''
+      ).trim();
+
       return {
         natureza: nature,
         data: row.Data,
+        dataEmissao,
         documento: String(row.Documento || ''), // R03
         status: String(row.Status || '').trim(), // R08
         projeto: projetoResolvido, // R02
