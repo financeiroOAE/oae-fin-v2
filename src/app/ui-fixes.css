@@ -53,26 +53,18 @@
   cursor: wait;
 }
 
-.chart-utility-tools {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.3rem;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.chart-tool-wrap {
+.card-help-wrap {
   position: relative;
   display: inline-flex;
   align-items: center;
+  margin-left: 0.35rem;
+  vertical-align: middle;
 }
 
-.chart-icon-button {
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
+.card-help-icon {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 50%;
@@ -83,15 +75,15 @@
   justify-content: center;
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
-  opacity: 0.72;
+  opacity: 0.62;
   transition: all 0.16s ease;
 }
 
-.chart-icon-button:hover,
-.chart-icon-button:focus-visible {
+.card-help-icon:hover,
+.card-help-icon:focus-visible {
   opacity: 1;
   color: var(--text-main);
   border-color: var(--border-color);
@@ -99,68 +91,57 @@
   outline: none;
 }
 
-.chart-menu-button {
-  font-size: 17px;
-  font-weight: 600;
-  padding-bottom: 3px;
-}
-
-.chart-popover {
+.card-help-popover {
   position: absolute;
   top: calc(100% + 7px);
-  right: 0;
-  z-index: 50;
+  left: 0;
+  z-index: 80;
   width: min(300px, calc(100vw - 40px));
-  padding: 0.85rem 0.9rem;
+  padding: 0.8rem 0.9rem;
   border: 1px solid var(--border-color);
   border-radius: 9px;
-  background: color-mix(in srgb, var(--bg-card) 96%, transparent);
+  background: color-mix(in srgb, var(--bg-card) 97%, transparent);
   box-shadow: 0 12px 28px rgba(0,0,0,0.28);
   backdrop-filter: blur(12px);
   color: var(--text-secondary);
   font-size: 12px;
+  font-weight: 400;
   line-height: 1.45;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
 }
 
-.chart-popover[hidden] {
+.card-help-popover[hidden] {
   display: none !important;
 }
 
-.chart-help-popover strong {
+.card-help-popover strong {
   display: block;
   color: var(--text-main);
   font-size: 11px;
-  margin-bottom: 0.2rem;
+  font-weight: 700;
+  margin-bottom: 0.18rem;
 }
 
-.chart-help-popover p {
-  margin: 0 0 0.7rem;
+.card-help-popover p {
+  margin: 0 0 0.65rem;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-transform: none;
 }
 
-.chart-help-popover p:last-child {
+.card-help-popover p:last-child {
   margin-bottom: 0;
 }
 
-.chart-actions-popover {
-  width: 160px;
-  padding: 0.35rem;
-}
-
-.chart-action-item {
-  width: 100%;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-main);
-  padding: 0.55rem 0.65rem;
-  text-align: left;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.chart-action-item:hover {
-  background: var(--bg-elevated);
+/* Nos cards demonstrativos, usamos somente o ? de leitura para não duplicar ajuda. */
+.has-demonstrative-help > .info-tooltip-container,
+.has-demonstrative-help h2 > .info-tooltip-container,
+.has-demonstrative-help h3 > .info-tooltip-container {
+  display: none !important;
 }
 
 .account-group-separator td {
@@ -182,11 +163,7 @@
     justify-content: flex-start;
   }
 
-  .chart-utility-tools {
-    margin-left: 0.4rem;
-  }
-
-  .chart-popover {
+  .card-help-popover {
     position: fixed;
     top: auto;
     right: 16px;
