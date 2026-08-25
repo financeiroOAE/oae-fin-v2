@@ -52,6 +52,15 @@ function isDailySyncDue(snapshotUpdatedAt) {
   );
 }
 
+function snapshotNeedsProjectRepair(payload) {
+  if (!Array.isArray(payload?.data)) return false;
+  return payload.data.some((item) => {
+    if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
+    const project = String(item?.projeto || '').trim().toUpperCase();
+    return project === 'GRUPO OAE';
+  });
+}
+
 export async function GET(request) {
   const session = await getSession();
   if (!session?.user?.username) {
@@ -64,22 +73,22 @@ export async function GET(request) {
 
   try {
     snapshot = await readCurrentSnapshot();
-    const scheduledDue = !force && isDailySyncDue(snapshot?.updatedAt);
+    const requiresRepair = snapshotNeedsProjectRepair(snapshot?.payload);
+    const scheduledDue = !force && !requiresRepair && isDailySyncDue(snapshot?.updatedAt);
 
-    if (force || scheduledDue) {
-      const triggeredBy = force ? username : 'AUTO_16:30';
+    if (force || requiresRepair || scheduledDue) {
+      const triggeredBy = force ? username : requiresRepair ? 'AUTO_REPAIR_PROJECTS' : 'AUTO_16:30';
 
       try {
         const payload = await refreshFinancialSnapshot(triggeredBy);
         return NextResponse.json({
           ...payload,
           fromSnapshot: false,
-          refreshReason: force ? 'MANUAL' : 'AUTO_16:30',
+          refreshReason: force ? 'MANUAL' : requiresRepair ? 'SNAPSHOT_REPAIR' : 'AUTO_16:30',
         });
       } catch (refreshError) {
         await registerSyncError(triggeredBy, refreshError);
 
-        // Nunca derrubar o painel se já existir uma fotografia válida.
         if (snapshot?.payload) {
           return NextResponse.json({
             ...snapshot.payload,
