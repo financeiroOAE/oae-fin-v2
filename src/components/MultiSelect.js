@@ -90,10 +90,11 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
         background: 'var(--bg-elevated)',
         border: '1px solid var(--border-color)',
         borderRadius: '8px',
-        zIndex: 2147482500,
+        zIndex: 2147483646,
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '0 18px 40px rgba(0,0,0,0.48)',
+        boxShadow: '0 22px 48px rgba(0,0,0,0.58)',
+        isolation: 'isolate',
         overflow: 'hidden',
       }}
     >

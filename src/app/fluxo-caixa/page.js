@@ -18,7 +18,7 @@ import ReportAdder from "@/components/report/ReportAdder";
 import { getRolling30DayRange } from "@/lib/dateRange";
 import { getActiveProjectNames } from "@/lib/projectRules";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine, Cell
+  BarChart, Bar, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine, Cell
 } from "recharts";
 
 export default function FluxoDeCaixa() {
@@ -52,7 +52,8 @@ export default function FluxoDeCaixa() {
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
       setSaldosBancarios(result.saldosBancarios || []);
-      setLastSync(new Date().toLocaleString('pt-BR'));
+      const syncDate = result.syncedAt || result.snapshotAt;
+      setLastSync(syncDate ? new Date(syncDate).toLocaleString('pt-BR') : null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -184,7 +185,7 @@ export default function FluxoDeCaixa() {
   const annualData2026 = useMemo(() => {
     const map = {};
     const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-    meses.forEach((m, i) => map[i] = { mesNome: m, Recebido: 0, 'A receber': 0, Pago: 0, Resultado: 0, id: i });
+    meses.forEach((m, i) => map[i] = { mesNome: m, Recebido: 0, 'A receber': 0, Pago: 0, 'A pagar': 0, Resultado: 0, id: i });
     
     annualFilteredData.forEach(item => {
       if (!item.data) return;
@@ -203,7 +204,8 @@ export default function FluxoDeCaixa() {
             map[m].Resultado += item.valor;
           }
           if (item.natureza === 'Saída') {
-            map[m].Pago += item.valor;
+            if (isPrevisto) map[m]['A pagar'] += item.valor;
+            else map[m].Pago += item.valor;
             map[m].Resultado -= item.valor;
           }
         }
@@ -771,11 +773,11 @@ export default function FluxoDeCaixa() {
         <ChartHeader
           title="Movimentações Financeiras Anuais — 2026"
           infoTitle="Fluxo Anual 2026"
-          infoContent="Mostra, por mês de 2026, o que já foi recebido, o que ainda está a receber, o que foi pago e o resultado financeiro. Esta visão anual não é cortada pelo filtro de datas da página."
+          infoContent="Mostra, por mês de 2026, Recebido, A receber, Pago e A pagar. A linha Resultado liga o saldo de cada mês: (Recebido + A receber) - (Pago + A pagar). Esta visão anual não é cortada pelo filtro de datas da página."
         />
         <div style={{ height: '300px', marginTop: '1rem' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={annualData2026} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+            <ComposedChart data={annualData2026} margin={{ top: 10, right: 18, left: 10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
               <XAxis dataKey="mesNome" stroke="var(--text-secondary)" fontSize={12} tickMargin={10} axisLine={false} tickLine={false} />
               <YAxis stroke="var(--text-secondary)" fontSize={12} tickFormatter={(val) => formatCurrency(val)} axisLine={false} tickLine={false} />
@@ -784,9 +786,10 @@ export default function FluxoDeCaixa() {
               <ReferenceLine y={0} stroke="var(--border-color)" />
               <Bar dataKey="Recebido" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={50} />
               <Bar dataKey="A receber" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={50} />
-              <Bar dataKey="Pago" fill="var(--danger)" radius={[4, 4, 0, 0]} maxBarSize={50} />
-              <Bar dataKey="Resultado" fill="var(--info)" radius={[4, 4, 0, 0]} maxBarSize={50} />
-            </BarChart>
+              <Bar dataKey="Pago" fill="var(--danger)" radius={[4, 4, 0, 0]} maxBarSize={42} />
+              <Bar dataKey="A pagar" fill="var(--warning)" radius={[4, 4, 0, 0]} maxBarSize={42} />
+              <Line type="monotone" dataKey="Resultado" stroke="var(--info)" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>

@@ -96,7 +96,11 @@ export function consolidateFinancialData(baseData, options = {}) {
     }
 
     const statusKey = String(item.status || '').trim().toUpperCase();
-    const key = `${item.lancamento}|${statusKey}`;
+    const dateKey = parseDateToLocalMidnight(item.data, item.dataTimestamp);
+    // O mesmo lançamento pode existir no fechamento de 31/12/2025 e voltar a
+    // aparecer na realização de 2026. Sem a data na chave, a linha de 2026
+    // herdava a data antiga e desaparecia do período selecionado.
+    const key = `${item.lancamento}|${statusKey}|${dateKey}`;
 
     if (!consolidatedMap.has(key)) {
       consolidatedMap.set(key, {

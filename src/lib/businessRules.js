@@ -178,7 +178,7 @@ function resolveCanonicalSourceProject(rawNome, rawCodigo, exactIndex, projectIn
  * Linhas sem Data/Conta são ignoradas.
  * Sempre que a identificação da obra for inequívoca, o nome exibido vem da relação oficial PROJETOS_2026.
  */
-export function processSiengeData(sheetData, type, deparaMap, projectCatalog = []) {
+export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [], financialPlanMap = {}) {
   const isCR = type === 'CR_GERAL';
   const nature = isCR ? 'Entrada' : 'Saída';
   const projectIndex = buildProjectIndex(projectCatalog);
@@ -198,6 +198,7 @@ export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [
         'Pacote': 'PENDENTE DE CLASSIFICAÇÃO',
         'Linha DRE': 'PENDENTE DE CLASSIFICAÇÃO'
       };
+      const financialPlan = financialPlanMap[accountCode] || {};
 
       const rawCodigo = String(row['Código centro de custo'] ?? '').trim();
       const rawNome = String(row['Nome centro de custo'] ?? '').trim();
@@ -268,6 +269,10 @@ export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [
         valorTotalTitulo: parseBRL(row['Valor total título'] || row['Valor total ttulo']),
         contaCodigo: accountCode,
         contaNome: contaNomeOriginal,
+        planoCodigo: String(financialPlan.CODIGO || '').trim(),
+        planoFinanceiro: String(financialPlan['PLANO FINANCEIRO'] || '').trim(),
+        planoCategoria: String(financialPlan.CATEGORIA || '').trim(),
+        planoTipo: String(financialPlan.TIPO || '').trim(),
         contaDescricao: dreInfo['DESCRIÇÃO DRE'],
         dreClasse: dreInfo['Classe Orçamentária'],
         drePacote: dreInfo['Pacote'],
