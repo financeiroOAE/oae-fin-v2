@@ -47,9 +47,6 @@ export function classifyFinancialEntry(item) {
     return { label: 'Receitas Administrativas', type: 'receita_administrativa', isRevenue: true };
   }
 
-  // Regra oficial: toda linha classificada como faturamento é Receita de Projetos.
-  // A classificação não depende do nome do centro de custo, pois ele pode vir genérico
-  // no relatório do Sienge. A parcela administrativa continua tratada acima.
   if (code === '1010101' || text.includes('REC. FATURAMENTO') || text.includes('REC FATURAMENTO')) {
     return { label: 'Receita de Projetos', type: 'receita_projeto', isRevenue: true };
   }
@@ -66,6 +63,17 @@ export function classifyFinancialEntry(item) {
   return { label: 'Outras Entradas', type: 'outra_entrada', isRevenue: false };
 }
 
+export function isPartnerWithdrawal(item) {
+  const code = accountCode(item);
+  const text = normalizeText(`${item?.contaNome || ''} ${item?.contaDescricao || ''}`);
+  return code === '2010522' || (text.includes('RETIRADA') && text.includes('SOCIO'));
+}
+
+export function isTeamExpense(item) {
+  const text = normalizeText(`${item?.contaNome || ''} ${item?.contaDescricao || ''} ${item?.dreClasse || ''} ${item?.drePacote || ''} ${item?.dreLinha || ''}`);
+  return text.includes('EQUIPE');
+}
+
 export function isSupplierTax(item) {
   const code = accountCode(item);
   const text = normalizeText(`${item?.contaNome || ''} ${item?.contaDescricao || ''} ${item?.dreClasse || ''} ${item?.drePacote || ''} ${item?.dreLinha || ''}`);
@@ -79,9 +87,12 @@ export function isRevenueTax(item) {
   const text = normalizeText(`${item.contaNome || ''} ${item.contaDescricao || ''} ${item.dreClasse || ''} ${item.drePacote || ''} ${item.dreLinha || ''}`);
 
   return (
-    ['2030101', '2030102', '2030103'].includes(code)
+    ['2030101', '2030102', '2030103', '2030104', '2030105', '2030107'].includes(code)
     || text.includes('IMPOSTOS SOBRE FATURAMENTO')
     || text.includes('DEDUCOES DA RECEITA')
+    || text.includes('IMPOSTOS RETIDOS NO FAT')
+    || text.includes('IRPJ')
+    || text.includes('CSLL')
   );
 }
 
@@ -91,7 +102,10 @@ export function getRevenueTaxLabel(item) {
   if (code === '2030101' || /(^|\s)PIS(\s|$)/.test(text)) return 'PIS';
   if (code === '2030102' || text.includes('COFINS')) return 'COFINS';
   if (code === '2030103' || text.includes('ISS')) return 'ISS';
-  return String(item?.contaNome || item?.contaDescricao || 'Outros impostos').trim();
+  if (code === '2030104' || text.includes('IRPJ')) return 'IRPJ';
+  if (code === '2030105' || text.includes('CSLL')) return 'CSLL';
+  if (code === '2030107') return 'Impostos Retidos no Faturamento';
+  return String(item?.contaNome || item?.contaDescricao || 'Imposto não identificado').trim();
 }
 
 export function getAccountGroup(value) {
