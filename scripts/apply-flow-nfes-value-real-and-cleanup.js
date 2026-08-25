@@ -62,7 +62,7 @@ replaceOrFail(
     // Valor total titulo apenas uma vez, sem somar a divisao ADM/operacional.
     const map = {};
     rawList.forEach(item => {
-      const key = `${item.lancamento || 'SEM-LANCAMENTO'}|${item.documento || item.nome || 'SEM-DOCUMENTO'}`;
+      const key = String(item.lancamento || 'SEM-LANCAMENTO') + '|' + String(item.documento || item.nome || 'SEM-DOCUMENTO');
       const linhas = Array.isArray(item.linhasOriginais) && item.linhasOriginais.length
         ? item.linhasOriginais
         : [item];
