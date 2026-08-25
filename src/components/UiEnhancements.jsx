@@ -229,28 +229,60 @@ const chartTitlePattern = /(curva|progresso|fluxo|entrada|saída|saida|receita|p
 
 function chartExplanation(title) {
   const text = cleanText(title).toLowerCase();
+
   if (text.includes('curva abc')) {
-    return 'Classifica os projetos pelo valor contratado: Classe A acima de R$ 500 mil; Classe B de R$ 100 mil a R$ 500 mil; Classe C abaixo de R$ 100 mil. Leia primeiro a classe e depois o valor/quantidade de projetos em cada faixa.';
+    return {
+      what: 'Organiza os projetos pelo valor dos contratos.',
+      read: 'A = acima de R$ 500 mil; B = de R$ 100 mil a R$ 500 mil; C = abaixo de R$ 100 mil.'
+    };
   }
   if (text.includes('progresso') && text.includes('contrat')) {
-    return 'Compara o valor contratado com o valor já faturado e o saldo a faturar. Quanto maior a parcela faturada e o percentual, mais avançado está o contrato.';
+    return {
+      what: 'Mostra quanto de cada contrato já foi faturado.',
+      read: 'Compare o valor faturado e o percentual com o valor total contratado. Quanto maior o percentual, mais avançado está o contrato.'
+    };
   }
   if (text.includes('imposto')) {
-    return 'Mostra apenas impostos classificados como deduções/impostos sobre faturamento vinculados aos projetos. Retenções de fornecedor não entram nesta leitura.';
+    return {
+      what: 'Mostra os impostos ligados ao faturamento dos projetos.',
+      read: 'Valores maiores indicam maior peso do imposto no período. Retenções de fornecedores não entram aqui.'
+    };
   }
-  if (text.includes('anual') || text.includes('fluxo')) {
-    return 'Mostra as movimentações ao longo do tempo. Entradas programadas representam títulos ainda a receber registrados no sistema — não são meta, orçamento ou receita esperada da empresa.';
+  if (text.includes('anual')) {
+    return {
+      what: 'Mostra as movimentações financeiras mês a mês no ano.',
+      read: 'Entradas realizadas são valores que já entraram. Entradas programadas são títulos ainda a receber — não são meta nem previsão de faturamento.'
+    };
+  }
+  if (text.includes('fluxo') || text.includes('evolução') || text.includes('evolucao')) {
+    return {
+      what: 'Mostra como entradas e saídas se movimentam ao longo do período.',
+      read: 'Compare as barras por data. Entradas aumentam o caixa; saídas reduzem o caixa; o resultado mostra a diferença entre elas.'
+    };
   }
   if (text.includes('receita') || text.includes('entrada') || text.includes('receb')) {
-    return 'Mostra de onde vieram ou estão programadas as entradas financeiras. Compare o tamanho das barras/fatias para identificar as maiores fontes e observe a classificação para não confundir receita com empréstimos ou aportes.';
+    return {
+      what: 'Mostra de onde vêm as entradas financeiras.',
+      read: 'Quanto maior a barra ou fatia, maior a participação daquela fonte. Empréstimos e aportes são entradas de caixa, mas não são receita.'
+    };
   }
   if (text.includes('saída') || text.includes('saida') || text.includes('pagamento') || text.includes('custo')) {
-    return 'Mostra onde se concentram as saídas financeiras. Quanto maior a barra/fatia, maior a participação daquele projeto, conta ou grupo no total do período selecionado.';
+    return {
+      what: 'Mostra onde estão concentradas as saídas financeiras.',
+      read: 'Quanto maior a barra ou fatia, maior o valor gasto naquele projeto, conta ou grupo.'
+    };
   }
   if (text.includes('resultado')) {
-    return 'Mostra a diferença entre entradas e saídas no recorte exibido. Valores positivos indicam geração líquida de caixa; negativos indicam consumo líquido de caixa.';
+    return {
+      what: 'Mostra a diferença entre entradas e saídas.',
+      read: 'Resultado positivo significa que entrou mais dinheiro do que saiu. Resultado negativo significa que saiu mais do que entrou.'
+    };
   }
-  return 'Leia o gráfico comparando os valores entre categorias e períodos. Os maiores elementos representam maior participação no total exibido e respeitam os filtros ativos da página, salvo quando o próprio título indicar visão anual.';
+
+  return {
+    what: 'Resume visualmente os valores deste indicador.',
+    read: 'Compare os tamanhos das barras, linhas ou fatias. Quanto maior o elemento, maior o valor representado.'
+  };
 }
 
 function isChartCard(card) {
@@ -262,16 +294,14 @@ function isChartCard(card) {
 
 async function downloadChartPng(card, title, button) {
   const html2canvas = (await import('html2canvas')).default;
-  const original = button.textContent;
   button.disabled = true;
-  button.textContent = 'Gerando...';
   try {
     const canvas = await html2canvas(card, {
       scale: 2,
       useCORS: true,
       logging: false,
       backgroundColor: null,
-      ignoreElements: (node) => node.hasAttribute?.('data-chart-tools'),
+      ignoreElements: (node) => node.hasAttribute?.('data-chart-tools') || node.hasAttribute?.('data-chart-popover'),
     });
     const safe = String(title || 'grafico')
       .normalize('NFD')
@@ -285,8 +315,13 @@ async function downloadChartPng(card, title, button) {
     link.click();
   } finally {
     button.disabled = false;
-    button.textContent = original;
   }
+}
+
+function closeOtherChartPopovers(current) {
+  document.querySelectorAll('[data-chart-popover]').forEach((popover) => {
+    if (popover !== current) popover.hidden = true;
+  });
 }
 
 function installChartTools() {
@@ -296,43 +331,88 @@ function installChartTools() {
     const heading = card.querySelector('h2, h3');
     if (!heading) return;
     const title = cleanText(heading.textContent) || 'Gráfico';
+    const explanation = chartExplanation(title);
 
     const tools = document.createElement('div');
     tools.setAttribute('data-chart-tools', 'true');
     tools.className = 'chart-utility-tools';
 
-    const explain = document.createElement('button');
-    explain.type = 'button';
-    explain.className = 'chart-utility-button';
-    explain.textContent = 'Como ler';
+    const helpWrap = document.createElement('div');
+    helpWrap.className = 'chart-tool-wrap';
 
-    const explanation = document.createElement('div');
-    explanation.className = 'chart-reading-guide';
-    explanation.hidden = true;
-    explanation.textContent = chartExplanation(title);
+    const help = document.createElement('button');
+    help.type = 'button';
+    help.className = 'chart-icon-button chart-help-button';
+    help.setAttribute('aria-label', `Entenda o gráfico ${title}`);
+    help.setAttribute('title', 'Entenda este gráfico');
+    help.textContent = '?';
 
-    explain.onclick = () => {
-      explanation.hidden = !explanation.hidden;
-      explain.textContent = explanation.hidden ? 'Como ler' : 'Ocultar leitura';
+    const helpPopover = document.createElement('div');
+    helpPopover.setAttribute('data-chart-popover', 'true');
+    helpPopover.className = 'chart-popover chart-help-popover';
+    helpPopover.hidden = true;
+    helpPopover.innerHTML = `
+      <strong>O que mostra</strong>
+      <p>${explanation.what}</p>
+      <strong>Como ler</strong>
+      <p>${explanation.read}</p>
+    `;
+
+    help.onclick = (event) => {
+      event.stopPropagation();
+      const willOpen = helpPopover.hidden;
+      closeOtherChartPopovers(helpPopover);
+      helpPopover.hidden = !willOpen;
     };
+
+    helpWrap.appendChild(help);
+    helpWrap.appendChild(helpPopover);
+
+    const menuWrap = document.createElement('div');
+    menuWrap.className = 'chart-tool-wrap';
+
+    const menu = document.createElement('button');
+    menu.type = 'button';
+    menu.className = 'chart-icon-button chart-menu-button';
+    menu.setAttribute('aria-label', `Ações do gráfico ${title}`);
+    menu.setAttribute('title', 'Mais opções');
+    menu.textContent = '⋮';
+
+    const menuPopover = document.createElement('div');
+    menuPopover.setAttribute('data-chart-popover', 'true');
+    menuPopover.className = 'chart-popover chart-actions-popover';
+    menuPopover.hidden = true;
 
     const download = document.createElement('button');
     download.type = 'button';
-    download.className = 'chart-utility-button';
-    download.textContent = 'Baixar PNG';
-    download.onclick = () => downloadChartPng(card, title, download);
+    download.className = 'chart-action-item';
+    download.textContent = 'Baixar imagem';
+    download.onclick = async (event) => {
+      event.stopPropagation();
+      menuPopover.hidden = true;
+      await downloadChartPng(card, title, download);
+    };
 
-    tools.appendChild(explain);
-    tools.appendChild(download);
+    menuPopover.appendChild(download);
+    menu.onclick = (event) => {
+      event.stopPropagation();
+      const willOpen = menuPopover.hidden;
+      closeOtherChartPopovers(menuPopover);
+      menuPopover.hidden = !willOpen;
+    };
+
+    menuWrap.appendChild(menu);
+    menuWrap.appendChild(menuPopover);
+
+    tools.appendChild(helpWrap);
+    tools.appendChild(menuWrap);
 
     const firstHeader = heading.closest('div');
     if (firstHeader && firstHeader.parentElement === card) {
       firstHeader.appendChild(tools);
-      firstHeader.style.flexWrap = 'wrap';
     } else {
       card.insertBefore(tools, card.firstChild);
     }
-    card.insertBefore(explanation, tools.nextSibling);
   });
 }
 
@@ -350,6 +430,9 @@ export default function UiEnhancements() {
       });
     };
 
+    const closePopovers = () => closeOtherChartPopovers(null);
+    document.addEventListener('click', closePopovers);
+
     apply();
     const observer = new MutationObserver(apply);
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
@@ -357,6 +440,7 @@ export default function UiEnhancements() {
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      document.removeEventListener('click', closePopovers);
     };
   }, [pathname]);
 
