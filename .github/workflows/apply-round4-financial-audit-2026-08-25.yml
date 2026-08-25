@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   apply:
-    if: ${{ !contains(github.event.head_commit.message, 'fix: aplicar auditoria financeira rodada 4') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
