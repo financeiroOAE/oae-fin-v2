@@ -17,6 +17,11 @@ export function isAdministrativeProject(value) {
   return normalized.includes('ADMINISTRA');
 }
 
+export function isGeneralProjectsBucket(value) {
+  const normalized = normalizeProjectText(value);
+  return normalized === 'PROJETOS' || normalized === 'PROJETO' || normalized === 'PROJETOS GERAL' || normalized === 'PROJETOS GERAIS';
+}
+
 export function isGenericProject(value) {
   const normalized = normalizeProjectText(value);
   return !normalized || normalized === 'GRUPO OAE' || normalized === 'SEM PROJETO';
@@ -55,6 +60,30 @@ export function getActiveProjectNames(projects = [], includeAdministration = tru
 
   if (includeAdministration) names.push('ADMINISTRAÇÃO');
   return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
+export function buildOfficialProjectNameMap(projects = []) {
+  const map = new Map();
+  for (const project of projects || []) {
+    const name = String(project?.OBRA || '').trim();
+    if (!name) continue;
+    const key = getProjectKey(name);
+    if (!key) continue;
+
+    // Um mesmo ID pode existir em mais de uma empresa. Para identificação de movimentação,
+    // mantemos um nome canônico sem criar duplicidade financeira. Os valores contratuais
+    // continuam sendo somados linha a linha na PROJETOS_2026.
+    const current = map.get(key);
+    if (!current || name.length < current.length) map.set(key, name.replace(/[.\s]+$/g, ''));
+  }
+  return map;
+}
+
+export function getOfficialProjectName(value, projects = []) {
+  if (isAdministrativeProject(value)) return 'ADMINISTRAÇÃO';
+  if (isGeneralProjectsBucket(value)) return 'PROJETOS';
+  const key = getProjectKey(value);
+  return buildOfficialProjectNameMap(projects).get(key) || String(value || '').trim();
 }
 
 export function isProjectRevenueType(classificationType) {
