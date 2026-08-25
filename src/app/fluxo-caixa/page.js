@@ -599,7 +599,7 @@ export default function FluxoDeCaixa() {
               <BarChart data={evolutionData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
                 <XAxis dataKey="dataExibicao" stroke="var(--text-secondary)" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} interval={0} angle={-45} textAnchor="end" height={52} />
-                <YAxis stroke="var(--text-secondary)" fontSize={11} tickFormatter={(val) => `R$ ${(val / 1000)}k`} axisLine={false} tickLine={false} />
+                <YAxis stroke="var(--text-secondary)" fontSize={11} tickFormatter={(val) => formatCurrency(val)} axisLine={false} tickLine={false} />
                 <RechartsTooltip content={<CustomTooltip />} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
                 <Bar dataKey="Entradas" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={40} />
@@ -778,7 +778,7 @@ export default function FluxoDeCaixa() {
             <BarChart data={annualData2026} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
               <XAxis dataKey="mesNome" stroke="var(--text-secondary)" fontSize={12} tickMargin={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="var(--text-secondary)" fontSize={12} tickFormatter={(val) => `R$ ${(val / 1000)}k`} axisLine={false} tickLine={false} />
+              <YAxis stroke="var(--text-secondary)" fontSize={12} tickFormatter={(val) => formatCurrency(val)} axisLine={false} tickLine={false} />
               <RechartsTooltip content={<CustomTooltip />} />
               <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
               <ReferenceLine y={0} stroke="var(--border-color)" />
@@ -835,7 +835,7 @@ export default function FluxoDeCaixa() {
                     <tr>
                       <th>{modalResumo.title.includes('Recebimentos') ? 'Cliente / Nome' : 'Fornecedor / Nome'}</th>
                       <th>Documento / Título</th>
-                      <th>Projeto / CC</th>
+                      <th>Projeto / Obra</th>
                       <th>Conta</th>
                       <th>Situação</th>
                       <th style={{ textAlign: 'right' }}>Valor</th>
