@@ -26,7 +26,6 @@ export default function StackedProgressChart({ data }) {
     } else if (sortOrder === 'Maior a Faturar') {
       return (b.Saldo || 0) - (a.Saldo || 0);
     }
-    // Maior Contrato (default)
     return (b.Contratado || 0) - (a.Contratado || 0);
   });
 
@@ -35,8 +34,6 @@ export default function StackedProgressChart({ data }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1rem' }}>
-
-      {/* Header (Filtro) + Info de Paginação */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Ordenar:</label>
@@ -51,14 +48,13 @@ export default function StackedProgressChart({ data }) {
         </span>
       </div>
 
-      {/* Lista de Barras */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1 }}>
         {pageData.map((item, index) => {
           const faturado = Math.max(0, item.Faturado || 0);
           const contrato = Math.max(0, item.Contratado || 0);
           const saldo = Math.max(0, item.Saldo || 0);
-          let percFaturado = contrato > 0 ? Math.min(100, (faturado / contrato) * 100) : 0;
-          let percSaldo = 100 - percFaturado;
+          const percFaturado = contrato > 0 ? Math.min(100, (faturado / contrato) * 100) : 0;
+          const percSaldo = 100 - percFaturado;
 
           return (
             <div key={item.nome || index} style={{ width: '100%' }}>
@@ -66,28 +62,20 @@ export default function StackedProgressChart({ data }) {
                 <span style={{ fontWeight: '600', fontSize: '12px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '1rem', flex: 1 }}>
                   {item.nome}
                 </span>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
-                  <span style={{
-                    fontSize: '11px', fontWeight: '700', padding: '1px 8px', borderRadius: '20px',
-                    background: percFaturado >= 90 ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
-                    color: percFaturado >= 90 ? 'var(--success)' : 'var(--text-secondary)',
-                    border: `1px solid ${percFaturado >= 90 ? 'rgba(16,185,129,0.3)' : 'var(--border-color)'}`,
-                  }}>
-                    {percFaturado.toFixed(1)}%
-                  </span>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-main)' }}>
-                    {formatCurrency(contrato)}
-                  </span>
-                </div>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-main)' }}>
+                  Contrato: {formatCurrency(contrato)}
+                </span>
               </div>
 
               <div style={{ width: '100%', height: '16px', background: 'var(--bg-main)', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-color)', display: 'flex', marginBottom: '0.3rem' }}>
-                <div title={`Faturado: ${formatCurrency(faturado)}`} style={{ width: `${percFaturado}%`, height: '100%', background: 'var(--primary)', transition: 'width 0.4s ease-out', borderRadius: percFaturado >= 99 ? '5px' : '5px 0 0 5px' }} />
+                <div title={`Faturado: ${formatCurrency(faturado)} (${percFaturado.toFixed(1)}%)`} style={{ width: `${percFaturado}%`, height: '100%', background: 'var(--primary)', transition: 'width 0.4s ease-out', borderRadius: percFaturado >= 99 ? '5px' : '5px 0 0 5px' }} />
                 <div title={`A Faturar: ${formatCurrency(saldo)}`} style={{ width: `${percSaldo}%`, height: '100%', background: 'var(--warning)', transition: 'width 0.4s ease-out', borderRadius: percFaturado <= 1 ? '5px' : '0 5px 5px 0' }} />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                <span style={{ color: 'var(--primary)' }}>Faturado: <strong>{formatCurrency(faturado)}</strong></span>
+                <span style={{ color: 'var(--primary)' }}>
+                  Faturado: <strong>{formatCurrency(faturado)} · {percFaturado.toFixed(1)}%</strong>
+                </span>
                 <span style={{ color: 'var(--warning)' }}>A Faturar: <strong>{formatCurrency(saldo)}</strong></span>
               </div>
             </div>
@@ -95,27 +83,15 @@ export default function StackedProgressChart({ data }) {
         })}
       </div>
 
-      {/* Paginação — mesmo estilo do Relatório Executivo */}
       {totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
-          <button onClick={() => setPage(1)} disabled={page === 1} className="btn"
-            style={{ padding: '5px 9px', fontSize: '11px', opacity: page === 1 ? 0.4 : 1, background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>«</button>
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn"
-            style={{ padding: '5px 8px', fontSize: '11px', opacity: page === 1 ? 0.4 : 1, background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', display: 'flex', alignItems: 'center' }}>
-            <ChevronLeft size={13} />
-          </button>
+          <button onClick={() => setPage(1)} disabled={page === 1} className="btn" style={{ padding: '5px 9px', fontSize: '11px', opacity: page === 1 ? 0.4 : 1, background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>«</button>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn" style={{ padding: '5px 8px', fontSize: '11px', opacity: page === 1 ? 0.4 : 1, background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', display: 'flex', alignItems: 'center' }}><ChevronLeft size={13} /></button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-            <button key={p} onClick={() => setPage(p)} className="btn"
-              style={{ padding: '5px 10px', fontSize: '11px', background: page === p ? 'var(--primary)' : 'transparent', border: `1px solid ${page === p ? 'var(--primary)' : 'var(--border-color)'}`, color: page === p ? '#fff' : 'var(--text-main)', fontWeight: page === p ? '600' : '400' }}>
-              {p}
-            </button>
+            <button key={p} onClick={() => setPage(p)} className="btn" style={{ padding: '5px 10px', fontSize: '11px', background: page === p ? 'var(--primary)' : 'transparent', border: `1px solid ${page === p ? 'var(--primary)' : 'var(--border-color)'}`, color: page === p ? '#fff' : 'var(--text-main)', fontWeight: page === p ? '600' : '400' }}>{p}</button>
           ))}
-          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn"
-            style={{ padding: '5px 8px', fontSize: '11px', opacity: page === totalPages ? 0.4 : 1, background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', display: 'flex', alignItems: 'center' }}>
-            <ChevronRight size={13} />
-          </button>
-          <button onClick={() => setPage(totalPages)} disabled={page === totalPages} className="btn"
-            style={{ padding: '5px 9px', fontSize: '11px', opacity: page === totalPages ? 0.4 : 1, background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>»</button>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn" style={{ padding: '5px 8px', fontSize: '11px', opacity: page === totalPages ? 0.4 : 1, background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', display: 'flex', alignItems: 'center' }}><ChevronRight size={13} /></button>
+          <button onClick={() => setPage(totalPages)} disabled={page === totalPages} className="btn" style={{ padding: '5px 9px', fontSize: '11px', opacity: page === totalPages ? 0.4 : 1, background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>»</button>
         </div>
       )}
     </div>
