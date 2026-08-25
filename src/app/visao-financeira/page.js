@@ -169,8 +169,10 @@ export default function VisaoFinanceira() {
       rows.forEach(row => {
         const classification = classifyFinancialEntry(row);
         if (classification.type !== 'receita_projeto') return;
-        if (!row.projeto || String(row.projeto).toUpperCase().includes('ADMINISTRA')) return;
-        map[row.projeto] = (map[row.projeto] || 0) + (Number(row.valor) || 0);
+        const projectName = String(row.projeto || '').trim();
+        const projectUpper = projectName.toUpperCase();
+        if (!projectName || projectUpper.includes('ADMINISTRA') || projectUpper === 'GRUPO OAE' || projectUpper === 'SEM PROJETO') return;
+        map[projectName] = (map[projectName] || 0) + (Number(row.valor) || 0);
       });
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
@@ -444,8 +446,7 @@ export default function VisaoFinanceira() {
           </div>
           <div id="report-visao-anual" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
             <ReportAdder sectionKey="visao:anual" title="Movimentações Financeiras Anuais — 2026" componentName="Gráfico de Fluxo Anual" page="Visão Financeira" type="CHART" data={annualData} filters={{ Ano: 2026 }} captureId="report-visao-anual" presetTags={["executive-financial"]} style={{ alignSelf: 'flex-end' }} />
-            <h2 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '0.25rem', color: 'var(--text-main)' }}>Movimentações Financeiras Anuais — 2026</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Entradas realizadas, títulos programados a receber e saídas. Entradas programadas não são meta nem orçamento. Visão anual independente do filtro de datas.</p>
+            <h2 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-main)' }}>Movimentações Financeiras Anuais — 2026</h2>
             <div style={{ flex: 1, minHeight: '240px' }}>
               <AnnualFlowChart data={annualData} />
             </div>

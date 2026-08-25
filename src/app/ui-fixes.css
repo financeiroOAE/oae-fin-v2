@@ -53,12 +53,17 @@
   cursor: wait;
 }
 
-.card-help-wrap {
+.has-demonstrative-help {
   position: relative;
+}
+
+.card-help-wrap {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 70;
   display: inline-flex;
   align-items: center;
-  margin-left: 0.35rem;
-  vertical-align: middle;
 }
 
 .card-help-icon {
@@ -94,7 +99,8 @@
 .card-help-popover {
   position: absolute;
   top: calc(100% + 7px);
-  left: 0;
+  right: 0;
+  left: auto;
   z-index: 80;
   width: min(300px, calc(100vw - 40px));
   padding: 0.8rem 0.9rem;
@@ -137,7 +143,7 @@
   margin-bottom: 0;
 }
 
-/* Nos cards demonstrativos, usamos somente o ? de leitura para não duplicar ajuda. */
+/* Nos cards demonstrativos, usamos somente o i de informação para não duplicar ajuda. */
 .has-demonstrative-help > .info-tooltip-container,
 .has-demonstrative-help h2 > .info-tooltip-container,
 .has-demonstrative-help h3 > .info-tooltip-container {

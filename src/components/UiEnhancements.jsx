@@ -291,8 +291,8 @@ function cardExplanation(title) {
     read: 'Quanto maior a barra ou valor, maior o gasto daquele projeto, conta ou grupo.'
   };
   if (text.includes('anual')) return {
-    what: 'Mostra as movimentações financeiras mês a mês no ano.',
-    read: 'Entradas programadas são títulos registrados a receber. Não são meta, orçamento ou faturamento esperado.'
+    what: 'Mostra, mês a mês, o que entrou, o que ainda está programado para entrar e o que saiu do caixa em 2026.',
+    read: 'Entradas realizadas já aconteceram. Entradas programadas são títulos registrados a receber — não são meta, orçamento nem faturamento esperado. Saídas são os pagamentos do período.'
   };
   if (text.includes('resultado')) return {
     what: 'Mostra a diferença entre entradas e saídas consideradas no cálculo.',
@@ -379,7 +379,7 @@ function installDemonstrativeCardHelp() {
     help.className = 'card-help-icon';
     help.setAttribute('aria-label', `Entenda o card ${title}`);
     help.setAttribute('title', 'Entenda este card');
-    help.textContent = '?';
+    help.textContent = 'i';
 
     const popover = document.createElement('div');
     popover.setAttribute('data-card-popover', 'true');
@@ -392,6 +392,18 @@ function installDemonstrativeCardHelp() {
       <p>${explanation.read}</p>
     `;
 
+    const openHelp = () => {
+      closeOtherCardPopovers(popover);
+      popover.hidden = false;
+    };
+    const closeHelp = () => {
+      popover.hidden = true;
+    };
+
+    wrap.addEventListener('mouseenter', openHelp);
+    wrap.addEventListener('mouseleave', closeHelp);
+    help.onfocus = openHelp;
+    help.onblur = closeHelp;
     help.onclick = (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -402,7 +414,7 @@ function installDemonstrativeCardHelp() {
 
     wrap.appendChild(help);
     wrap.appendChild(popover);
-    titleNode.appendChild(wrap);
+    card.appendChild(wrap);
   });
 }
 
