@@ -14,6 +14,7 @@ import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { getRolling30DayRange } from "@/lib/dateRange";
+import { classifyFinancialEntry } from "@/lib/financialClassification";
 
 export default function VisaoFinanceira() {
   const { isReportMode, openReportBuilder, exitReportMode } = useReport();
@@ -105,27 +106,9 @@ export default function VisaoFinanceira() {
     });
   }, [baseData, filterDataInicial, filterDataFinal, filterProjetos, filterStatus, filterNomes, filterContas]);
 
-  // Base de conteúdo sem recorte temporal. É usada nos campos realizados para que
-  // um filtro de datas futuras não apague o histórico realizado de 2026.
-  const contentFilteredData = useMemo(() => {
-    return baseData.filter(item => {
-      if (filterStatus.length > 0 && !filterStatus.includes(item.statusExibicao)) return false;
-      if (filterProjetos.length > 0 && !filterProjetos.includes(item.projeto)) return false;
-      if (filterNomes.length > 0 && !filterNomes.includes(item.nome)) return false;
-      if (filterContas.length > 0 && !filterContas.includes(item.contaDescricao)) return false;
-      return true;
-    });
-  }, [baseData, filterProjetos, filterStatus, filterNomes, filterContas]);
-
-  const realized2026Data = useMemo(() => {
-    const start2026 = new Date(2026, 0, 1, 0, 0, 0, 0).getTime();
-    const endToday = new Date().setHours(23, 59, 59, 999);
-    return contentFilteredData.filter(item =>
-      item.status === 'Realizado' &&
-      item.dataTimestamp >= start2026 &&
-      item.dataTimestamp <= endToday
-    );
-  }, [contentFilteredData]);
+  const realizedFilteredData = useMemo(() => filteredData.filter(item =>
+    String(item.status || '').trim().toUpperCase() === 'REALIZADO'
+  ), [filteredData]);
 
   const projetosDisponiveis = Array.from(new Set(baseData.map(d => d.projeto).filter(Boolean))).sort();
   const nomesDisponiveis = Array.from(new Set(baseData.map(d => d.nome).filter(Boolean))).sort();
@@ -134,9 +117,9 @@ export default function VisaoFinanceira() {
   // KPIs
   const totalBancario = saldosBancarios.reduce((acc, row) => acc + (Number(row.Saldo) || 0), 0);
   
-  const entradasRealizadas = realized2026Data.filter(r => r.natureza === 'Entrada').reduce((acc, r) => acc + r.valor, 0);
+  const entradasRealizadas = realizedFilteredData.filter(r => r.natureza === 'Entrada').reduce((acc, r) => acc + r.valor, 0);
   const entradasARealizar = filteredData.filter(r => r.natureza === 'Entrada' && r.status === 'A realizar').reduce((acc, r) => acc + r.valor, 0);
-  const saidasRealizadas = realized2026Data.filter(r => r.natureza === 'Saída').reduce((acc, r) => acc + r.valor, 0);
+  const saidasRealizadas = realizedFilteredData.filter(r => r.natureza === 'Saída').reduce((acc, r) => acc + r.valor, 0);
   const saidasARealizar = filteredData.filter(r => r.natureza === 'Saída' && r.status === 'A realizar').reduce((acc, r) => acc + r.valor, 0);
 
   const resultadoRealizado = entradasRealizadas - saidasRealizadas;
@@ -181,8 +164,14 @@ export default function VisaoFinanceira() {
   // Top Projetos Entradas / Saídas
   const topProjetosEntradas = useMemo(() => {
     const map = {};
-    filteredData.filter(i => i.natureza === 'Entrada' && i.projeto).forEach(i => {
-      map[i.projeto] = (map[i.projeto] || 0) + i.valor;
+    filteredData.forEach(item => {
+      const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
+      rows.forEach(row => {
+        const classification = classifyFinancialEntry(row);
+        if (classification.type !== 'receita_projeto') return;
+        if (!row.projeto || String(row.projeto).toUpperCase().includes('ADMINISTRA')) return;
+        map[row.projeto] = (map[row.projeto] || 0) + (Number(row.valor) || 0);
+      });
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
   }, [filteredData]);
@@ -196,12 +185,16 @@ export default function VisaoFinanceira() {
   }, [filteredData]);
 
   // Top Contas Entradas / Saídas
-  const topContasEntradas = useMemo(() => {
+  const entryCategoryData = useMemo(() => {
     const map = {};
-    filteredData.filter(i => i.natureza === 'Entrada' && i.contaDescricao).forEach(i => {
-      map[i.contaDescricao] = (map[i.contaDescricao] || 0) + i.valor;
+    filteredData.filter(i => i.natureza === 'Entrada').forEach(item => {
+      const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
+      rows.forEach(row => {
+        const classification = classifyFinancialEntry(row);
+        map[classification.label] = (map[classification.label] || 0) + (Number(row.valor) || 0);
+      });
     });
-    return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
+    return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor);
   }, [filteredData]);
 
   const topContasSaidas = useMemo(() => {
@@ -228,7 +221,7 @@ export default function VisaoFinanceira() {
     const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
     
     meses.forEach((m, idx) => {
-      map[idx] = { mesNome: m, Entradas: 0, 'Receitas Previstas': 0, Saídas: 0, mesId: idx };
+      map[idx] = { mesNome: m, 'Entradas Realizadas': 0, 'Entradas Programadas': 0, Saídas: 0, mesId: idx };
     });
 
     annualFilteredData.forEach(item => {
@@ -243,8 +236,8 @@ export default function VisaoFinanceira() {
           const isPrevisto = status === 'A REALIZAR';
           if (!isRealizado && !isPrevisto) return;
           if (item.natureza === 'Entrada') {
-            if (isPrevisto) map[mIdx]['Receitas Previstas'] += item.valor;
-            else map[mIdx].Entradas += item.valor;
+            if (isPrevisto) map[mIdx]['Entradas Programadas'] += item.valor;
+            else map[mIdx]['Entradas Realizadas'] += item.valor;
           }
           if (item.natureza === 'Saída') map[mIdx].Saídas += item.valor;
         }
@@ -271,6 +264,7 @@ export default function VisaoFinanceira() {
     Lançamento: item.lancamento || '',
     Situação: item.statusExibicao,
     Natureza: item.natureza,
+    "Classificação Financeira": item.natureza === 'Entrada' ? classifyFinancialEntry(item).label : 'Saída / Pagamento',
     Valor: item.valor,
   }));
 
@@ -336,11 +330,11 @@ export default function VisaoFinanceira() {
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Data Inicial</label>
-            <input type="date" value={filterDataInicial} readOnly aria-readonly="true" title="Período fixo: hoje" style={{ width: '100%', height: '34px', fontSize: '13px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', padding: '0 0.5rem' }} />
+            <input type="date" value={filterDataInicial} onChange={(e) => setFilterDataInicial(e.target.value)} style={{ width: '100%', height: '34px', fontSize: '13px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Data Final</label>
-            <input type="date" value={filterDataFinal} readOnly aria-readonly="true" title="Período fixo: 30 dias à frente" style={{ width: '100%', height: '34px', fontSize: '13px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', padding: '0 0.5rem' }} />
+            <input type="date" value={filterDataFinal} onChange={(e) => setFilterDataFinal(e.target.value)} style={{ width: '100%', height: '34px', fontSize: '13px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
           <div style={{ flex: '2 1 220px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><Building2 size={12}/> Projeto / Centro de Custo</label>
@@ -373,7 +367,7 @@ export default function VisaoFinanceira() {
       {/* KPIs Principais */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" data-report-section style={{ padding: '1.5rem' }}>
-          <ReportAdder sectionKey="visao:kpis" title="Resumo Executivo Financeiro" componentName="Indicadores Financeiros" page="Visão Financeira" type="SUMMARY" data={[{ "Saldo Bancário": totalBancario, "Saldo Contratos": somaProjetos, "Resultado Realizado": resultadoRealizado, "Resultado Previsto": resultadoPrevisto, Recebido: entradasRealizadas, "A Receber": entradasARealizar, Pago: saidasRealizadas, "A Pagar": saidasARealizar }]} columnFormats={{ "Saldo Bancário": "currency", "Saldo Contratos": "currency", "Resultado Realizado": "currency", "Resultado Previsto": "currency", Recebido: "currency", "A Receber": "currency", Pago: "currency", "A Pagar": "currency" }} filters={reportFilters} presetTags={["executive-financial"]} explanation="Consolidação dos principais saldos e resultados conforme os filtros ativos." style={{ float: 'right' }} />
+          <ReportAdder sectionKey="visao:kpis" title="Resumo Executivo Financeiro" componentName="Indicadores Financeiros" page="Visão Financeira" type="SUMMARY" data={[{ "Saldo Bancário": totalBancario, "Saldo Contratos": somaProjetos, "Resultado Realizado": resultadoRealizado, "Resultado Previsto": resultadoPrevisto, "Entradas Realizadas": entradasRealizadas, "A Receber": entradasARealizar, Pago: saidasRealizadas, "A Pagar": saidasARealizar }]} columnFormats={{ "Saldo Bancário": "currency", "Saldo Contratos": "currency", "Resultado Realizado": "currency", "Resultado Previsto": "currency", "Entradas Realizadas": "currency", "A Receber": "currency", Pago: "currency", "A Pagar": "currency" }} filters={reportFilters} presetTags={["executive-financial"]} explanation="Consolidação dos principais saldos e resultados conforme os filtros ativos." style={{ float: 'right' }} />
           <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Landmark size={16} color="var(--primary)"/> Saldo Bancário Total</p>
           <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalBancario)}</p>
         </div>
@@ -398,7 +392,7 @@ export default function VisaoFinanceira() {
       {/* KPIs Secundários */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)"/> Recebido</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)"/> Entradas Realizadas</p>
           <p style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(entradasRealizadas)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(16, 185, 129, 0.4)' }}>
@@ -444,14 +438,14 @@ export default function VisaoFinanceira() {
             <ReportAdder sectionKey="visao:status" title="Status Financeiro Consolidado" componentName="Gráficos de Status" page="Visão Financeira" type="CHART" data={[...pieRecebimentos, ...piePagamentos]} filters={reportFilters} captureId="report-visao-status" presetTags={["executive-financial"]} style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '1.5rem' }}>Status Financeiro Consolidado</h2>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', justifyContent: 'center' }}>
-              <PieStatusChart realizado={entradasRealizadas} pendente={entradasARealizar} colorRealizado="var(--success)" colorPendente="rgba(16, 185, 129, 0.3)" titulo="Recebimentos" />
+              <PieStatusChart realizado={entradasRealizadas} pendente={entradasARealizar} colorRealizado="var(--success)" colorPendente="rgba(16, 185, 129, 0.3)" titulo="Entradas" />
               <PieStatusChart realizado={saidasRealizadas} pendente={saidasARealizar} colorRealizado="var(--danger)" colorPendente="rgba(239, 68, 68, 0.3)" titulo="Pagamentos" />
             </div>
           </div>
           <div id="report-visao-anual" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <ReportAdder sectionKey="visao:anual" title="Fluxo Financeiro Anual — 2026" componentName="Gráfico de Fluxo Anual" page="Visão Financeira" type="CHART" data={annualData} filters={{ Ano: 2026 }} captureId="report-visao-anual" presetTags={["executive-financial"]} style={{ alignSelf: 'flex-end' }} />
-            <h2 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '0.25rem', color: 'var(--text-main)' }}>Fluxo Financeiro Anual — 2026</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Consolidação dos 12 meses — independente do filtro de datas</p>
+            <ReportAdder sectionKey="visao:anual" title="Movimentações Financeiras Anuais — 2026" componentName="Gráfico de Fluxo Anual" page="Visão Financeira" type="CHART" data={annualData} filters={{ Ano: 2026 }} captureId="report-visao-anual" presetTags={["executive-financial"]} style={{ alignSelf: 'flex-end' }} />
+            <h2 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '0.25rem', color: 'var(--text-main)' }}>Movimentações Financeiras Anuais — 2026</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Entradas realizadas, títulos programados a receber e saídas. Entradas programadas não são meta nem orçamento. Visão anual independente do filtro de datas.</p>
             <div style={{ flex: 1, minHeight: '240px' }}>
               <AnnualFlowChart data={annualData} />
             </div>
@@ -461,9 +455,9 @@ export default function VisaoFinanceira() {
         {/* ROW 3: Centro de Custo */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '3rem' }}>
           <div id="report-visao-centros-entrada" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <ReportAdder sectionKey="visao:centros-entrada" title="10 Centros de Custo por Entradas" componentName="Ranking de Entradas" page="Visão Financeira" type="CHART" data={topProjetosEntradas} filters={reportFilters} captureId="report-visao-centros-entrada" style={{ alignSelf: 'flex-end' }} />
-            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>10 Centros de Custo por Entradas</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Maiores volumes recebidos e a receber</p>
+            <ReportAdder sectionKey="visao:centros-entrada" title="10 Projetos por Receita de Projetos" componentName="Ranking de Entradas" page="Visão Financeira" type="CHART" data={topProjetosEntradas} filters={reportFilters} captureId="report-visao-centros-entrada" style={{ alignSelf: 'flex-end' }} />
+            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>10 Projetos por Receita de Projetos</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Projetos com maior volume de receita no período selecionado; Administração, empréstimos e aportes não entram neste ranking.</p>
             <div style={{ flex: 1, minHeight: '360px' }}>
               <TopBarChart data={topProjetosEntradas} color="var(--success)" />
             </div>
@@ -482,9 +476,9 @@ export default function VisaoFinanceira() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '3rem' }}>
           <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
             <AccountBarChart 
-              data={topContasEntradas} 
-              title="Receitas por Plano de Conta" 
-              infoContent="Concentração por contas contábeis de Entradas" 
+              data={entryCategoryData} 
+              title="Composição das Entradas por Natureza" 
+              infoContent="Separa Receita de Projetos, Receitas Administrativas, Outras Receitas, Empréstimos/Financiamentos, Aportes, Movimentações Financeiras e Outras Entradas. Empréstimos e aportes são entradas de caixa, mas não são receita." 
               color="var(--success)" 
             />
           </div>

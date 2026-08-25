@@ -22,42 +22,6 @@
   color: rgba(248, 113, 113, 0.88) !important;
 }
 
-/* Impostos sobre faturamento ainda está em revisão. Mantemos o bloco no lugar,
-   mas sem induzir leitura de números ainda não validados. */
-.card:has([data-report-section-key="projetos:impostos"]),
-.card:has([data-report-section-key="projetos:impostos-chart"]) {
-  position: relative;
-  overflow: hidden;
-  min-height: 150px;
-}
-
-.card:has([data-report-section-key="projetos:impostos"]) > *,
-.card:has([data-report-section-key="projetos:impostos-chart"]) > * {
-  filter: blur(5px);
-  opacity: 0.38;
-  pointer-events: none;
-  user-select: none;
-}
-
-.card:has([data-report-section-key="projetos:impostos"])::after,
-.card:has([data-report-section-key="projetos:impostos-chart"])::after {
-  content: "Impostos sobre Faturamento  ·  EM BREVE";
-  position: absolute;
-  inset: 50% auto auto 50%;
-  transform: translate(-50%, -50%);
-  z-index: 5;
-  padding: 0.5rem 0.85rem;
-  border: 1px solid rgba(57, 198, 198, 0.28);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-card) 86%, transparent);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-  backdrop-filter: blur(8px);
-}
-
 .project-export-controls {
   margin-left: auto;
   margin-right: 0.75rem;
@@ -67,7 +31,8 @@
   flex-wrap: wrap;
 }
 
-.project-export-button {
+.project-export-button,
+.chart-utility-button {
   min-height: 34px;
   padding: 0.4rem 0.75rem;
   border: 1px solid var(--border-color);
@@ -80,19 +45,67 @@
   cursor: pointer;
 }
 
-.project-export-button:hover {
+.project-export-button:hover,
+.chart-utility-button:hover {
   border-color: var(--primary);
   color: var(--primary);
 }
 
-.project-export-button:disabled {
+.project-export-button:disabled,
+.chart-utility-button:disabled {
   opacity: 0.55;
   cursor: wait;
 }
 
+.chart-utility-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.chart-utility-button {
+  min-height: 30px;
+  padding: 0.3rem 0.65rem;
+  background: var(--bg-elevated);
+  font-size: 11px;
+}
+
+.chart-reading-guide {
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid var(--primary);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg-elevated) 90%, transparent);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.chart-reading-guide[hidden] {
+  display: none !important;
+}
+
+.account-group-separator td {
+  padding: 0.4rem 0.75rem !important;
+  border-top: 2px solid var(--border-color) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+  color: var(--text-secondary) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 900px) {
-  .project-export-controls {
+  .project-export-controls,
+  .chart-utility-tools {
     width: 100%;
     margin: 0.5rem 0 0;
+    justify-content: flex-start;
   }
 }

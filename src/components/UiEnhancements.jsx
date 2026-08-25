@@ -225,6 +225,117 @@ function installProjectExportButtons() {
   else header.appendChild(controls);
 }
 
+const chartTitlePattern = /(curva|progresso|fluxo|entrada|saída|saida|receita|pagamento|recebimento|resultado|imposto|custo|ranking|top\s|evolução|evolucao|comparativo|distribuição|distribuicao|status)/i;
+
+function chartExplanation(title) {
+  const text = cleanText(title).toLowerCase();
+  if (text.includes('curva abc')) {
+    return 'Classifica os projetos pelo valor contratado: Classe A acima de R$ 500 mil; Classe B de R$ 100 mil a R$ 500 mil; Classe C abaixo de R$ 100 mil. Leia primeiro a classe e depois o valor/quantidade de projetos em cada faixa.';
+  }
+  if (text.includes('progresso') && text.includes('contrat')) {
+    return 'Compara o valor contratado com o valor já faturado e o saldo a faturar. Quanto maior a parcela faturada e o percentual, mais avançado está o contrato.';
+  }
+  if (text.includes('imposto')) {
+    return 'Mostra apenas impostos classificados como deduções/impostos sobre faturamento vinculados aos projetos. Retenções de fornecedor não entram nesta leitura.';
+  }
+  if (text.includes('anual') || text.includes('fluxo')) {
+    return 'Mostra as movimentações ao longo do tempo. Entradas programadas representam títulos ainda a receber registrados no sistema — não são meta, orçamento ou receita esperada da empresa.';
+  }
+  if (text.includes('receita') || text.includes('entrada') || text.includes('receb')) {
+    return 'Mostra de onde vieram ou estão programadas as entradas financeiras. Compare o tamanho das barras/fatias para identificar as maiores fontes e observe a classificação para não confundir receita com empréstimos ou aportes.';
+  }
+  if (text.includes('saída') || text.includes('saida') || text.includes('pagamento') || text.includes('custo')) {
+    return 'Mostra onde se concentram as saídas financeiras. Quanto maior a barra/fatia, maior a participação daquele projeto, conta ou grupo no total do período selecionado.';
+  }
+  if (text.includes('resultado')) {
+    return 'Mostra a diferença entre entradas e saídas no recorte exibido. Valores positivos indicam geração líquida de caixa; negativos indicam consumo líquido de caixa.';
+  }
+  return 'Leia o gráfico comparando os valores entre categorias e períodos. Os maiores elementos representam maior participação no total exibido e respeitam os filtros ativos da página, salvo quando o próprio título indicar visão anual.';
+}
+
+function isChartCard(card) {
+  if (!card || card.querySelector('[data-chart-tools]')) return false;
+  if (card.querySelector('.recharts-wrapper, canvas')) return true;
+  const title = cleanText(card.querySelector('h2, h3')?.textContent);
+  return Boolean(title && chartTitlePattern.test(title) && !card.querySelector('table'));
+}
+
+async function downloadChartPng(card, title, button) {
+  const html2canvas = (await import('html2canvas')).default;
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Gerando...';
+  try {
+    const canvas = await html2canvas(card, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: null,
+      ignoreElements: (node) => node.hasAttribute?.('data-chart-tools'),
+    });
+    const safe = String(title || 'grafico')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase();
+    const link = document.createElement('a');
+    link.download = `${safe || 'grafico'}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
+function installChartTools() {
+  document.querySelectorAll('.card').forEach((card) => {
+    if (!isChartCard(card)) return;
+
+    const heading = card.querySelector('h2, h3');
+    if (!heading) return;
+    const title = cleanText(heading.textContent) || 'Gráfico';
+
+    const tools = document.createElement('div');
+    tools.setAttribute('data-chart-tools', 'true');
+    tools.className = 'chart-utility-tools';
+
+    const explain = document.createElement('button');
+    explain.type = 'button';
+    explain.className = 'chart-utility-button';
+    explain.textContent = 'Como ler';
+
+    const explanation = document.createElement('div');
+    explanation.className = 'chart-reading-guide';
+    explanation.hidden = true;
+    explanation.textContent = chartExplanation(title);
+
+    explain.onclick = () => {
+      explanation.hidden = !explanation.hidden;
+      explain.textContent = explanation.hidden ? 'Como ler' : 'Ocultar leitura';
+    };
+
+    const download = document.createElement('button');
+    download.type = 'button';
+    download.className = 'chart-utility-button';
+    download.textContent = 'Baixar PNG';
+    download.onclick = () => downloadChartPng(card, title, download);
+
+    tools.appendChild(explain);
+    tools.appendChild(download);
+
+    const firstHeader = heading.closest('div');
+    if (firstHeader && firstHeader.parentElement === card) {
+      firstHeader.appendChild(tools);
+      firstHeader.style.flexWrap = 'wrap';
+    } else {
+      card.insertBefore(tools, card.firstChild);
+    }
+    card.insertBefore(explanation, tools.nextSibling);
+  });
+}
+
 export default function UiEnhancements() {
   const pathname = usePathname();
 
@@ -235,6 +346,7 @@ export default function UiEnhancements() {
       frame = requestAnimationFrame(() => {
         if (pathname.startsWith('/dre')) markNegativeDreValues();
         if (pathname.startsWith('/projetos')) installProjectExportButtons();
+        installChartTools();
       });
     };
 

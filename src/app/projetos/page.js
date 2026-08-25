@@ -17,6 +17,7 @@ import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { getRolling30DayRange } from "@/lib/dateRange";
+import { isRevenueTax, getRevenueTaxLabel } from "@/lib/financialClassification";
 
 const TABLE_PAGE_SIZE = 15;
 
@@ -81,9 +82,9 @@ export default function Projetos() {
 
   const dIni = filterDataInicial ? new Date(filterDataInicial + 'T00:00:00').getTime() : 0;
   const dFim = filterDataFinal ? new Date(filterDataFinal + 'T23:59:59').getTime() : Infinity;
-  const currentYear = new Date().getFullYear();
-  const realizadoIni = new Date(currentYear, 0, 1).getTime();
-  const realizadoFim = new Date().setHours(23, 59, 59, 999);
+  // O mesmo período selecionado passa a reger realizado e previsto.
+  const realizadoIni = dIni;
+  const realizadoFim = dFim;
 
   const baseData = useMemo(() => {
     return consolidateFinancialData(data, {
@@ -238,21 +239,6 @@ export default function Projetos() {
     return descricao.trim().toUpperCase().startsWith('C.D.P');
   }
 
-  // Helper para classificar tributos no gráfico de Impostos
-  const getTaxCategory = useCallback((item) => {
-    const infoStr = `${item.dreClasse || ''} ${item.drePacote || ''} ${item.dreLinha || ''} ${item.contaDescricao || ''} ${item.contaNome || ''}`.toUpperCase();
-    if (infoStr.includes('PIS/COFINS/CSLL/ISS') || infoStr.includes('RETENÇÕES AGRUPADAS')) return 'Retenções agrupadas';
-    if (infoStr.includes('ISS') || infoStr.includes('IMPOSTO SOBRE SERVIÇO')) return 'ISS';
-    if (infoStr.includes('PIS/COFINS')) return 'PIS/COFINS';
-    if (infoStr.includes('COFINS')) return 'COFINS';
-    if (infoStr.includes('PIS')) return 'PIS';
-    if (infoStr.includes('IRPJ')) return 'IRPJ';
-    if (infoStr.includes('CSLL')) return 'CSLL';
-    if (infoStr.includes('SIMPLES NACIONAL')) return 'SIMPLES NACIONAL';
-    if (infoStr.includes('IMPOSTOS SOBRE RECEITA') || infoStr.includes('DEDUÇÕES DA RECEITA')) return 'Outros impostos';
-    return null;
-  }, []);
-
   const dreStats = useMemo(() => {
     // Receita: usar a mesma lógica de consolidação 80/20 já validada
     const receitaConsolidada = consolidateFinancialData(
@@ -349,42 +335,32 @@ export default function Projetos() {
       const isRealizado = st.includes('REALIZADO') || st.includes('PAGO') || st.includes('EFETIVADO');
       if (!isRealizado || ts < realizadoIni || ts > realizadoFim) return;
 
-      const taxCategory = getTaxCategory(item);
-
-      if (taxCategory) {
-        const val = Math.abs(item.valor || 0);
-        taxesMap[taxCategory] = (taxesMap[taxCategory] || 0) + val;
-        totalTaxes += val;
-      }
+      if (!isRevenueTax(item)) return;
+      const taxCategory = getRevenueTaxLabel(item);
+      const val = Math.abs(item.valor || 0);
+      taxesMap[taxCategory] = (taxesMap[taxCategory] || 0) + val;
+      totalTaxes += val;
     });
 
     const arr = Object.entries(taxesMap).map(([name, Valor]) => ({ name, Valor })).sort((a, b) => b.Valor - a.Valor);
     return { list: arr, total: totalTaxes };
-  }, [data, filteredProjetos, realizadoIni, realizadoFim, getTaxCategory]);
+  }, [data, filteredProjetos, realizadoIni, realizadoFim]);
 
   const margemFinanceira = dreStats.receita > 0 ? ((dreStats.receita - dreStats.custo - dreStats.despesa) / dreStats.receita) * 100 : null;
   const resultadoGerencial = dreStats.receita - dreStats.custo - dreStats.despesa;
   const taxPercentage = dreStats.receita > 0 ? (taxesData.total / dreStats.receita) * 100 : 0;
 
   const abcDonutData = useMemo(() => {
-    const sortedForABC = [...filteredProjetos].filter(p => p.contratado > 0).sort((a, b) => b.contratado - a.contratado);
-    const sumTotal = sortedForABC.reduce((acc, p) => acc + p.contratado, 0);
-    let accPercent = 0;
-    let aTotal = 0, aProjects = [];
-    let bTotal = 0, bProjects = [];
-    let cTotal = 0, cProjects = [];
-    sortedForABC.forEach(p => {
-      const pInd = sumTotal > 0 ? (p.contratado / sumTotal) * 100 : 0;
-      accPercent += pInd;
-      if (accPercent <= 80) { aTotal += p.contratado; aProjects.push(p); }
-      else if (accPercent <= 95) { bTotal += p.contratado; bProjects.push(p); }
-      else { cTotal += p.contratado; cProjects.push(p); }
-    });
-    return [
-      { name: 'Classe A', value: aTotal, count: aProjects.length, color: 'var(--success)', projects: aProjects, rule: 'Projetos que somam os primeiros 80% do Valor Contratado total' },
-      { name: 'Classe B', value: bTotal, count: bProjects.length, color: 'var(--warning)', projects: bProjects, rule: 'Projetos que somam entre 80% e 95% do Valor Contratado total' },
-      { name: 'Classe C', value: cTotal, count: cProjects.length, color: 'var(--danger)', projects: cProjects, rule: 'Projetos que somam os últimos 5% do Valor Contratado total (cauda)' },
-    ].filter(item => item.value > 0);
+    const projects = [...filteredProjetos].filter(p => p.contratado > 0).sort((a, b) => b.contratado - a.contratado);
+    const classes = [
+      { name: 'Classe A', color: 'var(--success)', rule: 'Contratos acima de R$ 500 mil', test: (v) => v > 500000 },
+      { name: 'Classe B', color: 'var(--warning)', rule: 'Contratos de R$ 100 mil a R$ 500 mil', test: (v) => v >= 100000 && v <= 500000 },
+      { name: 'Classe C', color: 'var(--danger)', rule: 'Contratos abaixo de R$ 100 mil', test: (v) => v < 100000 },
+    ];
+    return classes.map(def => {
+      const classProjects = projects.filter(p => def.test(p.contratado));
+      return { ...def, value: classProjects.reduce((sum, p) => sum + p.contratado, 0), count: classProjects.length, projects: classProjects };
+    }).filter(item => item.count > 0);
   }, [filteredProjetos]);
 
   const allProjectsData = useMemo(() =>
@@ -393,8 +369,8 @@ export default function Projetos() {
     [filteredProjetos]);
 
   const topEntradasData = useMemo(() =>
-    [...filteredProjetos].filter(p => p.recebido > 0).sort((a, b) => b.recebido - a.recebido).slice(0, 5)
-      .map(p => ({ nome: p.nome, Valor: p.recebido })),
+    [...filteredProjetos].filter(p => p.receitaDireta > 0).sort((a, b) => b.receitaDireta - a.receitaDireta).slice(0, 5)
+      .map(p => ({ nome: p.nome, Valor: p.receitaDireta })),
     [filteredProjetos]);
 
   const topSaidasData = useMemo(() =>
@@ -427,6 +403,24 @@ export default function Projetos() {
     if (!selectedProject) return [];
     return data.filter(item => getProjectKey(item.projeto) === selectedProject.projectKey);
   }, [selectedProject, data]);
+
+  const selectedProjectTeamCosts = useMemo(() => {
+    if (!selectedProject) return [];
+    const map = {};
+    selectedProjectMoves.forEach(item => {
+      if (item.natureza !== 'Saída') return;
+      const accountText = String(item.contaNome || item.contaDescricao || '').toUpperCase();
+      if (!accountText.includes('EQUIP')) return;
+      const account = item.contaNome || item.contaDescricao || item.contaCodigo || 'Equipe não identificada';
+      if (!map[account]) map[account] = { Conta: account, Pago: 0, 'A Pagar': 0, Total: 0 };
+      const value = Math.abs(Number(item.valor) || 0);
+      const status = String(item.status || '').toUpperCase();
+      if (status.includes('REALIZADO') || status.includes('PAGO') || status.includes('EFETIVADO')) map[account].Pago += value;
+      else if (status.includes('A REALIZAR') || status.includes('A PAGAR') || status.includes('PREVISTO')) map[account]['A Pagar'] += value;
+      map[account].Total += value;
+    });
+    return Object.values(map).sort((a, b) => b.Total - a.Total);
+  }, [selectedProject, selectedProjectMoves]);
 
   const exportSelectedProjectExcel = async (mode = 'full') => {
     if (!selectedProject) return;
@@ -572,13 +566,13 @@ export default function Projetos() {
 
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Caixa: Data Inicial</label>
-            <input type="date" value={filterDataInicial} readOnly aria-readonly="true" title="Período fixo: hoje"
+            <input type="date" value={filterDataInicial} onChange={(e) => setFilterDataInicial(e.target.value)}
               style={{ width: '100%', height: '34px', fontSize: '13px', color: 'var(--text-main)', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
 
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Caixa: Data Final</label>
-            <input type="date" value={filterDataFinal} readOnly aria-readonly="true" title="Período fixo: 30 dias à frente"
+            <input type="date" value={filterDataFinal} onChange={(e) => setFilterDataFinal(e.target.value)}
               style={{ width: '100%', height: '34px', fontSize: '13px', color: 'var(--text-main)', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
 
@@ -649,7 +643,7 @@ export default function Projetos() {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)" /> Recebido em 2026</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)" /> Recebido no período</p>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(totalRecebido)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(16,185,129,0.4)' }}>
@@ -762,7 +756,7 @@ export default function Projetos() {
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Concentração da Carteira — Curva ABC</h2>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Projetos classificados pelo Valor Contratado. Clique em cada classe para expandir a lista.</p>
             </div>
-            <InfoTooltip title="Curva ABC" content={<><p>Classifica a relevância dos projetos filtrados com base em seu Valor Contratado.</p><ul style={{ paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}><li><strong style={{ color: 'var(--success)' }}>Classe A:</strong> Projetos que somam os primeiros 80% do valor total da carteira.</li><li><strong style={{ color: 'var(--warning)' }}>Classe B:</strong> Projetos que somam entre 80% e 95% do valor total.</li><li><strong style={{ color: 'var(--danger)' }}>Classe C:</strong> Projetos que compõem os últimos 5% (cauda).</li></ul><p style={{ marginTop: '0.5rem' }}>A separação é feita ordenando todos os projetos do maior para o menor contrato e calculando o acumulado percentual.</p></>} />
+            <InfoTooltip title="Curva ABC" content={<><p>Classifica os projetos pelo <strong>valor individual do contrato</strong>.</p><ul style={{ paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}><li><strong style={{ color: 'var(--success)' }}>Classe A:</strong> acima de R$ 500 mil.</li><li><strong style={{ color: 'var(--warning)' }}>Classe B:</strong> de R$ 100 mil a R$ 500 mil.</li><li><strong style={{ color: 'var(--danger)' }}>Classe C:</strong> abaixo de R$ 100 mil.</li></ul></>} />
           </div>
           <ABCClassDonut data={abcDonutData} />
         </div>
@@ -771,12 +765,12 @@ export default function Projetos() {
         <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: '1 1 400px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>5 Maiores Entradas de Caixa</h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Projetos com maior volume recebido em 2026</p>
+              <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>5 Maiores Fontes de Receita — Projetos</h2>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Projetos com maior receita recebida no período selecionado</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <ReportAdder sectionKey="projetos:top-entradas" title="5 Maiores Entradas de Caixa" componentName="Gráfico Maiores Entradas" page="Projetos" type="TABLE" data={topEntradasData} filters={reportFilters} presetTags={["project-executive"]} />
-              <InfoTooltip title="5 Maiores Entradas" content={<><p>Exibe os 5 projetos com maior total de movimentações de <strong>Entrada</strong> realizadas em 2026.</p><p style={{ marginTop: '0.5rem' }}>Não deduz saídas. Foco exclusivo no volume recebido.</p></>} />
+              <ReportAdder sectionKey="projetos:top-entradas" title="5 Maiores Fontes de Receita — Projetos" componentName="Gráfico Maiores Entradas" page="Projetos" type="TABLE" data={topEntradasData} filters={reportFilters} presetTags={["project-executive"]} />
+              <InfoTooltip title="5 Maiores Fontes de Receita — Projetos" content={<><p>Exibe os 5 projetos/obras com maior receita recebida no período. Administração não entra neste ranking.</p><p style={{ marginTop: '0.5rem' }}>Não deduz saídas. Foco exclusivo no volume recebido.</p></>} />
             </div>
           </div>
           <RankingBarChart data={topEntradasData} dataKey="Valor" color="var(--success)" emptyMessage="Sem recebimentos realizados em 2026." />
@@ -808,7 +802,7 @@ export default function Projetos() {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <ReportAdder sectionKey="projetos:impostos-chart" title="Impostos sobre Faturamento" componentName="Gráfico Impostos" page="Projetos" type="TABLE" data={taxesData.list} filters={reportFilters} presetTags={["project-executive"]} />
-              <InfoTooltip title="Impostos sobre Notas Fiscais" content={<><p>Mostra os tributos e retenções associados ao faturamento.</p></>} />
+              <InfoTooltip title="Impostos sobre Faturamento" content={<><p>Usa as saídas classificadas como deduções/impostos sobre faturamento e vinculadas aos projetos filtrados.</p><p style={{ marginTop: '0.5rem' }}><strong>Não inclui retenções de fornecedor.</strong></p></>} />
             </div>
           </div>
           <RankingBarChart data={taxesData.list} dataKey="Valor" color="var(--primary)" emptyMessage="Sem impostos registrados no período." onClickItem={(cat) => setTaxDrillDown && setTaxDrillDown(cat.name)} />
@@ -1022,6 +1016,23 @@ export default function Projetos() {
                     </details>
                   </div>
                 )}
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '0.35rem', color: 'var(--text-main)' }}>Custo de Equipe do Projeto</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Custos classificados em contas de equipe, separados por conta dentro do centro de custo/obra selecionado.</p>
+                <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead style={{ background: 'var(--bg-elevated)' }}>
+                      <tr><th style={{ padding: '0.65rem', textAlign: 'left' }}>Conta de Equipe</th><th style={{ padding: '0.65rem', textAlign: 'right' }}>Pago</th><th style={{ padding: '0.65rem', textAlign: 'right' }}>A Pagar</th><th style={{ padding: '0.65rem', textAlign: 'right' }}>Total</th></tr>
+                    </thead>
+                    <tbody>
+                      {selectedProjectTeamCosts.length ? selectedProjectTeamCosts.map((row) => (
+                        <tr key={row.Conta} style={{ borderTop: '1px solid var(--border-color)' }}><td style={{ padding: '0.65rem' }}>{row.Conta}</td><td style={{ padding: '0.65rem', textAlign: 'right' }}>{formatCurrency(row.Pago)}</td><td style={{ padding: '0.65rem', textAlign: 'right' }}>{formatCurrency(row['A Pagar'])}</td><td style={{ padding: '0.65rem', textAlign: 'right', fontWeight: '700' }}>{formatCurrency(row.Total)}</td></tr>
+                      )) : <tr><td colSpan={4} style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Sem custos de equipe identificados para este projeto.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '0.75rem', color: 'var(--text-main)' }}>Extrato de Movimentações</h3>
               <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
                 <DataTable data={selectedProjectMoves} />

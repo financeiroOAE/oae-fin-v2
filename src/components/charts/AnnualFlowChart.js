@@ -30,23 +30,23 @@ export default function AnnualFlowChart({ data }) {
           margin={{ top: 20, right: 0, left: 0, bottom: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-          <XAxis 
-            dataKey="mesNome" 
+          <XAxis
+            dataKey="mesNome"
             axisLine={false}
             tickLine={false}
             tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
             dy={10}
           />
-          <YAxis 
+          <YAxis
             axisLine={false}
             tickLine={false}
             tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
             tickFormatter={(value) => `R$ ${(value / 1000)}k`}
             dx={-10}
           />
-          <Tooltip 
-            contentStyle={{ 
-              backgroundColor: 'var(--bg-elevated)', 
+          <Tooltip
+            contentStyle={{
+              backgroundColor: 'var(--bg-elevated)',
               border: '1px solid var(--border-color)',
               borderRadius: '8px',
               fontSize: '12px',
@@ -58,12 +58,12 @@ export default function AnnualFlowChart({ data }) {
             itemStyle={{ padding: '2px 0' }}
             cursor={{ fill: 'rgba(255,255,255,0.02)' }}
           />
-          <Legend 
+          <Legend
             wrapperStyle={{ fontSize: '12px', paddingTop: '15px' }}
             iconType="circle"
           />
-          <Bar dataKey="Entradas" name="Entradas" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={30} />
-          <Bar dataKey="Receitas Previstas" name="Receitas Previstas" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={30} />
+          <Bar dataKey="Entradas Realizadas" name="Entradas Realizadas" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={30} />
+          <Bar dataKey="Entradas Programadas" name="Entradas Programadas (títulos a receber)" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={30} />
           <Bar dataKey="Saídas" name="Saídas" fill="var(--danger)" radius={[4, 4, 0, 0]} maxBarSize={30} />
         </BarChart>
       </ResponsiveContainer>
