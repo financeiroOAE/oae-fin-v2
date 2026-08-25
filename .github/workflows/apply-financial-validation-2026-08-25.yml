@@ -5,7 +5,7 @@ on:
     branches:
       - fix-financial-validation-2026-08-25
     paths:
-      - scripts/apply-financial-screen-fixes-2026-08-25.py
+      - scripts/apply-financial-refinements-2026-08-25.py
       - .github/workflows/apply-financial-validation-2026-08-25.yml
 
 permissions:
@@ -19,8 +19,8 @@ jobs:
         with:
           ref: fix-financial-validation-2026-08-25
           fetch-depth: 0
-      - name: Aplicar correcoes
-        run: python3 scripts/apply-financial-screen-fixes-2026-08-25.py
+      - name: Aplicar refinamentos
+        run: python3 scripts/apply-financial-refinements-2026-08-25.py
       - name: Commitar alteracoes
         run: |
           git config user.name "github-actions[bot]"
@@ -30,5 +30,5 @@ jobs:
             echo "Nenhuma alteracao nova."
             exit 0
           fi
-          git commit -m "fix: reconciliar projetos receitas tributos e layouts"
+          git commit -m "fix: finalizar rankings nomes oficiais e modais"
           git push origin HEAD:fix-financial-validation-2026-08-25
