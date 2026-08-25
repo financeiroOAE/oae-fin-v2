@@ -53,7 +53,9 @@ function isDemonstrativeCard(card) {
   if (!card || card.querySelector('[data-card-help]')) return false;
   // Cards que já têm o InfoTooltip antigo conservam somente aquele padrão.
   if (card.querySelector('.info-tooltip-container')) return false;
-  if (card.querySelector('input, select, textarea')) return false;
+  // Não inserir o i automático em cards que já têm controles/ícones acionáveis no cabeçalho.
+  // Isso evita sobreposição com ReportAdder, expandir, fechar, filtros e outros botões.
+  if (card.querySelector('button, [role="button"], a, input, select, textarea')) return false;
   if (card.querySelector(':scope .card')) return false;
   const title = getCardTitle(card);
   if (!title) return false;

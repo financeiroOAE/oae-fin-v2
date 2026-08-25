@@ -11,6 +11,7 @@ import DataTable from "@/components/DataTable";
 import ABCClassDonut from "@/components/charts/ABCClassDonut";
 import StackedProgressChart from "@/components/charts/StackedProgressChart";
 import RankingBarChart from "@/components/charts/RankingBarChart";
+import ProjectMonthlyFinancialLineChart from "@/components/charts/ProjectMonthlyFinancialLineChart";
 import MultiSelect from "@/components/MultiSelect";
 import InfoTooltip from "@/components/InfoTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
@@ -24,7 +25,7 @@ const TABLE_PAGE_SIZE = 15;
 const getYearToDateRange = () => {
   const today = new Date();
   const localDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  return { start: `${today.getFullYear()}-01-01`, end: localDate(today) };
+  return { start: '2026-01-01', end: localDate(today) };
 };
 
 export default function Projetos() {
@@ -64,7 +65,8 @@ export default function Projetos() {
       if (!response.ok) throw new Error(result.error || result.details?.message || 'Erro desconhecido');
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
-      setLastSync(new Date().toLocaleString('pt-BR'));
+      const syncDate = result.syncedAt || result.snapshotAt;
+      setLastSync(syncDate ? new Date(syncDate).toLocaleString('pt-BR') : null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -417,14 +419,12 @@ export default function Projetos() {
     [filteredProjetos]);
 
   const teamCostsChartData = useMemo(() => {
-    const allowedProjects = new Map(filteredProjetos.map(p => [p.projectKey, p.nome]));
+    const allowedProjects = new Set(filteredProjetos.map(p => p.projectKey));
     const map = {};
 
     data.forEach(item => {
       if (item.natureza !== 'Saída' || !isTeamExpense(item)) return;
-      const projectKey = getProjectKey(item.projeto);
-      const projectName = allowedProjects.get(projectKey);
-      if (!projectName) return;
+      if (!allowedProjects.has(getProjectKey(item.projeto))) return;
 
       let ts = 0;
       if (item.data) {
@@ -437,13 +437,56 @@ export default function Projetos() {
       const validStatus = status.includes('REALIZADO') || status.includes('PAGO') || status.includes('EFETIVADO') || status.includes('A REALIZAR') || status.includes('A PAGAR') || status.includes('PREVISTO');
       if (!validStatus) return;
 
-      map[projectName] = (map[projectName] || 0) + Math.abs(Number(item.valor) || 0);
+      const account = item.contaNome || item.contaDescricao || item.contaCodigo || 'Equipe não identificada';
+      map[account] = (map[account] || 0) + Math.abs(Number(item.valor) || 0);
     });
 
     return Object.entries(map)
       .map(([nome, Valor]) => ({ nome, Valor }))
       .sort((a, b) => b.Valor - a.Valor);
   }, [data, filteredProjetos, dIni, dFim]);
+
+  const monthlyFinancialData = useMemo(() => {
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const rows = months.map((mes, index) => ({ mes, month: index, Receitas: 0, Custos: 0, Despesas: 0 }));
+    const allowedProjects = new Set(filteredProjetos.map((project) => project.projectKey));
+
+    projectCashData.forEach((item) => {
+      if (item.natureza !== 'Entrada' || !allowedProjects.has(getProjectKey(item.projeto))) return;
+      const status = String(item.status || '').toUpperCase();
+      if (!(status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO'))) return;
+      const parts = String(item.data || '').split('/');
+      if (parts.length !== 3 || parts[2] !== '2026') return;
+      const month = Number(parts[1]) - 1;
+      if (month < 0 || month > 11) return;
+      const originalRows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
+      const revenue = originalRows.reduce((sum, row) => {
+        const classification = classifyFinancialEntry(row);
+        return (classification.type === 'receita_projeto' || classification.type === 'receita_administrativa') ? sum + (Number(row.valor) || 0) : sum;
+      }, 0);
+      rows[month].Receitas += revenue;
+    });
+
+    data.forEach((item) => {
+      if (item.natureza !== 'Saída' || !allowedProjects.has(getProjectKey(item.projeto))) return;
+      if (String(item.projeto || '').toUpperCase().includes('ADMINISTRA')) return;
+      const status = String(item.status || '').toUpperCase();
+      if (!(status.includes('REALIZADO') || status.includes('PAGO') || status.includes('EFETIVADO'))) return;
+      const parts = String(item.data || '').split('/');
+      if (parts.length !== 3 || parts[2] !== '2026') return;
+      const month = Number(parts[1]) - 1;
+      if (month < 0 || month > 11) return;
+      if (isRevenueTax(item)) return;
+
+      const dreText = [item.dreClasse, item.dreLinha, item.dreDescricao].filter(Boolean).join(' ').toUpperCase();
+      if (!dreText || dreText.includes('PENDENTE DE CLASSIFICAÇÃO')) return;
+      const value = Math.abs(Number(item.valor) || 0);
+      if (dreText.includes('CUSTO')) rows[month].Custos += value;
+      else rows[month].Despesas += value;
+    });
+
+    return rows;
+  }, [data, filteredProjetos, projectCashData]);
 
   const reportFilters = {
     "Data inicial": filterDataInicial || "Todas",
@@ -641,7 +684,7 @@ export default function Projetos() {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)" /> Recebido no período (Obra + ADM)</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)" /> Recebido no período</p>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(totalRecebido)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(16,185,129,0.4)' }}>
@@ -649,7 +692,7 @@ export default function Projetos() {
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(totalAReceber)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--danger)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowUp size={14} color="var(--danger)" /> Pago em 2026</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowUp size={14} color="var(--danger)" /> Pago no período</p>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(totalPago)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(239,68,68,0.4)' }}>
@@ -667,7 +710,7 @@ export default function Projetos() {
       </div>
 
       {/* 5. Composição Financeira + Resultado */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '1rem', marginBottom: '2rem', alignItems: 'start' }}>
         <div className="card" style={{ padding: '1.5rem', borderTop: '2px solid var(--primary)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -751,6 +794,21 @@ export default function Projetos() {
         </div>
       </div>
 
+
+      <div id="report-projetos-evolucao-anual" data-report-section className="card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+          <div>
+            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Evolução Financeira dos Projetos — 2026</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Receitas, custos e despesas realizados por mês. Os filtros de projeto, empresa e tipo continuam válidos.</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <ReportAdder sectionKey="projetos:evolucao-anual" title="Evolução Financeira dos Projetos — 2026" componentName="Gráfico de Evolução Financeira" page="Projetos" type="CHART" data={monthlyFinancialData} filters={reportFilters} captureId="report-projetos-evolucao-anual" presetTags={["project-executive"]} />
+            <InfoTooltip title="Evolução Financeira 2026" content="Linha mensal dos valores realizados: receitas de projetos, custos dos serviços e demais despesas vinculadas às obras. Tributos são exibidos separadamente na composição financeira e não são somados como despesas nesta linha." />
+          </div>
+        </div>
+        <ProjectMonthlyFinancialLineChart data={monthlyFinancialData} />
+      </div>
+
       {/* 6. Gráficos Analíticos */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '2rem' }}>
 
@@ -832,12 +890,12 @@ export default function Projetos() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
           <div>
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Custo de Equipe por Projeto</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Custos e compromissos de equipe vinculados aos projetos/obras no período selecionado.</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Contas EQUIP. TÉC. somadas nos projetos exibidos. Ao filtrar uma obra, os valores passam a representar somente aquela obra.</p>
           </div>
           <ReportAdder sectionKey="projetos:custo-equipe" title="Custo de Equipe por Projeto" componentName="Gráfico de Custo de Equipe" page="Projetos" type="TABLE" data={teamCostsChartData} filters={reportFilters} presetTags={["project-executive"]} />
         </div>
         <div style={{ minHeight: '280px' }}>
-          <RankingBarChart data={teamCostsChartData} dataKey="Valor" color="var(--warning)" emptyMessage="Sem custos de equipe identificados para os projetos filtrados." />
+          <RankingBarChart data={teamCostsChartData} dataKey="Valor" color="var(--warning)" emptyMessage="Sem contas de equipe identificadas para os projetos filtrados." />
         </div>
       </div>
 

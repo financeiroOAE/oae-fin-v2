@@ -187,3 +187,9 @@
     max-width: 100% !important;
   }
 }
+
+
+/* Cards financeiros não criam nova camada ao passar o mouse; dropdowns e tooltips permanecem acima. */
+.card:hover {
+  transform: none;
+}

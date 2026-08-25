@@ -142,6 +142,96 @@ function AuditDrawer({ items, title, onClose }) {
   );
 }
 
+
+function getPendingReason(item) {
+  const classe = String(item.dreClasse || '').toUpperCase();
+  const linha = String(item.dreLinha || '').toUpperCase();
+  if (!item.contaCodigo) return 'Conta financeira não identificada no lançamento.';
+  if (!item.planoFinanceiro) return 'Conta não encontrada na relação PLANOS_FINANCEIROS.';
+  if (classe.includes('PENDENTE') || linha.includes('PENDENTE')) return 'O plano financeiro existe, mas não possui DEPARA válido para a DRE.';
+  return 'O DEPARA existe, mas a classe/linha informada não corresponde a uma linha reconhecida da DRE.';
+}
+
+function PendingClassificationDrawer({ items, onClose }) {
+  const summary = Object.values((items || []).reduce((map, item) => {
+    const code = String(item.contaCodigo || '').trim() || 'SEM-CODIGO';
+    const plan = String(item.planoFinanceiro || '').trim() || `${code} - ${item.contaNome || item.contaDescricao || 'Plano não identificado'}`;
+    const nomenclature = item.contaNome || item.contaDescricao || 'Sem nomenclatura';
+    const reason = getPendingReason(item);
+    const key = `${code}|${plan}|${reason}`;
+    if (!map[key]) map[key] = { code, plan, nomenclature, reason, total: 0, count: 0 };
+    map[key].total += Math.abs(Number(item.valor) || 0);
+    map[key].count += 1;
+    return map;
+  }, {})).sort((a, b) => a.total - b.total || a.plan.localeCompare(b.plan, 'pt-BR'));
+
+  const detailRows = [...(items || [])].sort((a, b) => Math.abs(Number(a.valor) || 0) - Math.abs(Number(b.valor) || 0));
+  const total = summary.reduce((sum, row) => sum + row.total, 0);
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 2147483400, background: 'rgba(0,0,0,0.68)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(1100px, 100vw)', height: '100vh', background: 'var(--bg-main)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-18px 0 44px rgba(0,0,0,0.45)' }}>
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-elevated)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Pendências de Classificação</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Resumo por plano financeiro, do menor para o maior valor. Total fora da DRE: <strong style={{ color: 'var(--warning)' }}>{fmt(total)}</strong>.</p>
+          </div>
+          <button type="button" className="btn" onClick={onClose} style={{ padding: '0.4rem', background: 'transparent', border: 0 }}><X size={18} /></button>
+        </div>
+
+        <div style={{ flex: 1, overflow: 'auto', padding: '1.25rem' }}>
+          <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1.5rem' }}>
+            <div style={{ padding: '0.9rem 1rem', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-color)' }}>
+              <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>Resumo por plano financeiro</strong>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ minWidth: '900px', fontSize: '12px' }}>
+                <thead><tr><th>Plano Financeiro</th><th>Nomenclatura</th><th>Por que não entra na DRE</th><th style={{ textAlign: 'center' }}>Lanç.</th><th style={{ textAlign: 'right' }}>Valor</th></tr></thead>
+                <tbody>
+                  {summary.map((row) => (
+                    <tr key={`${row.code}-${row.plan}`}>
+                      <td style={{ fontWeight: 600, color: 'var(--text-main)', maxWidth: '300px' }}>{row.plan}</td>
+                      <td style={{ color: 'var(--text-secondary)' }}>{row.nomenclature}</td>
+                      <td style={{ color: 'var(--warning)', maxWidth: '360px' }}>{row.reason}</td>
+                      <td style={{ textAlign: 'center' }}>{row.count}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(row.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '0.9rem 1rem', background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-color)' }}>
+              <strong style={{ fontSize: '13px', color: 'var(--text-main)' }}>Lançamentos que compõem as pendências</strong>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Detalhamento abaixo para auditoria e ajuste do DEPARA.</p>
+            </div>
+            <div style={{ overflowX: 'auto', maxHeight: '48vh', overflowY: 'auto' }}>
+              <table style={{ minWidth: '1050px', fontSize: '12px' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}><tr><th>Data</th><th>Projeto</th><th>Plano Financeiro</th><th>Nomenclatura</th><th>Nome</th><th>Status</th><th style={{ textAlign: 'right' }}>Valor</th></tr></thead>
+                <tbody>
+                  {detailRows.map((item, idx) => (
+                    <tr key={idx}>
+                      <td>{item.data || '—'}</td>
+                      <td>{item.projeto || '—'}</td>
+                      <td>{item.planoFinanceiro || item.contaCodigo || '—'}</td>
+                      <td>{item.contaNome || item.contaDescricao || '—'}</td>
+                      <td>{item.nome || '—'}</td>
+                      <td>{item.status || '—'}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(Math.abs(Number(item.valor) || 0))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Linha de Resultado Calculado ─────────────────────────────────────────────
 function DreResultRow({ groupDef, value, byMonth, meses, showMonths }) {
   const isFinal = groupDef.id === "RES_LIQUIDO";
@@ -185,22 +275,72 @@ function DreResultRow({ groupDef, value, byMonth, meses, showMonths }) {
 }
 
 // ─── Linha de Grupo (Nível 1) ────────────────────────────────────────────────
+const normalizeAccountLabel = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toUpperCase();
+
+const accountSubgroup = (groupId, label) => {
+  const text = normalizeAccountLabel(label);
+  if (groupId === 'CUSTOS_SERVICOS') {
+    if (text.includes('EQUIP.') || text.includes('EQUIPE')) return { key: 'EQUIPE', label: 'CUSTOS / EQUIPE TÉCNICA', order: 0 };
+    if (text.includes('C.D.P') || text.includes('CDP')) return { key: 'CDP', label: 'CUSTOS / PROJETOS', order: 1 };
+    return { key: 'OUTROS_CUSTOS', label: 'OUTROS CUSTOS DOS SERVIÇOS', order: 2 };
+  }
+  if (groupId === 'DESP_ADM') {
+    if (text.includes('ASSESSORIA') || text.includes('CONSULTORIA EM TI') || text.includes('SERVICOS ESPECIALIZADOS')) {
+      return { key: 'ASSESSORIAS', label: 'DESPESAS COM ASSESSORIAS E SERVIÇOS', order: 1 };
+    }
+    return { key: 'ADM', label: 'DESPESAS ADMINISTRATIVAS', order: 0 };
+  }
+  return { key: 'CONTAS', label: null, order: 0 };
+};
+
 const accountSection = (label) => {
-  const text = String(label || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const text = normalizeAccountLabel(label);
+  if (text.includes('EQUIP.') || text.includes('EQUIPE')) return 'EQUIPE';
   if (text.includes('C.D.P') || text.includes('CDP')) return 'CDP';
-  if (text.includes('EQUIPE')) return 'EQUIPE';
   return 'OUTRO';
 };
 
-const sortAccounts = (accounts) => Object.values(accounts || {}).sort((a, b) => {
-  const order = { CDP: 0, EQUIPE: 1, OUTRO: 2 };
-  const sectionDiff = order[accountSection(a.label)] - order[accountSection(b.label)];
-  if (sectionDiff !== 0) return sectionDiff;
+const sortAccounts = (accounts, groupId = '') => Object.values(accounts || {}).sort((a, b) => {
+  const sectionA = accountSubgroup(groupId, a.label);
+  const sectionB = accountSubgroup(groupId, b.label);
+  if (sectionA.order !== sectionB.order) return sectionA.order - sectionB.order;
   return a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base', numeric: true });
 });
 
+function DreSubgroupRow({ label, accounts, meses, showMonths }) {
+  const total = accounts.reduce((sum, account) => sum + (account.total || 0), 0);
+  const byMonth = Object.fromEntries(meses.map((month) => [month.key, accounts.reduce((sum, account) => sum + (account.byMonth?.[month.key] || 0), 0)]));
+  return (
+    <tr style={{ background: 'rgba(57,198,198,0.055)', borderTop: '3px solid var(--bg-main)', borderBottom: '1px solid var(--border-color)' }}>
+      <td style={{ padding: '0.7rem 1rem 0.7rem 2.6rem', position: 'sticky', left: 0, zIndex: 1, background: 'rgba(10,38,65,0.99)', color: 'var(--primary)', fontSize: '11px', fontWeight: 800, letterSpacing: '0.045em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{label}</td>
+      {showMonths && meses.map((month) => <td key={month.key} style={{ padding: '0.7rem 1rem', textAlign: 'right', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>{byMonth[month.key] ? fmt(byMonth[month.key]) : '—'}</td>)}
+      <td style={{ padding: '0.7rem 1rem', textAlign: 'right', color: 'var(--text-main)', fontSize: '12px', fontWeight: 800, whiteSpace: 'nowrap', background: 'rgba(15,23,42,0.6)' }}>{fmt(total)}</td>
+    </tr>
+  );
+}
+
+function renderSubgroupedAccounts(accounts, groupId, meses, showMonths, onAccountClick, paddingLeft = '3rem') {
+  const sorted = sortAccounts(accounts, groupId);
+  const rows = [];
+  let previousKey = null;
+
+  sorted.forEach((account, idx) => {
+    const subgroup = accountSubgroup(groupId, account.label);
+    if (subgroup.label && subgroup.key !== previousKey) {
+      const subgroupAccounts = sorted.filter((candidate) => accountSubgroup(groupId, candidate.label).key === subgroup.key);
+      rows.push(<DreSubgroupRow key={`${groupId}-${subgroup.key}-header`} label={subgroup.label} accounts={subgroupAccounts} meses={meses} showMonths={showMonths} />);
+    }
+    rows.push(<DreAccountRow key={`${groupId}-acc-${idx}`} account={account} meses={meses} showMonths={showMonths} onAccountClick={onAccountClick} paddingLeft={paddingLeft} />);
+    previousKey = subgroup.key;
+  });
+  return rows;
+}
+
 function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggle, onAccountClick, dreData, isEditMode, onDragStart, onDragOver, onDrop }) {
-  const accounts = sortAccounts(groupData.accounts);
+  const accounts = sortAccounts(groupData.accounts, groupDef.id);
   let total = groupData.total || 0;
   
   // Tratamento especial para RESULTADO FINANCEIRO que é isCompound
@@ -281,7 +421,7 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
           groupDef.subGroups.flatMap(subId => {
             const subData = dreData.groups[subId];
             if (!subData || subData.itemCount === 0) return [];
-            const subAccounts = sortAccounts(subData.accounts);
+            const subAccounts = sortAccounts(subData.accounts, subId);
             const subDef = DRE_ORDER.find(g => g.id === subId);
 
             // Linha de cabeçalho do sub-grupo (mesmo grid que os demais)
@@ -312,31 +452,12 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
             );
 
             // Linhas de contas do sub-grupo (reutiliza DreAccountRow = mesma estrutura tr)
-            const accountRows = subAccounts.map((account, idx) => (
-              <DreAccountRow
-                key={`${subId}-acc-${idx}`}
-                account={account}
-                meses={meses}
-                showMonths={showMonths}
-                onAccountClick={onAccountClick}
-                paddingLeft="4.5rem"
-                showSeparator={idx > 0 && accountSection(subAccounts[idx - 1].label) === 'CDP' && accountSection(account.label) === 'EQUIPE'}
-              />
-            ));
+            const accountRows = renderSubgroupedAccounts(subAccounts, subId, meses, showMonths, onAccountClick, '4.5rem');
 
             return [headerRow, ...accountRows];
           })
         ) : (
-          accounts.map((account, idx) => (
-            <DreAccountRow
-              key={idx}
-              account={account}
-              meses={meses}
-              showMonths={showMonths}
-              onAccountClick={onAccountClick}
-              showSeparator={idx > 0 && accountSection(accounts[idx - 1].label) === 'CDP' && accountSection(account.label) === 'EQUIPE'}
-            />
-          ))
+          renderSubgroupedAccounts(accounts, groupDef.id, meses, showMonths, onAccountClick)
         )
       )}
     </>
@@ -401,19 +522,21 @@ export default function Dre() {
   // UI
   const [expandedGroups, setExpandedGroups] = useState(DEFAULT_EXPANDED_GROUPS);
   const [auditDrawer, setAuditDrawer] = useState(null); // { items, title }
+  const [pendingDrawerOpen, setPendingDrawerOpen] = useState(false);
   // A ordem contábil é fixa para preservar a sequência correta dos resultados.
   const customOrder = DRE_ORDER;
 
-  const fetchDados = async () => {
+  const fetchDados = async (force = false) => {
     setIsSyncing(true);
     setError(null);
     try {
-      const res = await fetch("/api/sync");
+      const res = await fetch(force ? "/api/sync?force=1" : "/api/sync", { method: 'GET', cache: 'no-store' });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Erro desconhecido");
+      if (!res.ok) throw new Error(result.error || result.details?.message || "Erro desconhecido");
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
-      setLastSync(new Date().toLocaleString("pt-BR"));
+      const syncDate = result.syncedAt || result.snapshotAt;
+      setLastSync(syncDate ? new Date(syncDate).toLocaleString("pt-BR") : null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -568,10 +691,10 @@ export default function Dre() {
             const subGroup = dreData.groups[subId];
             if (!subGroup || subGroup.itemCount === 0) return;
             rows.push(valueRow(subGroup.label, subGroup.total, subGroup.byMonth, "Subgrupo"));
-            sortAccounts(subGroup.accounts).forEach((account) => rows.push(valueRow(account.label, account.total, account.byMonth, "Conta")));
+            sortAccounts(subGroup.accounts, subId).forEach((account) => rows.push(valueRow(account.label, account.total, account.byMonth, "Conta")));
           });
         } else {
-          sortAccounts(groupData?.accounts).forEach((account) => rows.push(valueRow(account.label, account.total, account.byMonth, "Conta")));
+          sortAccounts(groupData?.accounts, groupDef.id).forEach((account) => rows.push(valueRow(account.label, account.total, account.byMonth, "Conta")));
         }
       });
       return rows;
@@ -594,11 +717,13 @@ export default function Dre() {
   const drePendingRows = useMemo(() => dreData.naoClassificados.items.map((item) => ({
     Data: item.data,
     Projeto: item.projeto,
-    Conta: item.contaNome || item.contaDescricao,
+    "Plano Financeiro": item.planoFinanceiro || item.contaCodigo || 'Não identificado',
+    Nomenclatura: item.contaNome || item.contaDescricao,
+    Motivo: getPendingReason(item),
     Nome: item.nome,
     Situação: item.status,
     Valor: Math.abs(item.valor || 0),
-  })), [dreData.naoClassificados.items]);
+  })).sort((a, b) => a.Valor - b.Valor), [dreData.naoClassificados.items]);
 
   return (
     <div style={{ padding: "1.5rem", maxWidth: "100%", minHeight: "100vh", background: "var(--bg-main)" }}>
@@ -632,7 +757,7 @@ export default function Dre() {
             </button>
           )}
           <button
-            onClick={fetchDados}
+            onClick={() => fetchDados(true)}
             disabled={isSyncing}
             style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1.25rem", background: "var(--primary)", borderRadius: "8px", border: "none", color: "#fff", fontSize: "13px", fontWeight: "600", cursor: isSyncing ? "not-allowed" : "pointer", opacity: isSyncing ? 0.7 : 1 }}
           >
@@ -795,14 +920,14 @@ export default function Dre() {
               <div>
                 <h3 style={{ fontSize: "14px", fontWeight: "700", color: "var(--text-main)", marginBottom: "0.25rem" }}>Pendências de Classificação</h3>
                 <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                  Existem {dreData.naoClassificados.items.length} lançamentos que não foram classificados na DRE (sem DEPARA). Eles <strong>NÃO</strong> estão somando no resultado acima.
+                  Existem {dreData.naoClassificados.items.length} lançamentos sem DEPARA válido ou sem linha DRE reconhecida. Eles <strong>NÃO</strong> estão somando no resultado acima.
                 </p>
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
               <span style={{ fontSize: "16px", fontWeight: "800", color: "var(--warning)" }}>{fmt(dreData.naoClassificados.total)}</span>
               <button
-                onClick={() => setAuditDrawer({ items: dreData.naoClassificados.items, title: "Lançamentos Não Classificados" })}
+                onClick={() => setPendingDrawerOpen(true)}
                 style={{ background: "rgba(245,158,11,0.15)", color: "var(--warning)", border: "none", padding: "0.5rem 1rem", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}
               >
                 Revisar contas
@@ -812,7 +937,8 @@ export default function Dre() {
         </div>
       )}
 
-      {/* ── Audit Drawer ── */}
+      {/* ── Drawers de Auditoria ── */}
+      {pendingDrawerOpen && <PendingClassificationDrawer items={dreData.naoClassificados.items} onClose={() => setPendingDrawerOpen(false)} />}
       {auditDrawer && <AuditDrawer items={auditDrawer.items} title={auditDrawer.title} onClose={() => setAuditDrawer(null)} />}
     </div>
   );

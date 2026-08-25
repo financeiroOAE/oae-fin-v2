@@ -84,9 +84,16 @@ async function performFullSync(triggeredBy) {
     if (code) deparaMap[code] = row;
   });
 
+  const planosMap = {};
+  planos.forEach((row) => {
+    const code = String(row.ID || '').replace(/\D/g, '') || extractAccountCode(row['PLANO FINANCEIRO']);
+    if (code) planosMap[code] = row;
+  });
+
   // O catálogo oficial é usado tanto no CP quanto no CR para padronizar o nome da obra.
-  const cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap, projetos);
-  const crProcessed = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos);
+  // PLANOS_FINANCEIROS acompanha cada lançamento para auditoria das pendências da DRE.
+  const cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap, projetos, planosMap);
+  const crProcessed = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos, planosMap);
 
   const stats = {
     EMPRESAS: empresas.length,

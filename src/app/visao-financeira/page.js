@@ -10,6 +10,7 @@ import PieStatusChart from "@/components/charts/PieStatusChart";
 import ABCClassDonut from "@/components/charts/ABCClassDonut";
 import ProjectFinancialOverviewChart from "@/components/charts/ProjectFinancialOverviewChart";
 import MultiSelect from "@/components/MultiSelect";
+import InfoTooltip from "@/components/InfoTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
@@ -54,7 +55,8 @@ export default function VisaoFinanceira() {
       setProjetosBrutos(result.projetos || []);
       setSaldosBancarios(result.saldosBancarios || []);
       setSomaProjetos(result.somaProjetosSaldo || 0);
-      setLastSync(new Date().toLocaleString('pt-BR'));
+      const syncDate = result.syncedAt || result.snapshotAt;
+      setLastSync(syncDate ? new Date(syncDate).toLocaleString('pt-BR') : null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -122,9 +124,27 @@ export default function VisaoFinanceira() {
     return true;
   }), [baseData, filterProjetos, filterStatus, filterNomes, filterContas]);
 
-  const realizedFilteredData = useMemo(() => filteredData.filter(item =>
-    String(item.status || '').trim().toUpperCase() === 'REALIZADO'
-  ), [filteredData]);
+  const realizedFilteredData = useMemo(() => {
+    const start = filterDataInicial ? new Date(filterDataInicial + 'T00:00:00').getTime() : 0;
+    const selectedEnd = filterDataFinal ? new Date(filterDataFinal + 'T23:59:59').getTime() : Infinity;
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const end = Math.min(selectedEnd, todayEnd.getTime());
+    return openFilteredData.filter((item) => {
+      if (String(item.status || '').trim().toUpperCase() !== 'REALIZADO') return false;
+      return item.dataTimestamp >= start && item.dataTimestamp <= end;
+    });
+  }, [openFilteredData, filterDataInicial, filterDataFinal]);
+
+  const forecastFilteredData = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endOf2026 = new Date('2026-12-31T23:59:59').getTime();
+    return openFilteredData.filter((item) => {
+      if (String(item.status || '').trim().toUpperCase() !== 'A REALIZAR') return false;
+      return item.dataTimestamp >= today.getTime() && item.dataTimestamp <= endOf2026;
+    });
+  }, [openFilteredData]);
 
   const projetosDisponiveis = useMemo(() => getActiveProjectNames(projetosBrutos, true), [projetosBrutos]);
   const activeProjects = useMemo(() => getActiveProjects(projetosBrutos), [projetosBrutos]);
@@ -136,9 +156,9 @@ export default function VisaoFinanceira() {
   const totalBancario = saldosBancarios.reduce((acc, row) => acc + (Number(row.Saldo) || 0), 0);
   
   const entradasRealizadas = realizedFilteredData.filter(r => r.natureza === 'Entrada').reduce((acc, r) => acc + r.valor, 0);
-  const entradasARealizar = openFilteredData.filter(r => r.natureza === 'Entrada' && String(r.status || '').trim().toUpperCase() === 'A REALIZAR').reduce((acc, r) => acc + r.valor, 0);
+  const entradasARealizar = forecastFilteredData.filter(r => r.natureza === 'Entrada').reduce((acc, r) => acc + r.valor, 0);
   const saidasRealizadas = realizedFilteredData.filter(r => r.natureza === 'Saída').reduce((acc, r) => acc + r.valor, 0);
-  const saidasARealizar = openFilteredData.filter(r => r.natureza === 'Saída' && String(r.status || '').trim().toUpperCase() === 'A REALIZAR').reduce((acc, r) => acc + r.valor, 0);
+  const saidasARealizar = forecastFilteredData.filter(r => r.natureza === 'Saída').reduce((acc, r) => acc + r.valor, 0);
 
   const resultadoRealizado = entradasRealizadas - saidasRealizadas;
   const resultadoPrevisto = entradasARealizar - saidasARealizar;
@@ -229,9 +249,9 @@ export default function VisaoFinanceira() {
     };
 
     accumulate(realizedFilteredData, 'realizado');
-    accumulate(openFilteredData.filter((item) => String(item.status || '').trim().toUpperCase() === 'A REALIZAR'), 'pendente');
+    accumulate(forecastFilteredData, 'pendente');
     return result;
-  }, [realizedFilteredData, openFilteredData]);
+  }, [realizedFilteredData, forecastFilteredData]);
 
   const projectFinancialOverview = useMemo(() => {
     let receitaObra = 0;
@@ -474,13 +494,13 @@ export default function VisaoFinanceira() {
           <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(somaProjetos)}</p>
         </div>
         <div className="card" style={{ padding: '1.5rem' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><CheckCircle size={16} color="var(--primary)"/> Resultado Realizado</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><CheckCircle size={16} color="var(--primary)"/> Resultado Realizado <InfoTooltip title="Resultado Realizado" content="Entradas realizadas menos saídas realizadas entre a Data Inicial e a menor entre Data Final e hoje. No período padrão: 01/01/2026 até hoje." /></p>
           <p style={{ fontSize: '24px', fontWeight: '700', color: resultadoRealizado >= 0 ? 'var(--success)' : 'var(--danger)' }}>
             {formatCurrency(resultadoRealizado)}
           </p>
         </div>
         <div className="card" style={{ padding: '1.5rem' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Target size={16} color="var(--primary)"/> Resultado Previsto</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Target size={16} color="var(--primary)"/> Resultado Previsto <InfoTooltip title="Resultado Previsto" content="A receber menos A pagar dos lançamentos ainda A realizar, com vencimento de hoje até 31/12/2026. Os filtros de projeto, nome e conta continuam válidos." /></p>
           <p style={{ fontSize: '24px', fontWeight: '700', color: resultadoPrevisto >= 0 ? 'var(--success)' : 'var(--danger)' }}>
             {formatCurrency(resultadoPrevisto)}
           </p>
