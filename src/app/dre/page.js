@@ -861,10 +861,7 @@ export default function Dre() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <h1 style={{ fontSize: "22px", fontWeight: "800", color: "var(--text-main)" }}>DRE Gerencial</h1>
-              <InfoTooltip
-                title="Demonstrativo de Resultado"
-                content="Demonstrativo gerencial estruturado conforme o DEPARA financeiro da OAE. Os grupos podem ser expandidos para visualizar as contas que formam cada total. Ao analisar uma obra, receitas administrativas vinculadas ao mesmo título financeiro são incorporadas à receita da obra, enquanto despesas administrativas gerais permanecem fora da análise do projeto. Registros sem classificação ou deliberadamente marcados como fora da DRE não participam dos resultados."
-              />
+              <InfoTooltip title="Demonstrativo de Resultado" content="Receitas, deduções, custos, despesas e resultados classificados na DRE." />
             </div>
             {lastSync && <p style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "0.25rem" }}>Última sync: {lastSync}</p>}
           </div>
@@ -907,10 +904,7 @@ export default function Dre() {
           <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem", minWidth: "220px" }}>
             <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase", display: "flex", alignItems: "center", gap: "4px" }}>
               Visão
-              <InfoTooltip
-                title="Modo de Visualização"
-                content="Realizado: Somente lançamentos realizados até a data atual. Realizado + Previsão 2026: Realizado até hoje e A Realizar/A Pagar/A Receber até 31/12/2026. Somente Previsão: Apenas futuros a realizar até 31/12/2026."
-              />
+              <InfoTooltip title="Modo de Visualização" content="Define se a DRE mostra realizado, previsão ou realizado + previsão." />
             </label>
             <select
               value={visao}
@@ -941,7 +935,7 @@ export default function Dre() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', minWidth: '190px' }}>
               <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 Retroativo 2026
-                <InfoTooltip title="Retroativo 2026" content={`Existem ${retroactiveItems.length} movimentações realizadas em 2025 para o(s) projeto(s) selecionado(s). Ao ativar, elas aparecem consolidadas em uma coluna “Retroativo 2026” e passam a compor os resultados da DRE.`} />
+                <InfoTooltip title="Retroativo 2026" content="Movimentações realizadas em 2025 dos projetos selecionados, exibidas como Retroativo 2026." />
               </label>
               <button type="button" onClick={() => setIncludeRetroactive((value) => !value)} style={{ height: '38px', padding: '0 0.8rem', borderRadius: '6px', border: `1px solid ${includeRetroactive ? 'var(--primary)' : 'var(--border-color)'}`, background: includeRetroactive ? 'rgba(57,198,198,0.15)' : 'var(--bg-elevated)', color: includeRetroactive ? 'var(--primary)' : 'var(--text-main)', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
                 {includeRetroactive ? '✓ Incluído no resultado' : '+ Incluir retroativo'}

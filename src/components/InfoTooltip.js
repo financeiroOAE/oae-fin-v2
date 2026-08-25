@@ -6,37 +6,43 @@ import { createPortal } from "react-dom";
 
 export default function InfoTooltip({ title, content }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0, below: false });
+  const [position, setPosition] = useState({ top: 0, left: 0 });
   const containerRef = useRef(null);
-  const popoverRef = useRef(null);
   const closeTimerRef = useRef(null);
 
   const updatePosition = useCallback(() => {
     if (!containerRef.current || typeof window === 'undefined') return;
+
     const rect = containerRef.current.getBoundingClientRect();
-    const width = Math.min(320, Math.max(240, window.innerWidth - 24));
-    const left = Math.min(
-      Math.max(12, rect.right - width),
-      Math.max(12, window.innerWidth - width - 12)
+    const viewportPadding = 10;
+    const gap = 10;
+    const width = Math.min(260, Math.max(190, window.innerWidth - viewportPadding * 2));
+    const hasRoomRight = rect.right + gap + width <= window.innerWidth - viewportPadding;
+    const hasRoomLeft = rect.left - gap - width >= viewportPadding;
+
+    let left;
+    if (hasRoomRight) left = rect.right + gap;
+    else if (hasRoomLeft) left = rect.left - width - gap;
+    else left = Math.min(Math.max(viewportPadding, rect.left), window.innerWidth - width - viewportPadding);
+
+    const top = Math.min(
+      Math.max(viewportPadding, rect.top - 4),
+      Math.max(viewportPadding, window.innerHeight - 120)
     );
-    const below = rect.top < 190;
-    setPosition({
-      top: below ? rect.bottom + 8 : rect.top - 8,
-      left,
-      below,
-    });
+
+    setPosition({ top, left });
   }, []);
 
-  const openTooltip = () => {
+  const openTooltip = useCallback(() => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     updatePosition();
     setIsOpen(true);
-  };
+  }, [updatePosition]);
 
-  const scheduleClose = () => {
+  const closeTooltip = useCallback(() => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = setTimeout(() => setIsOpen(false), 120);
-  };
+    closeTimerRef.current = setTimeout(() => setIsOpen(false), 70);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -49,96 +55,69 @@ export default function InfoTooltip({ title, content }) {
     };
   }, [isOpen, updatePosition]);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      const insideTrigger = containerRef.current?.contains(event.target);
-      const insidePopover = popoverRef.current?.contains(event.target);
-      if (!insideTrigger && !insidePopover) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-    };
+  useEffect(() => () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
   }, []);
 
   const popover = isOpen && typeof document !== 'undefined' ? createPortal(
     <div
-      ref={popoverRef}
-      className="info-tooltip-popover"
-      onMouseEnter={openTooltip}
-      onMouseLeave={scheduleClose}
+      role="tooltip"
       style={{
         position: 'fixed',
         top: position.top,
         left: position.left,
-        transform: position.below ? 'none' : 'translateY(-100%)',
         width: 'max-content',
-        maxWidth: 'min(320px, calc(100vw - 24px))',
-        minWidth: 'min(240px, calc(100vw - 24px))',
-        backgroundColor: 'var(--bg-elevated)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '8px',
-        padding: '1rem',
-        color: 'var(--text-main)',
-        fontSize: '12px',
-        lineHeight: '1.5',
-        boxShadow: '0 14px 34px rgba(0,0,0,0.45)',
+        maxWidth: 'min(260px, calc(100vw - 20px))',
+        background: 'rgba(18, 27, 38, 0.96)',
+        border: '1px solid rgba(148, 163, 184, 0.18)',
+        borderRadius: '6px',
+        padding: '0.5rem 0.6rem',
+        color: 'var(--text-secondary)',
+        fontSize: '11px',
+        lineHeight: 1.4,
+        boxShadow: '0 8px 22px rgba(0,0,0,0.26)',
         zIndex: 2147483000,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.75rem',
-        pointerEvents: 'auto'
+        pointerEvents: 'none',
+        whiteSpace: 'normal',
       }}
     >
-      {title && (
-        <h4 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--primary)', margin: 0, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-          {title}
-        </h4>
-      )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', whiteSpace: 'normal' }}>
-        {content}
-      </div>
+      {content}
     </div>,
     document.body
   ) : null;
 
   return (
     <>
-      <div
-        className="info-tooltip-container"
+      <span
         ref={containerRef}
-        style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+        className="info-tooltip-container"
         onMouseEnter={openTooltip}
-        onMouseLeave={scheduleClose}
+        onMouseLeave={closeTooltip}
+        onFocus={openTooltip}
+        onBlur={closeTooltip}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openTooltip();
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label={title ? `Informações: ${title}` : 'Informações'}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '15px',
+          height: '15px',
+          color: 'var(--text-secondary)',
+          opacity: 0.52,
+          cursor: 'help',
+          flexShrink: 0,
+          transition: 'opacity 0.15s ease',
+        }}
       >
-        <button
-          type="button"
-          className="btn"
-          aria-label={title ? `Informações: ${title}` : 'Informações'}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!isOpen) updatePosition();
-            setIsOpen((open) => !open);
-          }}
-          onFocus={openTooltip}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            padding: '4px',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <Info size={16} />
-        </button>
-      </div>
+        <Info size={12} strokeWidth={1.8} />
+      </span>
       {popover}
     </>
   );
