@@ -16,6 +16,7 @@ import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { getRolling30DayRange } from "@/lib/dateRange";
+import { getActiveProjectNames } from "@/lib/projectRules";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine, Cell
 } from "recharts";
@@ -24,6 +25,7 @@ export default function FluxoDeCaixa() {
   const { isReportMode, openReportBuilder, exitReportMode } = useReport();
   const [isSyncing, setIsSyncing] = useState(false);
   const [data, setData] = useState([]);
+  const [projetosBrutos, setProjetosBrutos] = useState([]);
   const [saldosBancarios, setSaldosBancarios] = useState([]);
   const [error, setError] = useState(null);
   const [lastSync, setLastSync] = useState(null);
@@ -48,6 +50,7 @@ export default function FluxoDeCaixa() {
       if (!response.ok) throw new Error(result.error || result.details?.message || 'Erro desconhecido');
 
       setData(result.data || []);
+      setProjetosBrutos(result.projetos || []);
       setSaldosBancarios(result.saldosBancarios || []);
       setLastSync(new Date().toLocaleString('pt-BR'));
     } catch (err) {
@@ -109,7 +112,7 @@ export default function FluxoDeCaixa() {
     });
   }, [baseData, filterDataInicial, filterDataFinal, filterProjetos, filterStatus, filterNomes, filterContas]);
 
-  const projetosDisponiveis = Array.from(new Set(baseData.map(d => d.projeto).filter(Boolean))).sort();
+  const projetosDisponiveis = useMemo(() => getActiveProjectNames(projetosBrutos, true), [projetosBrutos]);
   const nomesDisponiveis = Array.from(new Set(baseData.map(d => d.nome).filter(Boolean))).sort();
   const contasDisponiveis = Array.from(new Set(baseData.map(d => d.contaDescricao).filter(Boolean))).sort();
   const statusDisponiveis = ["Recebido", "A receber", "Pago", "A pagar"];
@@ -255,21 +258,17 @@ export default function FluxoDeCaixa() {
           const upper = projeto.toUpperCase();
           return projeto && !upper.includes('ADMINISTRA') && upper !== 'GRUPO OAE' && upper !== 'SEM PROJETO';
         }) || item.projeto;
-
-      const dataEmissao = String(item.dataEmissao || '').trim();
       const valorRealNota = valoresReais.length ? Math.max(...valoresReais) : 0;
 
       if (!map[key]) {
         map[key] = {
           ...item,
           projeto: projetoObra,
-          dataEmissao,
           valorRealNota,
         };
       } else {
         map[key].valor += Number(item.valor) || 0;
         map[key].valorRealNota = Math.max(map[key].valorRealNota || 0, valorRealNota);
-        if (!map[key].dataEmissao && dataEmissao) map[key].dataEmissao = dataEmissao;
         if ((!map[key].projeto || String(map[key].projeto).toUpperCase().includes('ADMINISTRA')) && projetoObra) {
           map[key].projeto = projetoObra;
         }
@@ -709,12 +708,12 @@ export default function FluxoDeCaixa() {
           </div>
 
           <div data-report-section className="card fluxo-billing-card" style={{ padding: '1.5rem' }}>
-            <ReportAdder sectionKey="fluxo:faturamento-nfes" title="Painel de Faturamento (NFES)" componentName="Tabela de Faturamentos" page="Fluxo de Caixa" type="TABLE" data={faturamentosNfesFiltrados.map(row => ({ Documento: row.documento, Projeto: row.projeto, Data: row.data, Valor: row.valor, "Data de Emissão": row.dataEmissao || '', "Valor Real da Nota Fiscal": row.valorRealNota }))} filters={{ Tipo: "NFES", Situação: "A receber" }} style={{ float: 'right' }} />
+            <ReportAdder sectionKey="fluxo:faturamento-nfes" title="Painel de Faturamento (NFES)" componentName="Tabela de Faturamentos" page="Fluxo de Caixa" type="TABLE" data={faturamentosNfesFiltrados.map(row => ({ Documento: row.documento, Projeto: row.projeto, Vencimento: row.data, "Valor Bruto": row.valorRealNota, "Valor Líquido": row.valor }))} filters={{ Tipo: "NFES", Situação: "A receber" }} style={{ float: 'right' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <ChartHeader
                 title="Painel de Faturamento (NFES)"
                 infoTitle="Faturamento"
-                infoContent="Lista receitas da CR_GERAL cujo documento inclui NFES. Projeto segue o centro de custo/obra. Valor permanece conforme a regra atual e Valor Real da Nota Fiscal usa Valor total título sem duplicar a divisão administrativa/operacional. A Data de Emissão será exibida quando essa informação estiver disponível na fonte."
+                infoContent="Relação de notas faturadas — A receber."
               />
               <select
                 value={filtroFaturamento}
@@ -732,10 +731,9 @@ export default function FluxoDeCaixa() {
                   <tr>
                     <th>Documento</th>
                     <th>Projeto</th>
-                    <th>Data</th>
-                    <th style={{ textAlign: 'right' }}>Valor</th>
-                    <th>Data de Emissão</th>
-                    <th style={{ textAlign: 'right' }}>Valor Real da Nota Fiscal</th>
+                    <th>Vencimento</th>
+                    <th style={{ textAlign: 'right' }}>Valor Bruto</th>
+                    <th style={{ textAlign: 'right' }}>Valor Líquido</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -744,21 +742,19 @@ export default function FluxoDeCaixa() {
                       <td style={{ fontWeight: '500' }}>{row.documento}</td>
                       <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.projeto}>{row.projeto}</td>
                       <td>{row.data}</td>
-                      <td style={{ textAlign: 'right', color: 'var(--success)' }}>{formatCurrency(row.valor)}</td>
-                      <td>{row.dataEmissao || '—'}</td>
                       <td style={{ textAlign: 'right', color: 'var(--text-main)', fontWeight: '600' }}>{formatCurrency(row.valorRealNota)}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--success)' }}>{formatCurrency(row.valor)}</td>
                     </tr>
                   )) : (
-                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhum faturamento encontrado.</td></tr>
+                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhum faturamento encontrado.</td></tr>
                   )}
                 </tbody>
                 {faturamentosNfesFiltrados.length > 0 && (
                   <tfoot style={{ position: 'sticky', bottom: 0, background: 'var(--bg-elevated)', zIndex: 10, boxShadow: '0 -2px 10px rgba(0,0,0,0.1)' }}>
                     <tr>
                       <td colSpan="3" style={{ fontWeight: '600', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>Total:</td>
-                      <td style={{ fontWeight: '700', color: 'var(--success)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>{formatCurrency(totalFaturamentosNfes)}</td>
-                      <td style={{ borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}></td>
                       <td style={{ fontWeight: '700', color: 'var(--text-main)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>{formatCurrency(totalValorRealNfes)}</td>
+                      <td style={{ fontWeight: '700', color: 'var(--success)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>{formatCurrency(totalFaturamentosNfes)}</td>
                     </tr>
                   </tfoot>
                 )}
