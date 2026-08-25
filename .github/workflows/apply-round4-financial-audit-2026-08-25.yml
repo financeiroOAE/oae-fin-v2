@@ -1,0 +1,32 @@
+name: Apply Round 4 Financial Audit 2026-08-25
+
+on:
+  push:
+    branches:
+      - fix-financial-revenue-retroactive-2026-08-25
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, 'fix: aplicar auditoria financeira rodada 4') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-financial-revenue-retroactive-2026-08-25
+          fetch-depth: 0
+      - name: Aplicar correcoes
+        run: python scripts/apply-round4-financial-audit-2026-08-25.py
+      - name: Commitar alteracoes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src
+          if git diff --cached --quiet; then
+            echo "Sem alteracoes"
+          else
+            git commit -m "fix: aplicar auditoria financeira rodada 4"
+            git push origin HEAD:fix-financial-revenue-retroactive-2026-08-25
+          fi
