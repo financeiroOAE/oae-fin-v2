@@ -184,7 +184,7 @@ export default function FluxoDeCaixa() {
   const annualData2026 = useMemo(() => {
     const map = {};
     const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-    meses.forEach((m, i) => map[i] = { mesNome: m, 'Entradas Realizadas': 0, 'Entradas Programadas': 0, Saídas: 0, Resultado: 0, id: i });
+    meses.forEach((m, i) => map[i] = { mesNome: m, Recebido: 0, 'A receber': 0, Pago: 0, Resultado: 0, id: i });
     
     annualFilteredData.forEach(item => {
       if (!item.data) return;
@@ -198,12 +198,12 @@ export default function FluxoDeCaixa() {
           const isPrevisto = status === 'A REALIZAR';
           if (!isRealizado && !isPrevisto) return;
           if (item.natureza === 'Entrada') {
-            if (isPrevisto) map[m]['Entradas Programadas'] += item.valor;
-            else map[m]['Entradas Realizadas'] += item.valor;
+            if (isPrevisto) map[m]['A receber'] += item.valor;
+            else map[m].Recebido += item.valor;
             map[m].Resultado += item.valor;
           }
           if (item.natureza === 'Saída') {
-            map[m].Saídas += item.valor;
+            map[m].Pago += item.valor;
             map[m].Resultado -= item.valor;
           }
         }
@@ -726,7 +726,7 @@ export default function FluxoDeCaixa() {
               </select>
             </div>
             <div className="table-container" style={{ marginTop: '1rem', maxHeight: '360px', overflowY: 'auto' }}>
-              <table style={{ fontSize: '12px' }}>
+              <table style={{ fontSize: '12px', minWidth: '760px' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr>
                     <th>Documento</th>
@@ -771,7 +771,7 @@ export default function FluxoDeCaixa() {
         <ChartHeader
           title="Movimentações Financeiras Anuais — 2026"
           infoTitle="Fluxo Anual 2026"
-          infoContent="Representa o fluxo consolidado dos meses de janeiro a dezembro de 2026. Este gráfico possui um recorte de período independente do filtro padrão de 30 dias utilizado nos outros componentes."
+          infoContent="Mostra, por mês de 2026, o que já foi recebido, o que ainda está a receber, o que foi pago e o resultado financeiro. Esta visão anual não é cortada pelo filtro de datas da página."
         />
         <div style={{ height: '300px', marginTop: '1rem' }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -782,9 +782,9 @@ export default function FluxoDeCaixa() {
               <RechartsTooltip content={<CustomTooltip />} />
               <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
               <ReferenceLine y={0} stroke="var(--border-color)" />
-              <Bar dataKey="Entradas" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={50} />
-              <Bar dataKey="Entradas Programadas" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={50} />
-              <Bar dataKey="Saídas" fill="var(--danger)" radius={[4, 4, 0, 0]} maxBarSize={50} />
+              <Bar dataKey="Recebido" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={50} />
+              <Bar dataKey="A receber" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={50} />
+              <Bar dataKey="Pago" fill="var(--danger)" radius={[4, 4, 0, 0]} maxBarSize={50} />
               <Bar dataKey="Resultado" fill="var(--info)" radius={[4, 4, 0, 0]} maxBarSize={50} />
             </BarChart>
           </ResponsiveContainer>
@@ -803,11 +803,11 @@ export default function FluxoDeCaixa() {
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+          display: 'flex', alignItems: 'stretch', justifyContent: 'center', zIndex: 2147482000,
           padding: '1rem'
         }}>
           <div className="card" style={{
-            width: '100%', maxWidth: '800px', maxHeight: '90vh',
+            width: 'min(1100px, 100%)', maxWidth: '1100px', maxHeight: 'calc(100vh - 2rem)',
             display: 'flex', flexDirection: 'column',
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
             overflow: 'hidden'
