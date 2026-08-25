@@ -113,10 +113,8 @@
   margin-bottom: 0;
 }
 
-/* Nos cards demonstrativos, usamos somente o i de informação para não duplicar ajuda. */
-.has-demonstrative-help > .info-tooltip-container,
-.has-demonstrative-help h2 > .info-tooltip-container,
-.has-demonstrative-help h3 > .info-tooltip-container {
+/* Nos cards demonstrativos, usamos somente o i do canto para não duplicar ajuda. */
+.has-demonstrative-help .info-tooltip-container {
   display: none !important;
 }
 
