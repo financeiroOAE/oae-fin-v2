@@ -22,16 +22,12 @@ export default function DivergingResultChart({ data }) {
     );
   }
 
-  const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
-  
-  const formatShortCurrency = (val) => {
-    if (!val && val !== 0) return '';
-    const absVal = Math.abs(val);
-    const sign = val < 0 ? '-' : '';
-    if (absVal >= 1000000) return `${sign}R$ ${(absVal / 1000000).toFixed(1).replace('.', ',')} mi`;
-    if (absVal >= 1000) return `${sign}R$ ${(absVal / 1000).toFixed(1).replace('.', ',')} mil`;
-    return formatCurrency(val);
-  };
+  const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(val || 0);
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -99,14 +95,12 @@ export default function DivergingResultChart({ data }) {
     const { x, y, width, height, value } = props;
     if (value === undefined || value === null) return null;
     const isNegative = value < 0;
-    
-    // For negative values, x is the left edge of the bar. For positive, x+width is the right edge.
     const labelX = isNegative ? x - 5 : x + width + 5;
     const anchor = isNegative ? 'end' : 'start';
-    
+
     return (
       <text x={labelX} y={y + height / 2 + 4} fill={isNegative ? 'var(--danger)' : 'var(--success)'} fontSize={10} fontWeight="600" textAnchor={anchor}>
-        {formatShortCurrency(value)}
+        {formatCurrency(value)}
       </text>
     );
   };
@@ -114,26 +108,12 @@ export default function DivergingResultChart({ data }) {
   return (
     <div style={{ width: '100%', height: '100%', minHeight: '400px' }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data}
-          layout="vertical"
-          margin={{ top: 10, right: 60, left: 20, bottom: 5 }}
-          barSize={20}
-        >
+        <BarChart data={data} layout="vertical" margin={{ top: 10, right: 150, left: 20, bottom: 5 }} barSize={20}>
           <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="var(--border-color)" opacity={0.3} />
           <XAxis type="number" hide />
-          <YAxis 
-            type="category"
-            dataKey="nome"
-            axisLine={false}
-            tickLine={false}
-            tick={<CustomYAxisTick />}
-            width={180}
-          />
+          <YAxis type="category" dataKey="nome" axisLine={false} tickLine={false} tick={<CustomYAxisTick />} width={180} />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-          
           <ReferenceLine x={0} stroke="var(--border-color)" strokeWidth={2} />
-
           <Bar dataKey="Resultado" radius={[4, 4, 4, 4]}>
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.Resultado >= 0 ? 'var(--success)' : 'var(--danger)'} />
