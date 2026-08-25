@@ -164,11 +164,14 @@ export default function VisaoFinanceira() {
   // Top Projetos Entradas / Saídas
   const topProjetosEntradas = useMemo(() => {
     const map = {};
-    filteredData.filter(i => {
-      const classification = classifyFinancialEntry(i);
-      return classification.type === 'receita_projeto' && i.projeto && !String(i.projeto).toUpperCase().includes('ADMINISTRA');
-    }).forEach(i => {
-      map[i.projeto] = (map[i.projeto] || 0) + i.valor;
+    filteredData.forEach(item => {
+      const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
+      rows.forEach(row => {
+        const classification = classifyFinancialEntry(row);
+        if (classification.type !== 'receita_projeto') return;
+        if (!row.projeto || String(row.projeto).toUpperCase().includes('ADMINISTRA')) return;
+        map[row.projeto] = (map[row.projeto] || 0) + (Number(row.valor) || 0);
+      });
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
   }, [filteredData]);
@@ -184,9 +187,12 @@ export default function VisaoFinanceira() {
   // Top Contas Entradas / Saídas
   const entryCategoryData = useMemo(() => {
     const map = {};
-    filteredData.filter(i => i.natureza === 'Entrada').forEach(i => {
-      const classification = classifyFinancialEntry(i);
-      map[classification.label] = (map[classification.label] || 0) + (Number(i.valor) || 0);
+    filteredData.filter(i => i.natureza === 'Entrada').forEach(item => {
+      const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
+      rows.forEach(row => {
+        const classification = classifyFinancialEntry(row);
+        map[classification.label] = (map[classification.label] || 0) + (Number(row.valor) || 0);
+      });
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor);
   }, [filteredData]);
@@ -258,6 +264,7 @@ export default function VisaoFinanceira() {
     Lançamento: item.lancamento || '',
     Situação: item.statusExibicao,
     Natureza: item.natureza,
+    "Classificação Financeira": item.natureza === 'Entrada' ? classifyFinancialEntry(item).label : 'Saída / Pagamento',
     Valor: item.valor,
   }));
 
@@ -360,7 +367,7 @@ export default function VisaoFinanceira() {
       {/* KPIs Principais */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" data-report-section style={{ padding: '1.5rem' }}>
-          <ReportAdder sectionKey="visao:kpis" title="Resumo Executivo Financeiro" componentName="Indicadores Financeiros" page="Visão Financeira" type="SUMMARY" data={[{ "Saldo Bancário": totalBancario, "Saldo Contratos": somaProjetos, "Resultado Realizado": resultadoRealizado, "Resultado Previsto": resultadoPrevisto, Recebido: entradasRealizadas, "A Receber": entradasARealizar, Pago: saidasRealizadas, "A Pagar": saidasARealizar }]} columnFormats={{ "Saldo Bancário": "currency", "Saldo Contratos": "currency", "Resultado Realizado": "currency", "Resultado Previsto": "currency", Recebido: "currency", "A Receber": "currency", Pago: "currency", "A Pagar": "currency" }} filters={reportFilters} presetTags={["executive-financial"]} explanation="Consolidação dos principais saldos e resultados conforme os filtros ativos." style={{ float: 'right' }} />
+          <ReportAdder sectionKey="visao:kpis" title="Resumo Executivo Financeiro" componentName="Indicadores Financeiros" page="Visão Financeira" type="SUMMARY" data={[{ "Saldo Bancário": totalBancario, "Saldo Contratos": somaProjetos, "Resultado Realizado": resultadoRealizado, "Resultado Previsto": resultadoPrevisto, "Entradas Realizadas": entradasRealizadas, "A Receber": entradasARealizar, Pago: saidasRealizadas, "A Pagar": saidasARealizar }]} columnFormats={{ "Saldo Bancário": "currency", "Saldo Contratos": "currency", "Resultado Realizado": "currency", "Resultado Previsto": "currency", "Entradas Realizadas": "currency", "A Receber": "currency", Pago: "currency", "A Pagar": "currency" }} filters={reportFilters} presetTags={["executive-financial"]} explanation="Consolidação dos principais saldos e resultados conforme os filtros ativos." style={{ float: 'right' }} />
           <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Landmark size={16} color="var(--primary)"/> Saldo Bancário Total</p>
           <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalBancario)}</p>
         </div>

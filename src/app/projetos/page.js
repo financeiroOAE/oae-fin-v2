@@ -369,8 +369,8 @@ export default function Projetos() {
     [filteredProjetos]);
 
   const topEntradasData = useMemo(() =>
-    [...filteredProjetos].filter(p => p.recebido > 0).sort((a, b) => b.recebido - a.recebido).slice(0, 5)
-      .map(p => ({ nome: p.nome, Valor: p.recebido })),
+    [...filteredProjetos].filter(p => p.receitaDireta > 0).sort((a, b) => b.receitaDireta - a.receitaDireta).slice(0, 5)
+      .map(p => ({ nome: p.nome, Valor: p.receitaDireta })),
     [filteredProjetos]);
 
   const topSaidasData = useMemo(() =>

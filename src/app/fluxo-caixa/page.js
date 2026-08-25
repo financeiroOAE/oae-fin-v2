@@ -177,7 +177,7 @@ export default function FluxoDeCaixa() {
     return true;
   }), [baseData, filterProjetos, filterStatus, filterNomes, filterContas]);
 
-  // Fluxo Anual Fixo (2026) independentemente dos filtros principais
+  // Visão anual fixa de 2026; os filtros de conteúdo continuam válidos, mas o filtro de datas não limita este gráfico
   const annualData2026 = useMemo(() => {
     const map = {};
     const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -410,6 +410,10 @@ export default function FluxoDeCaixa() {
         </div>
       </div>
 
+      <div style={{ margin: '-0.5rem 0 1.25rem', padding: '0.75rem 0.9rem', borderLeft: '3px solid var(--primary)', background: 'var(--bg-elevated)', borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '12px', lineHeight: 1.5 }}>
+        <strong style={{ color: 'var(--text-main)' }}>Como ler Entradas:</strong> este total representa dinheiro entrando no caixa e pode conter receita operacional, empréstimos/financiamentos, aportes e outras movimentações. Entrada de caixa não é automaticamente receita.
+      </div>
+
       {/* Linha Executiva Compacta de KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" data-report-section style={{ padding: '1.25rem', borderLeft: '4px solid var(--info)' }}>
@@ -423,7 +427,7 @@ export default function FluxoDeCaixa() {
 
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Entradas</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Entradas de Caixa</p>
             <ArrowUpCircle size={16} color="var(--success)" />
           </div>
           <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalEntradas)}</p>
