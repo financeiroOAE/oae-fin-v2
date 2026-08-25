@@ -21,7 +21,6 @@ export function classifyFinancialEntry(item) {
 
   const code = accountCode(item);
   const text = normalizeText(`${item.contaNome || ''} ${item.contaDescricao || ''} ${item.dreClasse || ''} ${item.drePacote || ''} ${item.dreLinha || ''}`);
-  const project = normalizeText(item.projeto);
 
   if (code === '1020101' || text.includes('APORTE')) {
     return { label: 'Aportes', type: 'aporte', isRevenue: false };
@@ -48,13 +47,11 @@ export function classifyFinancialEntry(item) {
     return { label: 'Receitas Administrativas', type: 'receita_administrativa', isRevenue: true };
   }
 
+  // Regra oficial: toda linha classificada como faturamento é Receita de Projetos.
+  // A classificação não depende do nome do centro de custo, pois ele pode vir genérico
+  // no relatório do Sienge. A parcela administrativa continua tratada acima.
   if (code === '1010101' || text.includes('REC. FATURAMENTO') || text.includes('REC FATURAMENTO')) {
-    const isAdministrativeProject = project.includes('ADMINISTRA') || project === 'GRUPO OAE' || project === 'SEM PROJETO';
-    return {
-      label: isAdministrativeProject ? 'Outras Receitas' : 'Receita de Projetos',
-      type: isAdministrativeProject ? 'outra_receita' : 'receita_projeto',
-      isRevenue: true,
-    };
+    return { label: 'Receita de Projetos', type: 'receita_projeto', isRevenue: true };
   }
 
   if (
