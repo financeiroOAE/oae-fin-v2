@@ -182,19 +182,20 @@ export default function VisaoFinanceira() {
         const projectName = String(row.projeto || '').trim();
         const projectUpper = projectName.toUpperCase();
         if (!projectName || projectUpper.includes('ADMINISTRA') || projectUpper === 'GRUPO OAE' || projectUpper === 'SEM PROJETO') return;
+        if (!activeProjectKeys.has(getProjectKey(projectName))) return;
         map[projectName] = (map[projectName] || 0) + (Number(row.valor) || 0);
       });
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
-  }, [filteredData]);
+  }, [filteredData, activeProjectKeys]);
 
   const topProjetosSaidas = useMemo(() => {
     const map = {};
-    filteredData.filter(i => i.natureza === 'Saída' && i.projeto).forEach(i => {
-      map[i.projeto] = (map[i.projeto] || 0) + i.valor;
+    filteredData.filter(i => i.natureza === 'Saída' && i.projeto && activeProjectKeys.has(getProjectKey(i.projeto))).forEach(i => {
+      map[i.projeto] = (map[i.projeto] || 0) + (Number(i.valor) || 0);
     });
     return Object.entries(map).map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor).slice(0, 10);
-  }, [filteredData]);
+  }, [filteredData, activeProjectKeys]);
 
   // Top Contas Entradas / Saídas
   const entryStatusBreakdown = useMemo(() => {
@@ -411,7 +412,7 @@ export default function VisaoFinanceira() {
             <input type="date" value={filterDataFinal} onChange={(e) => setFilterDataFinal(e.target.value)} style={{ width: '100%', height: '34px', fontSize: '13px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
           <div style={{ flex: '2 1 220px', minWidth: 0 }}>
-            <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><Building2 size={12}/> Projeto / Centro de Custo</label>
+            <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><Building2 size={12}/> Projeto / Obra</label>
             <MultiSelect options={projetosDisponiveis} value={filterProjetos} onChange={setFilterProjetos} placeholder="Todos os projetos" />
           </div>
           <div style={{ flex: '2 1 200px', minWidth: 0 }}>

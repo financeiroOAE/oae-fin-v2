@@ -416,7 +416,7 @@ export default function FluxoDeCaixa() {
           <MultiSelect options={statusDisponiveis} selected={filterStatus} onChange={setFilterStatus} placeholder="Todas as situações" />
         </div>
         <div style={{ flex: '2 1 200px', minWidth: 0 }}>
-          <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Projeto / CC</label>
+          <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Projeto / Obra</label>
           <MultiSelect options={projetosDisponiveis} selected={filterProjetos} onChange={setFilterProjetos} placeholder="Todos os projetos" />
         </div>
         <div style={{ flex: '2 1 200px', minWidth: 0 }}>
@@ -630,7 +630,7 @@ export default function FluxoDeCaixa() {
               <BarChart data={previsao7Dias} margin={{ top: 10, right: 10, left: 10, bottom: 0 }} onClick={handleBarClick}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
                 <XAxis dataKey="dataExibicao" stroke="var(--text-secondary)" fontSize={12} tickMargin={10} axisLine={false} tickLine={false} />
-                <YAxis stroke="var(--text-secondary)" fontSize={12} tickFormatter={(val) => `R$ ${(val / 1000)}k`} axisLine={false} tickLine={false} />
+                <YAxis stroke="var(--text-secondary)" fontSize={10} width={110} tickFormatter={(val) => formatCurrency(val)} axisLine={false} tickLine={false} />
                 <RechartsTooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
                 <Bar dataKey="Entradas" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={30} />
