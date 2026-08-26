@@ -17,6 +17,7 @@ import InfoTooltip from "@/components/InfoTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
+import { exportReportToPdf } from "@/lib/reportExport";
 import { isRevenueTax, getRevenueTaxLabel, classifyFinancialEntry, isTeamExpense } from "@/lib/financialClassification";
 import { getProjectKey, isProjectOngoing, getActiveProjectNames, isGeneralProjectsBucket } from "@/lib/projectRules";
 
@@ -615,50 +616,105 @@ export default function Projetos() {
 
   const exportSelectedProjectPdf = useCallback(async () => {
     if (!selectedProject) return;
-    const { jsPDF } = await import('jspdf');
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 14;
-    let y = 16;
 
-    const money = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
-    const addText = (text, size = 9, options = {}) => {
-      doc.setFont('helvetica', options.bold ? 'bold' : 'normal');
-      doc.setFontSize(size);
-      doc.setTextColor(options.muted ? 95 : 30);
-      const lines = doc.splitTextToSize(String(text), pageWidth - margin * 2);
-      if (y + lines.length * 4.5 > pageHeight - 14) {
-        doc.addPage();
-        y = 16;
-      }
-      doc.text(lines, margin, y);
-      y += lines.length * 4.5 + (options.gap ?? 1.5);
+    const filters = {
+      Projeto: selectedProject.nome,
+      Empresa: selectedProject.empresa || 'Todas',
+      Tipo: selectedProject.tipo || 'Todos',
+      'Data inicial': filterDataInicial || 'Todas',
+      'Data final': filterDataFinal || 'Todas',
     };
 
-    addText('Relatorio Executivo de Projeto', 16, { bold: true, gap: 3 });
-    addText(selectedProject.nome, 12, { bold: true, gap: 1 });
-    addText(`${selectedProject.empresa || ''} • ${selectedProject.tipo || ''}`, 8, { muted: true, gap: 3 });
-    addText(`Periodo: ${filterDataInicial || 'inicio'} a ${filterDataFinal || 'atual'}`, 8, { muted: true, gap: 4 });
+    const movementRows = selectedProjectReportMoves.map((item) => ({
+      Data: item.data || '',
+      Natureza: item.natureza || '',
+      Situação: item.status || '',
+      'Nome / Fornecedor': item.nome || '',
+      Conta: item.contaNome || item.contaDescricao || item.contaCodigo || '',
+      Documento: item.documento || '',
+      Lançamento: item.lancamento || '',
+      Valor: Number(item.valor) || 0,
+    }));
 
-    addText('Resumo Contratual', 10, { bold: true });
-    addText(`Contratado: ${money(selectedProject.contratado)}   |   Faturado: ${money(selectedProject.faturado)}`, 9);
-    addText(`Saldo contratual: ${money(selectedProject.saldoContratual)}   |   % faturado: ${(Number(selectedProject.percentFaturado || 0) * 100).toFixed(2).replace('.', ',')}%`, 9, { gap: 3 });
+    const reportItems = [
+      {
+        id: 'projeto-resumo-contratual',
+        sectionKey: 'projeto:resumo-contratual',
+        title: 'Resumo Contratual',
+        page: 'Projetos',
+        type: 'TABLE',
+        data: [{
+          Projeto: selectedProject.nome,
+          Empresa: selectedProject.empresa || '',
+          Tipo: selectedProject.tipo || '',
+          Contratado: Number(selectedProject.contratado) || 0,
+          Faturado: Number(selectedProject.faturado) || 0,
+          '% Faturado': Number(selectedProject.percentFaturado) || 0,
+          'Saldo Contratual': Number(selectedProject.saldoContratual) || 0,
+        }],
+        columns: [
+          { key: 'Projeto', label: 'Projeto' },
+          { key: 'Empresa', label: 'Empresa' },
+          { key: 'Tipo', label: 'Tipo' },
+          { key: 'Contratado', label: 'Contratado', format: 'currency' },
+          { key: 'Faturado', label: 'Faturado', format: 'currency' },
+          { key: '% Faturado', label: '% Faturado', format: 'percent' },
+          { key: 'Saldo Contratual', label: 'Saldo Contratual', format: 'currency' },
+        ],
+        filters,
+        explanation: 'Posição contratual do projeto selecionado.',
+      },
+      {
+        id: 'projeto-resumo-financeiro',
+        sectionKey: 'projeto:resumo-financeiro',
+        title: 'Resumo Financeiro',
+        page: 'Projetos',
+        type: 'TABLE',
+        data: [{
+          Recebido: Number(selectedProject.recebido) || 0,
+          'A Receber': Number(selectedProject.aReceber) || 0,
+          Pago: Number(selectedProject.pago) || 0,
+          'A Pagar': Number(selectedProject.aPagar) || 0,
+          Resultado: Number(selectedProject.resultadoCaixa) || 0,
+        }],
+        columns: [
+          { key: 'Recebido', label: 'Recebido', format: 'currency' },
+          { key: 'A Receber', label: 'A Receber', format: 'currency' },
+          { key: 'Pago', label: 'Pago', format: 'currency' },
+          { key: 'A Pagar', label: 'A Pagar', format: 'currency' },
+          { key: 'Resultado', label: 'Resultado', format: 'currency' },
+        ],
+        filters,
+        explanation: 'Movimentação financeira do projeto no período selecionado.',
+      },
+      {
+        id: 'projeto-movimentacoes',
+        sectionKey: 'projeto:movimentacoes',
+        title: 'Movimentações do Período',
+        page: 'Projetos',
+        type: 'TABLE',
+        data: movementRows,
+        columns: [
+          { key: 'Data', label: 'Data', format: 'date' },
+          { key: 'Natureza', label: 'Natureza' },
+          { key: 'Situação', label: 'Situação' },
+          { key: 'Nome / Fornecedor', label: 'Nome / Fornecedor' },
+          { key: 'Conta', label: 'Conta' },
+          { key: 'Documento', label: 'Documento' },
+          { key: 'Lançamento', label: 'Lançamento' },
+          { key: 'Valor', label: 'Valor', format: 'currency' },
+        ],
+        filters,
+        explanation: 'Extrato das movimentações que compõem a posição financeira do projeto no período.',
+      },
+    ];
 
-    addText('Resumo Financeiro', 10, { bold: true });
-    addText(`Recebido: ${money(selectedProject.recebido)}   |   A receber: ${money(selectedProject.aReceber)}`, 9);
-    addText(`Pago: ${money(selectedProject.pago)}   |   A pagar: ${money(selectedProject.aPagar)}`, 9);
-    addText(`Resultado de caixa: ${money(selectedProject.resultadoCaixa)}`, 9, { bold: true, gap: 4 });
-
-    addText(`Movimentacoes no periodo (${selectedProjectReportMoves.length})`, 10, { bold: true });
-    selectedProjectReportMoves.forEach((item) => {
-      const conta = String(item.contaNome || item.contaDescricao || item.contaCodigo || '').slice(0, 62);
-      const nature = item.natureza === 'Entrada' ? 'Entrada' : 'Saida';
-      addText(`${item.data || '-'} | ${nature} | ${item.status || '-'} | ${conta} | ${money(item.valor)}`, 7.5, { gap: 0.5 });
+    await exportReportToPdf(reportItems, {
+      title: `Relatório Executivo — ${selectedProject.nome}`,
+      orientation: 'auto',
+      includeExplanations: true,
     });
-
-    doc.save(`Relatorio_Executivo_${projectReportFileName()}.pdf`);
-  }, [selectedProject, selectedProjectReportMoves, filterDataInicial, filterDataFinal, projectReportFileName]);
+  }, [selectedProject, selectedProjectReportMoves, filterDataInicial, filterDataFinal]);
 
   const selectedProjectTeamCosts = useMemo(() => {
     if (!selectedProject) return [];
@@ -1153,10 +1209,10 @@ export default function Projetos() {
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <button onClick={exportSelectedProjectPdf} className="btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.48rem 0.7rem', fontSize: '11px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
-                  <Download size={14} /> Relatorio PDF
+                  <Download size={14} /> Relatório Executivo PDF
                 </button>
                 <button onClick={exportSelectedProjectExcel} className="btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.48rem 0.7rem', fontSize: '11px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
-                  <FileSpreadsheet size={14} /> Movimentacoes Excel
+                  <FileSpreadsheet size={14} /> Movimentações Excel
                 </button>
                 <button onClick={() => setSelectedProject(null)} className="btn" style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%' }}>
                   <X size={20} color="var(--text-secondary)" />

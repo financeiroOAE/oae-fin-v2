@@ -27,7 +27,7 @@ export default function FinancialCompositionBar({ title, total = 0, items = [], 
           borderRadius: '8px',
           overflow: 'hidden',
           background: 'var(--bg-main)',
-          marginBottom: '0.75rem',
+          marginBottom: '0.9rem',
         }}
       >
         {visibleItems.map((item) => {
@@ -55,30 +55,38 @@ export default function FinancialCompositionBar({ title, total = 0, items = [], 
         })}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '0.45rem 0.75rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: '0.55rem' }}>
         {visibleItems.map((item) => (
           <button
             key={item.key}
             type="button"
             onClick={() => onSelect?.(item)}
             style={{
-              display: 'flex',
+              display: 'grid',
+              gridTemplateColumns: '9px minmax(0, 1fr) auto',
               alignItems: 'center',
-              justifyContent: 'space-between',
               gap: '0.5rem',
-              border: 0,
-              background: 'transparent',
-              padding: '0.15rem 0',
+              border: '1px solid rgba(148,163,184,0.14)',
+              borderRadius: '7px',
+              background: 'rgba(255,255,255,0.018)',
+              padding: '0.5rem 0.6rem',
               color: 'var(--text-secondary)',
               cursor: 'pointer',
               textAlign: 'left',
               minWidth: 0,
+              transition: 'background 0.15s ease, border-color 0.15s ease',
+            }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.background = 'rgba(255,255,255,0.035)';
+              event.currentTarget.style.borderColor = 'rgba(148,163,184,0.28)';
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.background = 'rgba(255,255,255,0.018)';
+              event.currentTarget.style.borderColor = 'rgba(148,163,184,0.14)';
             }}
           >
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', minWidth: 0, fontSize: '10.5px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
-            </span>
+            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+            <span style={{ fontSize: '10.5px', lineHeight: 1.25, color: 'var(--text-secondary)', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{item.label}</span>
             <strong style={{ fontSize: '10.5px', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{formatCurrency(item.value)}</strong>
           </button>
         ))}
