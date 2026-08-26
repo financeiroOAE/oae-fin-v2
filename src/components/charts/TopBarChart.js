@@ -11,37 +11,69 @@ export default function TopBarChart({ data, dataKey = "valor", nameKey = "nome",
     style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2,
   }).format(val || 0);
 
-  const CustomYAxisTick = ({ x, y, payload }) => {
-    let line1 = payload.value;
-    let line2 = '';
-    if (line1.length > 24) {
-      const splitPoint = line1.substring(0, 24).lastIndexOf(' ');
-      if (splitPoint > 0) {
-        line1 = payload.value.substring(0, splitPoint);
-        line2 = payload.value.substring(splitPoint + 1);
-        if (line2.length > 22) line2 = line2.substring(0, 20) + '...';
-      } else {
-        line1 = payload.value.substring(0, 24);
-        line2 = payload.value.substring(24, 44) + '...';
-      }
+  const wrapLabel = (value, maxChars = 30) => {
+    const text = String(value || '').trim();
+    if (!text) return [''];
+    const lines = [];
+    let remaining = text;
+
+    while (remaining.length > maxChars) {
+      const dash = remaining.lastIndexOf('-', maxChars);
+      const space = remaining.lastIndexOf(' ', maxChars);
+      let cut = Math.max(dash, space);
+      if (cut < 12) cut = maxChars;
+      if (remaining[cut] === '-') cut += 1;
+      lines.push(remaining.slice(0, cut).trim());
+      remaining = remaining.slice(cut).trim();
     }
+    if (remaining) lines.push(remaining);
+    return lines;
+  };
+
+  const CustomYAxisTick = ({ x, y, payload }) => {
+    const fullLabel = String(payload?.value || '');
+    const lines = wrapLabel(fullLabel, 30);
+    const lineHeight = 11;
+    const startY = 4 - ((lines.length - 1) * lineHeight) / 2;
+
     return (
       <g transform={`translate(${x},${y})`}>
-        <text x={-5} y={line2 ? -6 : 4} textAnchor="end" fill="var(--text-main)" fontSize={11}>{line1}</text>
-        {line2 && <text x={-5} y={6} textAnchor="end" fill="var(--text-main)" fontSize={11}>{line2}</text>}
+        <title>{fullLabel}</title>
+        {lines.map((line, index) => (
+          <text
+            key={`${fullLabel}-${index}`}
+            x={-8}
+            y={startY + index * lineHeight}
+            textAnchor="end"
+            fill="var(--text-main)"
+            fontSize={10}
+            fontWeight={500}
+          >
+            {line}
+          </text>
+        ))}
       </g>
     );
   };
 
   return (
-    <div style={{ width: '100%', height: '100%', marginTop: '0.5rem' }}>
+    <div style={{ width: '100%', height: '100%', marginTop: '0.5rem', minWidth: 0 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 5, right: 150, left: 0, bottom: 5 }} barCategoryGap="25%">
+        <BarChart data={data} layout="vertical" margin={{ top: 5, right: 128, left: 4, bottom: 5 }} barCategoryGap="22%">
           <XAxis type="number" hide />
-          <YAxis type="category" dataKey={nameKey} axisLine={false} tickLine={false} tick={<CustomYAxisTick />} width={160} />
+          <YAxis
+            type="category"
+            dataKey={nameKey}
+            axisLine={false}
+            tickLine={false}
+            tick={<CustomYAxisTick />}
+            width={238}
+            interval={0}
+          />
           <Tooltip
             contentStyle={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-main)', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}
             formatter={(value) => [formatCurrency(value), "Valor"]}
+            labelFormatter={(label) => String(label || '')}
             cursor={{ fill: 'rgba(255,255,255,0.02)' }}
           />
           <Bar dataKey={dataKey} radius={[0, 4, 4, 0]} minPointSize={2} maxBarSize={20}>
