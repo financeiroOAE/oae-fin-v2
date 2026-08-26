@@ -20,7 +20,7 @@ export default function AnnualFlowChart({ data }) {
           <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-secondary)' }} tickFormatter={formatCurrency} width={105} />
           <Tooltip contentStyle={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-main)', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }} formatter={(value, name) => [formatCurrency(value), name]} labelStyle={{ color: 'var(--text-secondary)', marginBottom: '0.25rem' }} itemStyle={{ padding: '2px 0' }} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
           <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '15px' }} iconType="circle" />
-          <Bar dataKey="Entradas Realizadas" name="Entradas Realizadas" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={30} />
+          <Bar dataKey="Entradas Realizadas" name="Entradas Realizadas (líquidas)" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={30} />
           <Bar dataKey="Entradas Programadas" name="Entradas Programadas (títulos a receber)" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={30} />
           <Bar dataKey="Saídas" name="Saídas" fill="var(--danger)" radius={[4, 4, 0, 0]} maxBarSize={30} />
         </BarChart>

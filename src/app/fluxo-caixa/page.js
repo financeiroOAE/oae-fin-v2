@@ -124,8 +124,11 @@ export default function FluxoDeCaixa() {
   const saidasRealizadas = filteredData.filter(r => r.statusExibicao === 'Pago').reduce((acc, r) => acc + r.valor, 0);
   const saidasARealizar = filteredData.filter(r => r.statusExibicao === 'A pagar').reduce((acc, r) => acc + r.valor, 0);
 
-  const totalEntradas = entradasRealizadas + entradasARealizar;
-  const totalSaidas = saidasRealizadas + saidasARealizar;
+  // Entradas e saídas representam somente caixa realizado. Previsões ficam
+  // separadas em A receber e A pagar para não misturar bruto previsto com
+  // valor líquido efetivamente creditado.
+  const totalEntradas = entradasRealizadas;
+  const totalSaidas = saidasRealizadas;
   const resultadoTotal = totalEntradas - totalSaidas;
   const totalBancario = saldosBancarios.reduce((acc, row) => acc + (Number(row.Saldo) || 0), 0);
 
@@ -151,6 +154,7 @@ export default function FluxoDeCaixa() {
     }
 
     filteredData.forEach(item => {
+      if (item.statusExibicao !== 'Recebido' && item.statusExibicao !== 'Pago') return;
       if (!item.data) return;
       const parts = item.data.split('/');
       if (parts.length !== 3) return;
@@ -450,7 +454,7 @@ export default function FluxoDeCaixa() {
 
         <div className="card" style={{ padding: '1.25rem', height: '100%', minWidth: 0, borderLeft: '4px solid var(--success)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Entradas</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Entradas Realizadas</p>
             <ArrowUpCircle size={16} color="var(--success)" />
           </div>
           <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalEntradas)}</p>
@@ -595,7 +599,7 @@ export default function FluxoDeCaixa() {
           <ChartHeader
             title="Evolução do Fluxo de Caixa"
             infoTitle="Evolução do Fluxo"
-            infoContent="Entradas, saídas e resultado ao longo do período selecionado."
+            infoContent="Entradas líquidas realizadas, saídas pagas e resultado ao longo do período selecionado. Previsões ficam separadas."
           />
           <div style={{ flex: 1, minHeight: '300px', marginTop: '1rem' }}>
             <ResponsiveContainer width="100%" height="100%">

@@ -40,7 +40,7 @@ export default function IncomeExpenseChart({ data }) {
             cursor={{ fill: 'rgba(255,255,255,0.02)' }}
           />
           <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} iconType="circle" />
-          <Bar dataKey="Entradas" name="Entradas" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={46} />
+          <Bar dataKey="Entradas" name="Entradas Realizadas (líquidas)" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={46} />
           <Bar dataKey="Saídas" name="Saídas" fill="var(--danger)" radius={[4, 4, 0, 0]} maxBarSize={46} />
         </BarChart>
       </ResponsiveContainer>
