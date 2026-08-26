@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useReport } from "@/contexts/ReportContext";
-import { CheckCircle, LoaderCircle, PlusCircle } from "lucide-react";
+import { LoaderCircle, PlusCircle } from "lucide-react";
 
 export default function ReportAdder({
   sectionKey,
@@ -76,9 +76,15 @@ export default function ReportAdder({
 
   const isAdded = reportItems.some((item) => item.sectionKey === normalizedKey);
 
+  // Depois que a seção entra no relatório, o controle some completamente.
+  // Isso evita o selo verde "Adicionado" sobre os cards e mantém a tela limpa.
+  if (isAdded) {
+    return <span data-report-section-key={normalizedKey} hidden aria-hidden="true" />;
+  }
+
   const handleAdd = async (event) => {
     event.stopPropagation();
-    if (isAdded || isPreparing) return;
+    if (isPreparing) return;
 
     setIsPreparing(true);
     let capturedImage;
@@ -114,13 +120,13 @@ export default function ReportAdder({
       data-report-section-key={normalizedKey}
       className="report-add-button"
       onClick={handleAdd}
-      disabled={isAdded || isPreparing}
-      aria-label={isAdded ? `${title} já adicionado` : `Adicionar ${title} ao relatório`}
-      title={isAdded ? "Já adicionado" : "Adicionar ao relatório"}
+      disabled={isPreparing}
+      aria-label={`Adicionar ${title} ao relatório`}
+      title="Adicionar ao relatório"
       style={{
-        background: isAdded ? "var(--success)" : "var(--bg-elevated)",
-        color: isAdded ? "#fff" : "var(--primary)",
-        border: `1px solid ${isAdded ? "var(--success)" : "var(--primary)"}`,
+        background: "var(--bg-elevated)",
+        color: "var(--primary)",
+        border: "1px solid var(--primary)",
         borderRadius: "4px",
         padding: "0.25rem 0.5rem",
         display: "inline-flex",
@@ -129,7 +135,7 @@ export default function ReportAdder({
         gap: "0.25rem",
         fontSize: "11px",
         fontWeight: "600",
-        cursor: isAdded || isPreparing ? "default" : "pointer",
+        cursor: isPreparing ? "default" : "pointer",
         transition: "all 0.2s",
         whiteSpace: "nowrap",
         ...style,
@@ -137,12 +143,10 @@ export default function ReportAdder({
     >
       {isPreparing ? (
         <LoaderCircle size={14} className="report-spin" />
-      ) : isAdded ? (
-        <CheckCircle size={14} />
       ) : (
         <PlusCircle size={14} />
       )}
-      {isPreparing ? "Preparando..." : isAdded ? "Adicionado" : "Adicionar"}
+      {isPreparing ? "Preparando..." : "Adicionar"}
     </button>
   );
 }
