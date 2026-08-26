@@ -29,6 +29,126 @@ function parseSortDate(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeReceiptTitle(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const direct = raw.match(/^(\d+)(?:\/\d+)?$/);
+  if (direct) return direct[1];
+  const leading = raw.match(/^(\d+)/);
+  return leading?.[1] || '';
+}
+
+function normalizeReceiptDocument(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+function parseReceiptValue(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const raw = String(value ?? '').trim();
+  if (!raw) return 0;
+  const cleaned = raw.replace(/R\$/gi, '').replace(/\s/g, '');
+  if (cleaned.includes(',')) {
+    const parsed = Number(cleaned.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isRealized2026Entry(row) {
+  if (String(row?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
+  if (!String(row?.status || '').toUpperCase().includes('REALIZADO')) return false;
+  const date = String(row?.data || '').trim();
+  return /(?:^|\/)2026$/.test(date);
+}
+
+function enrichCashReceived(crRows, receiptRows) {
+  const receipts = [];
+  const byTitle = new Map();
+  const byDocument = new Map();
+
+  (receiptRows || []).forEach((row, index) => {
+    const title = normalizeReceiptTitle(row['Título'] ?? row.Titulo);
+    const document = normalizeReceiptDocument(row.Documento);
+    const net = parseReceiptValue(row['Vl Recebido']);
+    if (!title && !document) return;
+    const receipt = {
+      id: title ? `T:${title}` : `D:${document}:${index}`,
+      title,
+      document,
+      net,
+      gross: parseReceiptValue(row['Vl. baixa'] ?? row['Vl, baixa']),
+      discount: parseReceiptValue(row.Desconto),
+    };
+    receipts.push(receipt);
+    if (title) byTitle.set(title, receipt);
+    if (document) byDocument.set(document, receipt);
+  });
+
+  const groups = new Map();
+  crRows.forEach((row) => {
+    if (!isRealized2026Entry(row)) return;
+    const title = normalizeReceiptTitle(row.lancamento);
+    const document = normalizeReceiptDocument(row.documento);
+    const receipt = (title && byTitle.get(title)) || (document && byDocument.get(document));
+    if (!receipt) return;
+    if (!groups.has(receipt.id)) groups.set(receipt.id, { receipt, rows: [] });
+    groups.get(receipt.id).rows.push(row);
+  });
+
+  const cashByRow = new Map();
+  let matchedNet = 0;
+  let matchedGross = 0;
+  let matchedRows = 0;
+
+  groups.forEach(({ receipt, rows }) => {
+    const totalGroup = rows.reduce((sum, row) => sum + Math.max(0, Number(row.valor) || 0), 0);
+    if (totalGroup <= 0) return;
+    let remaining = Math.round(receipt.net * 100) / 100;
+    rows.forEach((row, index) => {
+      let allocated;
+      if (index === rows.length - 1) {
+        allocated = remaining;
+      } else {
+        allocated = Math.round((receipt.net * ((Number(row.valor) || 0) / totalGroup)) * 100) / 100;
+        remaining = Math.round((remaining - allocated) * 100) / 100;
+      }
+      cashByRow.set(row, allocated);
+      matchedRows += 1;
+    });
+    matchedNet += receipt.net;
+    matchedGross += receipt.gross;
+  });
+
+  const rows = crRows.map((row) => {
+    const gross = Number(row.valor) || 0;
+    const matched = cashByRow.has(row);
+    return {
+      ...row,
+      valorBruto: gross,
+      valorCaixa: matched ? cashByRow.get(row) : gross,
+      recebimentoLiquidoFonte: matched ? 'RECEBIMENTOS_2026' : 'CR_GERAL',
+    };
+  });
+
+  return {
+    rows,
+    stats: {
+      sourceTitles: receipts.length,
+      matchedTitles: groups.size,
+      matchedRows,
+      matchedGross: Math.round(matchedGross * 100) / 100,
+      matchedNet: Math.round(matchedNet * 100) / 100,
+      sourceNet: Math.round(receipts.reduce((sum, item) => sum + item.net, 0) * 100) / 100,
+      sourceDiscount: Math.round(receipts.reduce((sum, item) => sum + item.discount, 0) * 100) / 100,
+    },
+  };
+}
+
 async function performFullSync(triggeredBy) {
   const startedAt = Date.now();
   const sheetsData = await batchReadSheets();
@@ -76,6 +196,7 @@ async function performFullSync(triggeredBy) {
   const planos = sheetsData.PLANOS_FINANCEIROS || [];
   const cpGeralRaw = sheetsData.CP_GERAL || [];
   const crGeralRaw = sheetsData.CR_GERAL || [];
+  const recebimentosRaw = sheetsData.RECEBIMENTOS_2026 || [];
   const depara = sheetsData.DEPARA || [];
 
   const deparaMap = {};
@@ -93,7 +214,8 @@ async function performFullSync(triggeredBy) {
   // O catálogo oficial é usado tanto no CP quanto no CR para padronizar o nome da obra.
   // PLANOS_FINANCEIROS acompanha cada lançamento para auditoria das pendências da DRE.
   const cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap, projetos, planosMap);
-  const crProcessed = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos, planosMap);
+  const crProcessedBase = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos, planosMap);
+  const { rows: crProcessed, stats: recebimentosLiquidosStats } = enrichCashReceived(crProcessedBase, recebimentosRaw);
 
   const stats = {
     EMPRESAS: empresas.length,
@@ -103,6 +225,7 @@ async function performFullSync(triggeredBy) {
     CP_GERAL: cpProcessed.length,
     CR_GERAL: crProcessed.length,
     DEPARA: depara.length,
+    RECEBIMENTOS_2026: recebimentosRaw.length,
   };
 
   const totalRecords = Object.values(stats).reduce((a, b) => a + b, 0);
@@ -111,6 +234,7 @@ async function performFullSync(triggeredBy) {
 
   const somaCP = cpProcessed.reduce((acc, row) => acc + row.valor, 0);
   const somaCR = crProcessed.reduce((acc, row) => acc + row.valor, 0);
+  const somaCRCaixa = crProcessed.reduce((acc, row) => acc + (Number(row.valorCaixa) || 0), 0);
   const somaProjetosContrato = projetos.reduce((acc, row) => acc + row.CONTRATO, 0);
   const somaProjetosFaturado = projetos.reduce((acc, row) => acc + row['NF FATURADAS'], 0);
   const somaProjetosSaldo = projetos.reduce((acc, row) => acc + row['SALDO CONTRATUAL'], 0);
@@ -119,7 +243,9 @@ async function performFullSync(triggeredBy) {
   console.log(`Disparado por: ${triggeredBy}`);
   console.log(`Quantidade de registros processados (CP + CR): ${allData.length}`);
   console.log(`Soma de CP_GERAL.Valor (Saídas): ${somaCP}`);
-  console.log(`Soma de CR_GERAL.Valor (Entradas): ${somaCR}`);
+  console.log(`Soma de CR_GERAL.Valor (Entradas brutas): ${somaCR}`);
+  console.log(`Soma de CR_GERAL.valorCaixa (Entradas liquidas/fallback): ${somaCRCaixa}`);
+  console.log(`Recebimentos liquidos conciliados: ${JSON.stringify(recebimentosLiquidosStats)}`);
   console.log(`Soma de PROJETOS_2026.CONTRATO: ${somaProjetosContrato}`);
   console.log(`Soma de PROJETOS_2026.NF FATURADAS: ${somaProjetosFaturado}`);
   console.log(`Soma de PROJETOS_2026.SALDO CONTRATUAL: ${somaProjetosSaldo}`);
@@ -136,6 +262,7 @@ async function performFullSync(triggeredBy) {
     somaProjetosContrato,
     somaProjetosFaturado,
     somaProjetosSaldo,
+    recebimentosLiquidosStats,
     recordsCount: totalRecords,
     syncedAt,
     message: 'Sincronização concluída com sucesso!',

@@ -1,5 +1,7 @@
 import { google } from 'googleapis';
 
+const RECEIPTS_SPREADSHEET_ID = process.env.GOOGLE_RECEIPTS_SPREADSHEET_ID || '144w55s4bDTJingPhw1Dm0mxViGmF0G649I23cYEa8Jk';
+
 function normalizeHeader(value) {
   return String(value ?? '')
     .replace(/\u00a0/g, ' ')
@@ -45,7 +47,8 @@ export async function batchReadSheets() {
     PLANOS_FINANCEIROS: [],
     CP_GERAL: [],
     CR_GERAL: [],
-    DEPARA: []
+    DEPARA: [],
+    RECEBIMENTOS_2026: []
   };
 
   try {
@@ -88,6 +91,35 @@ export async function batchReadSheets() {
         }
       }
     });
+
+    // Fonte auxiliar privada: valores efetivamente creditados por titulo.
+    // Falha nessa leitura nao derruba a base principal; nesse caso o sistema
+    // mantem o valor do CR_GERAL como fallback de caixa.
+    try {
+      const receiptResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: RECEIPTS_SPREADSHEET_ID,
+        range: 'RECEBIMENTOS_2026!A:G',
+        valueRenderOption: 'UNFORMATTED_VALUE',
+        dateTimeRenderOption: 'FORMATTED_STRING',
+        majorDimension: 'ROWS'
+      });
+
+      const values = receiptResponse.data.values || [];
+      const headers = values.length > 0 ? values[0].map(normalizeHeader) : [];
+      resultData.RECEBIMENTOS_2026 = values.slice(1).map((row) => {
+        const rowData = {};
+        headers.forEach((header, index) => {
+          if (!header) return;
+          rowData[header] = row[index] ?? '';
+        });
+        return rowData;
+      });
+
+      console.log(`[Google Sheets Diagnostic] RECEBIMENTOS_2026: ${resultData.RECEBIMENTOS_2026.length} titulos`);
+    } catch (receiptError) {
+      console.warn('[Google Sheets Diagnostic] Fonte de recebimentos liquidos indisponivel:', receiptError?.message || receiptError);
+      resultData.RECEBIMENTOS_2026 = [];
+    }
 
     return resultData;
   } catch (error) {

@@ -62,10 +62,11 @@ function normalizeDateTimestamp(item) {
   };
 }
 
-function projectRevenueValue(item, incluirRateioAdm) {
+function projectRevenueValue(item, incluirRateioAdm, valueOverride = null) {
   const classification = classifyFinancialEntry(item);
-  if (classification.type === 'receita_projeto') return Number(item.valor) || 0;
-  if (classification.type === 'receita_administrativa' && incluirRateioAdm) return Number(item.valor) || 0;
+  const value = valueOverride === null ? (Number(item.valor) || 0) : valueOverride;
+  if (classification.type === 'receita_projeto') return value;
+  if (classification.type === 'receita_administrativa' && incluirRateioAdm) return value;
   return 0;
 }
 
@@ -73,10 +74,21 @@ export function consolidateFinancialData(baseData, options = {}) {
   const {
     filterProjetos = [],
     isProjetosPage = false,
-    incluirRateioAdm = false
+    incluirRateioAdm = false,
+    usarValorCaixa = false
   } = options;
 
   const normalizedBaseData = (baseData || []).map(normalizeDateTimestamp);
+  const effectiveValue = (item) => {
+    const status = String(item?.status || '').trim().toUpperCase();
+    const realizedEntry = String(item?.natureza || '').toUpperCase() === 'ENTRADA'
+      && (status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO'));
+    if (usarValorCaixa && realizedEntry && item?.valorCaixa !== undefined && item?.valorCaixa !== null) {
+      const cash = Number(item.valorCaixa);
+      if (Number.isFinite(cash)) return cash;
+    }
+    return Number(item?.valor) || 0;
+  };
   const isFiltroSomenteAdm = filterProjetos.length === 1 && filterProjetos[0].toUpperCase() === 'ADMINISTRAÇÃO';
   const isFiltroAdmPresente = filterProjetos.some(p => p.toUpperCase() === 'ADMINISTRAÇÃO');
 
@@ -86,12 +98,12 @@ export function consolidateFinancialData(baseData, options = {}) {
   normalizedBaseData.forEach(item => {
     if (item.natureza !== 'Entrada' || !item.lancamento) {
       if (isProjetosPage && item.natureza === 'Entrada') {
-        const value = projectRevenueValue(item, incluirRateioAdm);
+        const value = projectRevenueValue(item, incluirRateioAdm, effectiveValue(item));
         if (value === 0) return;
         nonConsolidatable.push({ ...item, valor: value });
         return;
       }
-      nonConsolidatable.push(item);
+      nonConsolidatable.push(usarValorCaixa ? { ...item, valorBruto: item.valorBruto ?? item.valor, valor: effectiveValue(item) } : item);
       return;
     }
 
@@ -114,10 +126,10 @@ export function consolidateFinancialData(baseData, options = {}) {
     }
 
     const consItem = consolidatedMap.get(key);
-    consItem.linhasOriginais.push(item);
+    consItem.linhasOriginais.push(usarValorCaixa ? { ...item, valorBruto: item.valorBruto ?? item.valor, valor: effectiveValue(item) } : item);
 
     const classification = classifyFinancialEntry(item);
-    const value = Number(item.valor) || 0;
+    const value = effectiveValue(item);
 
     if (classification.type === 'receita_administrativa') {
       consItem.valorAdministrativo += value;
