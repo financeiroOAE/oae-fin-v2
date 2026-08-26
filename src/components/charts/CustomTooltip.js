@@ -10,6 +10,10 @@ const isLiquidRevenueEntry = (entry) => {
   return name === 'RECEBIDO' || name === 'RECEBIDO LÍQUIDO' || name === 'RECEBIDO LIQUIDO';
 };
 
+const liquidRevenueLabel = (entry, fallback) => (
+  isLiquidRevenueEntry(entry) ? 'Receita líquida' : fallback
+);
+
 export default function CustomTooltip({ active, payload, label, formatter, labelFormatter }) {
   if (active && payload && payload.length) {
     return (
@@ -34,34 +38,18 @@ export default function CustomTooltip({ active, payload, label, formatter, label
               const formatted = formatter(entry.value, entry.name, entry, index, payload);
               if (Array.isArray(formatted)) {
                 return (
-                  <div key={index}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', color: entry.color || 'var(--text-secondary)' }}>
-                      <span style={{ fontWeight: '500' }}>{formatted[1] || entry.name}:</span>
-                      <span style={{ fontWeight: '600' }}>{formatted[0]}</span>
-                    </div>
-                    {isLiquidRevenueEntry(entry) && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '2px', color: 'var(--text-secondary)', fontSize: '11px' }}>
-                        <span>Receita líquida:</span>
-                        <span style={{ fontWeight: '600', color: 'var(--success)' }}>{formatCurrency(entry.value)}</span>
-                      </div>
-                    )}
+                  <div key={index} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', color: entry.color || 'var(--text-secondary)' }}>
+                    <span style={{ fontWeight: '500' }}>{liquidRevenueLabel(entry, formatted[1] || entry.name)}:</span>
+                    <span style={{ fontWeight: '600' }}>{formatted[0]}</span>
                   </div>
                 );
               }
             }
 
             return (
-              <div key={index}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', color: entry.color || 'var(--text-secondary)' }}>
-                  <span style={{ fontWeight: '500' }}>{entry.name}:</span>
-                  <span style={{ fontWeight: '600' }}>{formatCurrency(entry.value)}</span>
-                </div>
-                {isLiquidRevenueEntry(entry) && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '2px', color: 'var(--text-secondary)', fontSize: '11px' }}>
-                    <span>Receita líquida:</span>
-                    <span style={{ fontWeight: '600', color: 'var(--success)' }}>{formatCurrency(entry.value)}</span>
-                  </div>
-                )}
+              <div key={index} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', color: entry.color || 'var(--text-secondary)' }}>
+                <span style={{ fontWeight: '500' }}>{liquidRevenueLabel(entry, entry.name)}:</span>
+                <span style={{ fontWeight: '600' }}>{formatCurrency(entry.value)}</span>
               </div>
             );
           })}
