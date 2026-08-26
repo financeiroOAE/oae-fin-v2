@@ -5,7 +5,7 @@ import {
   RefreshCw, AlertCircle, Database, Building2, 
   FileText, Target, ArrowDownCircle, ArrowUpCircle, ArrowDown, ArrowUp,
   Percent, Briefcase, X, ArrowUpDown, ArrowUpAZ, ArrowDownAZ, LayoutDashboard,
-  FilterX, PieChart, Activity, ChevronLeft, ChevronRight, Download, FileSpreadsheet
+  FilterX, PieChart, Activity, ChevronLeft, ChevronRight, FileSpreadsheet
 } from "lucide-react";
 import DataTable from "@/components/DataTable";
 import ABCClassDonut from "@/components/charts/ABCClassDonut";
@@ -1208,11 +1208,11 @@ export default function Projetos() {
                 <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--primary)' }}>{selectedProject.nome}</h2>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <button onClick={exportSelectedProjectPdf} className="btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.48rem 0.7rem', fontSize: '11px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
-                  <Download size={14} /> Relatório Executivo PDF
+                <button onClick={exportSelectedProjectPdf} className="btn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                  <FileText size={14} /> Gerar PDF
                 </button>
-                <button onClick={exportSelectedProjectExcel} className="btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.48rem 0.7rem', fontSize: '11px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
-                  <FileSpreadsheet size={14} /> Movimentações Excel
+                <button onClick={exportSelectedProjectExcel} className="btn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                  <FileSpreadsheet size={14} /> Exportar Excel
                 </button>
                 <button onClick={() => setSelectedProject(null)} className="btn" style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%' }}>
                   <X size={20} color="var(--text-secondary)" />

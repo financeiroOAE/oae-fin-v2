@@ -437,7 +437,7 @@ export default function FluxoDeCaixa() {
       </div>
 
       {/* Linha Executiva Compacta de KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem', alignItems: 'stretch' }}>
         <div className="card" data-report-section style={{ padding: '1.25rem', borderLeft: '4px solid var(--info)' }}>
           <ReportAdder sectionKey="fluxo:kpis" title="Resumo Executivo do Fluxo de Caixa" componentName="Indicadores do Fluxo de Caixa" page="Fluxo de Caixa" type="SUMMARY" data={[{ "Saldo Bancário": totalBancario, Entradas: totalEntradas, Saídas: totalSaidas, Resultado: resultadoTotal, "A Receber": entradasARealizar, "A Pagar": saidasARealizar }]} filters={reportFilters} presetTags={["executive-financial"]} explanation="Resumo de saldos, entradas, saídas e compromissos conforme os filtros ativos." style={{ float: 'right' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
@@ -447,15 +447,15 @@ export default function FluxoDeCaixa() {
           <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalBancario)}</p>
         </div>
 
-        <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
+        <div className="card" style={{ padding: '1.25rem', height: '100%', minWidth: 0, borderLeft: '4px solid var(--success)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Entradas de Caixa</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Entradas</p>
             <ArrowUpCircle size={16} color="var(--success)" />
           </div>
           <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalEntradas)}</p>
         </div>
 
-        <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--danger)' }}>
+        <div className="card" style={{ padding: '1.25rem', height: '100%', minWidth: 0, borderLeft: '4px solid var(--danger)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Saídas</p>
             <ArrowDownCircle size={16} color="var(--danger)" />
@@ -463,7 +463,7 @@ export default function FluxoDeCaixa() {
           <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalSaidas)}</p>
         </div>
 
-        <div className="card" style={{ padding: '1.25rem', borderLeft: `4px solid ${resultadoTotal >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
+        <div className="card" style={{ padding: '1.25rem', height: '100%', minWidth: 0, borderLeft: `4px solid ${resultadoTotal >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Resultado</p>
             <Activity size={16} color={resultadoTotal >= 0 ? 'var(--success)' : 'var(--danger)'} />
@@ -471,7 +471,7 @@ export default function FluxoDeCaixa() {
           <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(resultadoTotal)}</p>
         </div>
 
-        <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--warning)' }}>
+        <div className="card" style={{ padding: '1.25rem', height: '100%', minWidth: 0, borderLeft: '4px solid var(--warning)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>A Receber</p>
             <Calendar size={16} color="var(--warning)" />
@@ -479,7 +479,7 @@ export default function FluxoDeCaixa() {
           <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(entradasARealizar)}</p>
         </div>
 
-        <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--orange)' }}>
+        <div className="card" style={{ padding: '1.25rem', height: '100%', minWidth: 0, borderLeft: '4px solid var(--orange)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>A Pagar</p>
             <Banknote size={16} color="var(--orange)" />
