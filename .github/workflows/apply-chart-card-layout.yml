@@ -1,0 +1,34 @@
+name: Apply chart card layout
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - scripts/patch-chart-card-layout.py
+      - .github/workflows/apply-chart-card-layout.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Aplicar alinhamento visual
+        run: python3 scripts/patch-chart-card-layout.py
+      - name: Commitar ajuste
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/visao-financeira/page.js
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteracao nova."
+            exit 0
+          fi
+          git commit -m "fix: alinhar cards status e curva abc"
+          git push origin HEAD:main
