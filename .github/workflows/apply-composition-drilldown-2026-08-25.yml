@@ -1,0 +1,34 @@
+name: Apply Composition Drilldown 2026-08-25
+
+on:
+  push:
+    branches:
+      - fix-composition-tooltip-selectall-2026-08-25
+    paths:
+      - scripts/apply-composition-drilldown-2026-08-25.py
+      - .github/workflows/apply-composition-drilldown-2026-08-25.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-composition-tooltip-selectall-2026-08-25
+          fetch-depth: 0
+      - name: Aplicar ajustes
+        run: python3 scripts/apply-composition-drilldown-2026-08-25.py
+      - name: Commitar alteracoes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteracao nova."
+            exit 0
+          fi
+          git commit -m "feat: compor entradas e saidas com drilldown"
+          git push origin HEAD:fix-composition-tooltip-selectall-2026-08-25
