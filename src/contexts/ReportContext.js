@@ -104,6 +104,27 @@ function sectionFingerprint(section) {
   }
 }
 
+function reportSourceFingerprint(section) {
+  try {
+    const {
+      id,
+      capturedAt,
+      capturedImage,
+      restoredWithoutImage,
+      detailMode,
+      ...comparable
+    } = section || {};
+    void id;
+    void capturedAt;
+    void capturedImage;
+    void restoredWithoutImage;
+    void detailMode;
+    return JSON.stringify(comparable);
+  } catch {
+    return `${section?.sectionKey || ""}:${section?.title || ""}:${section?.page || ""}`;
+  }
+}
+
 function makePersistableItem(item) {
   const persistedSets = item.dataSets
     ? Object.fromEntries(
@@ -209,12 +230,40 @@ export function ReportProvider({ children }) {
     if (isExcludedExecutiveSection(section)) return;
     if (!section?.sectionKey && (!section?.page || !section?.title)) return;
     const normalized = snapshotSection(section);
+
     setAvailableSections((current) => {
       const existing = current[normalized.sectionKey];
       if (existing && sectionFingerprint(existing) === sectionFingerprint(normalized)) {
         return current;
       }
       return { ...current, [normalized.sectionKey]: normalized };
+    });
+
+    // Um bloco ja adicionado deve sempre refletir o estado ATUAL da pagina.
+    // Se projeto, empresa, tipo, periodo, rateio ou qualquer dado do bloco mudar,
+    // renovamos o snapshot usado pelo relatorio. Mantemos apenas as escolhas do
+    // usuario (id e nivel de detalhe). Uma imagem capturada anteriormente e
+    // descartada para nunca exportar um grafico de filtros antigos.
+    setReportItems((current) => {
+      let changed = false;
+      const next = current.map((item) => {
+        if (item.sectionKey !== normalized.sectionKey) return item;
+
+        if (reportSourceFingerprint(item) === reportSourceFingerprint(normalized)) {
+          return item;
+        }
+
+        changed = true;
+        return {
+          ...normalized,
+          id: item.id,
+          detailMode: item.detailMode ?? normalized.detailMode,
+          capturedImage: undefined,
+          restoredWithoutImage: Boolean(item.capturedImage) || Boolean(item.restoredWithoutImage),
+          capturedAt: new Date().toISOString(),
+        };
+      });
+      return changed ? next : current;
     });
   }, []);
 
