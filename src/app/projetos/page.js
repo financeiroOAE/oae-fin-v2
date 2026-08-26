@@ -460,7 +460,7 @@ export default function Projetos() {
     const rows = months.map((mes, index) => ({ mes, month: index, Receitas: 0, Custos: 0, Despesas: 0 }));
     const allowedProjects = new Set(filteredProjetos.map((project) => project.projectKey));
 
-    const revenueItems = usarCarteiraCompleta ? data : projectCashData;
+    const revenueItems = baseData;
     revenueItems.forEach((item) => {
       if (item.natureza !== 'Entrada') return;
       if (!usarCarteiraCompleta && !allowedProjects.has(getProjectKey(item.projeto))) return;
@@ -470,12 +470,7 @@ export default function Projetos() {
       if (parts.length !== 3 || parts[2] !== '2026') return;
       const month = Number(parts[1]) - 1;
       if (month < 0 || month > 11) return;
-      const originalRows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
-      const revenue = originalRows.reduce((sum, row) => {
-        const code = String(row.contaCodigo || '').replace(/\D/g, '');
-        return (code === '1010101' || code === '1010107') ? sum + (Number(row.valorCaixa ?? row.valor) || 0) : sum;
-      }, 0);
-      rows[month].Receitas += revenue;
+      rows[month].Receitas += Number(item.valor) || 0;
     });
 
     data.forEach((item) => {
@@ -497,7 +492,7 @@ export default function Projetos() {
     });
 
     return rows;
-  }, [data, filteredProjetos, projectCashData, usarCarteiraCompleta]);
+  }, [data, filteredProjetos, baseData, usarCarteiraCompleta]);
 
   const reportFilters = {
     "Data inicial": filterDataInicial || "Todas",
