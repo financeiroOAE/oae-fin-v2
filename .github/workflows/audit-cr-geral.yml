@@ -1,0 +1,47 @@
+name: Audit CR_GERAL
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/audit-cr-geral.yml'
+      - 'src/app/api/sync/cron/audit-cr-geral/route.js'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Aguardar deploy
+        run: sleep 90
+
+      - name: Obter token OIDC
+        shell: bash
+        run: |
+          set -euo pipefail
+          OIDC_RESPONSE=$(curl --fail --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=oae-fin-cr-audit")
+          OIDC_TOKEN=$(printf '%s' "$OIDC_RESPONSE" | jq -r '.value')
+          echo "OIDC_TOKEN=$OIDC_TOKEN" >> "$GITHUB_ENV"
+
+      - name: Auditar CR_GERAL
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            --retry 5 \
+            --retry-delay 20 \
+            --max-time 240 \
+            -X POST \
+            -H "Authorization: Bearer ${OIDC_TOKEN}" \
+            -H "Content-Type: application/json" \
+            https://oae-fin-v2.onrender.com/api/sync/cron/audit-cr-geral \
+            | tee audit-result.json
+          echo
