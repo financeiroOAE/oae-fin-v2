@@ -34,7 +34,6 @@ export default function Projetos() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [data, setData] = useState([]);
   const [projetosBrutos, setProjetosBrutos] = useState([]);
-  const [recebimentosLiquidosStats, setRecebimentosLiquidosStats] = useState(null);
   const [error, setError] = useState(null);
   const [lastSync, setLastSync] = useState(null);
 
@@ -67,7 +66,6 @@ export default function Projetos() {
       if (!response.ok) throw new Error(result.error || result.details?.message || 'Erro desconhecido');
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
-      setRecebimentosLiquidosStats(result.recebimentosLiquidosStats || null);
       const syncDate = result.syncedAt || result.snapshotAt;
       setLastSync(syncDate ? new Date(syncDate).toLocaleString('pt-BR') : null);
     } catch (err) {
@@ -89,12 +87,8 @@ export default function Projetos() {
   const realizadoIni = dIni;
   const realizadoFim = dFim;
 
-  const projectCashData = useMemo(() => consolidateFinancialData(data, {
-    isProjetosPage: true,
-    incluirRateioAdm: true,
-    usarValorCaixa: true
-  }), [data]);
-
+  // Regra de Projetos: receita/recebido realizado usa a coluna K da CR_GERAL,
+  // preservando a consolidacao por titulo e o toggle de rateio administrativo.
   const baseData = useMemo(() => consolidateFinancialData(data, {
     isProjetosPage: true,
     incluirRateioAdm,
@@ -139,7 +133,7 @@ export default function Projetos() {
       projeto.saldoContratual += Number(p['SALDO CONTRATUAL']) || 0;
     });
 
-    projectCashData.forEach((item) => {
+    baseData.forEach((item) => {
       const projectKey = getProjectKey(item.projeto);
       const projeto = mapaProjetos[projectKey];
       if (!projeto) return;
@@ -179,9 +173,9 @@ export default function Projetos() {
       tipo: p.tipos.join(' / ') || 'N/A',
       percentFaturado: p.contratado > 0 ? p.faturado / p.contratado : 0,
       resultadoCaixa: p.recebido - p.pago,
-      receitaConsideradaTooltip: p.receitaDireta + p.receitaAdm
+      receitaConsideradaTooltip: p.receitaDireta + (incluirRateioAdm ? p.receitaAdm : 0)
     }));
-  }, [projetosBrutos, projectCashData, realizadoIni, realizadoFim]);
+  }, [projetosBrutos, baseData, realizadoIni, realizadoFim, incluirRateioAdm]);
 
   const filteredProjetos = useMemo(() => {
     return projetosCruzados.filter(p => {
@@ -254,62 +248,12 @@ export default function Projetos() {
   const totalSaldo = filteredProjetos.reduce((acc, p) => acc + p.saldoContratual, 0);
   const percentTotalFaturado = totalContratado > 0 ? totalFaturado / totalContratado : 0;
 
-  const rawProjectRevenueStats = useMemo(() => {
-    let recebidoDireto = 0;
-    let recebidoAdm = 0;
-    let aReceberDireto = 0;
-    let aReceberAdm = 0;
-
-    data.forEach((item) => {
-      if (item.natureza !== 'Entrada') return;
-      const classification = classifyFinancialEntry(item);
-      if (classification.type !== 'receita_projeto' && classification.type !== 'receita_administrativa') return;
-
-      const status = String(item.status || '').toUpperCase();
-      const isRealizado = status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO');
-      const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A RECEBER') || status.includes('PREVISTO'));
-      const value = isRealizado ? (Number(item.valorCaixa ?? item.valor) || 0) : (Number(item.valor) || 0);
-
-      let ts = 0;
-      if (item.dataTimestamp) ts = Number(item.dataTimestamp) || 0;
-      if (!ts && item.data) {
-        const parts = String(item.data).split('/');
-        if (parts.length === 3) ts = new Date(parts[2], Number(parts[1]) - 1, parts[0]).getTime();
-      }
-
-      if (isRealizado && ts >= realizadoIni && ts <= realizadoFim) {
-        if (classification.type === 'receita_projeto') recebidoDireto += value;
-        if (classification.type === 'receita_administrativa') recebidoAdm += value;
-      }
-      if (isPrevisto) {
-        if (classification.type === 'receita_projeto') aReceberDireto += value;
-        if (classification.type === 'receita_administrativa') aReceberAdm += value;
-      }
-    });
-
-    return {
-      recebidoDireto,
-      recebidoAdm,
-      recebido: recebidoDireto + (incluirRateioAdm ? recebidoAdm : 0),
-      aReceberDireto,
-      aReceberAdm,
-      aReceber: aReceberDireto + (incluirRateioAdm ? aReceberAdm : 0),
-    };
-  }, [data, realizadoIni, realizadoFim, incluirRateioAdm]);
-
-  const usarCarteiraCompleta = filterProjetos.length === 0 && filterEmpresas.length === 0 && filterTipos.length === 0;
-  const totalRecebido = usarCarteiraCompleta
-    ? rawProjectRevenueStats.recebido
-    : filteredProjetos.reduce((acc, p) => acc + p.recebido, 0);
-  const periodoPadraoYtd = filterDataInicial === '2026-01-01' && filterDataFinal === getYearToDateRange().end;
-  const receitaLiquidaFonte = Number(recebimentosLiquidosStats?.sourceNet) || 0;
-  const receitaLiquidaProjetos = usarCarteiraCompleta && incluirRateioAdm && periodoPadraoYtd && receitaLiquidaFonte > 0
-    ? receitaLiquidaFonte
-    : totalRecebido;
-  const totalAReceber = usarCarteiraCompleta
-    ? rawProjectRevenueStats.aReceber
-    : filteredProjetos.reduce((acc, p) => acc + p.aReceber, 0);
+  // KPIs financeiros seguem exatamente os projetos ja consolidados acima.
+  // Sem rateio: somente receita direta. Com rateio: a parcela ADM do titulo entra uma vez.
+  const totalRecebido = filteredProjetos.reduce((acc, p) => acc + p.recebido, 0);
+  const totalAReceber = filteredProjetos.reduce((acc, p) => acc + p.aReceber, 0);
   const totalPago = filteredProjetos.reduce((acc, p) => acc + p.pago, 0);
+  const receitaLiquidaProjetos = totalRecebido;
 
   const previsaoProjetosGeral = useMemo(() => data
     .filter((item) => {
@@ -324,7 +268,7 @@ export default function Projetos() {
   const totalAPagar = filteredProjetos.reduce((acc, p) => acc + p.aPagar, 0) + (incluirPrevisaoGeral ? previsaoProjetosGeral : 0);
   const totalResultado = receitaLiquidaProjetos - totalPago;
   
-  const totalRecebidoAdmGlobal = usarCarteiraCompleta ? rawProjectRevenueStats.recebidoAdm : filteredProjetos.reduce((acc, p) => acc + (p.receitaAdm || 0), 0);
+  const totalRecebidoAdmGlobal = filteredProjetos.reduce((acc, p) => acc + (p.receitaAdm || 0), 0);
 
   function isCDP(planoFinanceiro) {
     const raw = String(planoFinanceiro || '');

@@ -109,7 +109,12 @@ export function buildDreStructure(items, meses) {
   items.forEach(item => {
     const dreId = mapClasseToDreId(item);
     const mesKey = item.mesKey;
-    const valorCru = Math.abs(item.valor || 0); // Sempre absoluto — o sinal vem de group.sign
+    // Receita Bruta da DRE = coluna J da CR_GERAL (Valor total titulo).
+    // Receita/Recebido operacional fora da DRE continua pela coluna K.
+    const valorBase = dreId === 'RECEITA_BRUTA' && item.natureza === 'Entrada'
+      ? (item.valorFaturamento ?? item.valorTotalTitulo ?? item.valor)
+      : item.valor;
+    const valorCru = Math.abs(Number(valorBase) || 0); // Sempre absoluto — o sinal vem de group.sign
 
     // NÍVEL 2: Nome real da conta do lançamento (ex: PIS, COFINS, ISS, TARIFAS)
     const linhaKey = item.contaNome || item.contaDescricao || 'Sem descrição';
