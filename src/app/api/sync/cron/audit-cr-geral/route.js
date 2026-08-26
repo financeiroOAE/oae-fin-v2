@@ -294,3 +294,5 @@ export async function POST(request) {
     );
   }
 }
+
+// Trigger de auditoria: leitura agregada somente, sem alterar a planilha.
