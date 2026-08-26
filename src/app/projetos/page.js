@@ -348,8 +348,8 @@ export default function Projetos() {
     });
 
     if (usarCarteiraCompleta) {
-      recReceita = rawProjectRevenueStats.recebido;
-      recAReceber = rawProjectRevenueStats.aReceber;
+      recReceita = receitaLiquidaProjetos;
+      recAReceber = totalAReceber;
     }
 
     return {
@@ -364,7 +364,7 @@ export default function Projetos() {
       naoClassificado: nc,
       naoClassificados
     };
-  }, [data, filteredProjetos, realizadoIni, realizadoFim, incluirRateioAdm, usarCarteiraCompleta, rawProjectRevenueStats]);
+  }, [data, filteredProjetos, realizadoIni, realizadoFim, incluirRateioAdm, usarCarteiraCompleta, receitaLiquidaProjetos, totalAReceber]);
 
   const taxesData = useMemo(() => {
     const taxesMap = {};
