@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -17,6 +18,8 @@ function compactProjectName(value) {
 
 export default function ABCClassDonut({ data }) {
   const [expandedClass, setExpandedClass] = useState(null);
+  const pathname = usePathname();
+  const showFullProjectNames = pathname?.startsWith('/projetos');
 
   if (!data || data.length === 0) {
     return (
@@ -140,16 +143,25 @@ export default function ABCClassDonut({ data }) {
             <table style={{ width: '100%', minWidth: '0', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '10px' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'left', fontWeight: '600', width: '26%' }}>Projeto</th>
-                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'right', fontWeight: '600', width: '34%' }}>Contrato</th>
-                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'right', fontWeight: '600', width: '20%' }}>% Total</th>
-                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'right', fontWeight: '600', width: '20%' }}>% Fat.</th>
+                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'left', fontWeight: '600', width: showFullProjectNames ? '42%' : '26%' }}>Projeto</th>
+                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'right', fontWeight: '600', width: showFullProjectNames ? '26%' : '34%' }}>Contrato</th>
+                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'right', fontWeight: '600', width: '16%' }}>% Total</th>
+                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'right', fontWeight: '600', width: showFullProjectNames ? '16%' : '20%' }}>% Fat.</th>
                 </tr>
               </thead>
               <tbody>
                 {expandedItem.projects.map((p) => (
                   <tr key={p.nome} style={{ borderTop: '1px solid var(--border-color)' }} title={p.nome}>
-                    <td style={{ padding: '0.48rem 0.45rem', color: 'var(--text-main)', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{compactProjectName(p.nome)}</td>
+                    <td style={{
+                      padding: '0.48rem 0.45rem',
+                      color: 'var(--text-main)',
+                      fontWeight: '600',
+                      whiteSpace: showFullProjectNames ? 'normal' : 'nowrap',
+                      overflow: showFullProjectNames ? 'visible' : 'hidden',
+                      textOverflow: showFullProjectNames ? 'clip' : 'ellipsis',
+                      overflowWrap: showFullProjectNames ? 'anywhere' : 'normal',
+                      lineHeight: 1.35,
+                    }}>{showFullProjectNames ? p.nome : compactProjectName(p.nome)}</td>
                     <td style={{ padding: '0.48rem 0.45rem', textAlign: 'right', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatCurrency(p.contratado)}</td>
                     <td style={{ padding: '0.48rem 0.45rem', textAlign: 'right', color: expandedItem.color, whiteSpace: 'nowrap' }}>
                       {total > 0 ? ((p.contratado / total) * 100).toFixed(1) : 0}%
