@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { RefreshCw, AlertCircle, TrendingUp, TrendingDown, LayoutDashboard, Calendar, DollarSign, Database, ChevronLeft, ChevronRight, Building2, Activity, FilterX, Landmark, FileText, CheckCircle, Target, ArrowDownCircle, ArrowUpCircle, ArrowDown, ArrowUp } from "lucide-react";
+import { RefreshCw, AlertCircle, TrendingUp, TrendingDown, LayoutDashboard, Calendar, DollarSign, Database, ChevronLeft, ChevronRight, Building2, Activity, FilterX, Landmark, FileText, CheckCircle, Target, ArrowDownCircle, ArrowUpCircle, ArrowDown, ArrowUp, X } from "lucide-react";
 import IncomeExpenseChart from "@/components/charts/IncomeExpenseChart";
 import MonthlyResultChart from "@/components/charts/MonthlyResultChart";
 import TopBarChart from "@/components/charts/TopBarChart";
@@ -9,6 +9,7 @@ import AccountBarChart from "@/components/charts/AccountBarChart";
 import PieStatusChart from "@/components/charts/PieStatusChart";
 import ABCClassDonut from "@/components/charts/ABCClassDonut";
 import ProjectFinancialOverviewChart from "@/components/charts/ProjectFinancialOverviewChart";
+import FinancialCompositionBar from "@/components/FinancialCompositionBar";
 import MultiSelect from "@/components/MultiSelect";
 import InfoTooltip from "@/components/InfoTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
@@ -42,6 +43,7 @@ export default function VisaoFinanceira() {
   const [filterStatus, setFilterStatus] = useState([]);
   const [filterNomes, setFilterNomes] = useState([]);
   const [filterContas, setFilterContas] = useState([]);
+  const [compositionDrilldown, setCompositionDrilldown] = useState(null);
 
   const fetchDados = async (force = false) => {
     setIsSyncing(true);
@@ -248,66 +250,121 @@ export default function VisaoFinanceira() {
 
 
   const entryBreakdown = useMemo(() => {
-    const totals = {
-      obra: 0,
-      adm: 0,
-      emprestimos: 0,
-      aportes: 0,
-      outras: 0,
+    const totals = { obra: 0, adm: 0, emprestimos: 0, aportes: 0, outras: 0 };
+    const detailMaps = {
+      projetos: new Map(),
+      capital: new Map(),
+      outras: new Map(),
     };
-    const outrasMap = new Map();
 
-    const addOther = (row, value, fallbackLabel) => {
-      totals.outras += value;
-      const label = String(
-        row.contaDescricao || row.contaNome || row.planoFinanceiro || fallbackLabel || 'Outras entradas'
-      ).trim() || 'Outras entradas';
-      outrasMap.set(label, (outrasMap.get(label) || 0) + value);
+    const accountLabel = (row, fallback) => {
+      const code = String(row?.contaCodigo || '').trim();
+      const name = String(row?.contaNome || row?.contaDescricao || row?.planoFinanceiro || fallback || 'Conta não identificada').trim();
+      return code ? `${code} - ${name}` : name;
+    };
+
+    const addDetail = (bucket, row, value, fallback) => {
+      const label = accountLabel(row, fallback);
+      detailMaps[bucket].set(label, (detailMaps[bucket].get(label) || 0) + value);
     };
 
     realizedFilteredData.forEach((item) => {
       if (item.natureza !== 'Entrada') return;
-
-      const itemValue = Number(item.valor) || 0;
-      const isAdmOnly = item.isConsolidated &&
-        String(item.projeto || '').toUpperCase().includes('ADMINISTRA') &&
-        Math.abs(itemValue - (Number(item.valorAdministrativo) || 0)) < 0.01;
-
-      if (isAdmOnly) {
-        totals.adm += itemValue;
-        return;
-      }
-
       const rows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
       rows.forEach((row) => {
         const value = Number(row.valor) || 0;
         const classification = classifyFinancialEntry(row);
-
-        if (classification.type === 'receita_projeto') totals.obra += value;
-        else if (classification.type === 'receita_administrativa') totals.adm += value;
-        else if (classification.type === 'emprestimo') totals.emprestimos += value;
-        else if (classification.type === 'aporte') totals.aportes += value;
-        else addOther(row, value, classification.label);
+        if (classification.type === 'receita_projeto') {
+          totals.obra += value;
+          addDetail('projetos', row, value, classification.label);
+        } else if (classification.type === 'receita_administrativa') {
+          totals.adm += value;
+          addDetail('projetos', row, value, classification.label);
+        } else if (classification.type === 'emprestimo') {
+          totals.emprestimos += value;
+          addDetail('capital', row, value, classification.label);
+        } else if (classification.type === 'aporte') {
+          totals.aportes += value;
+          addDetail('capital', row, value, classification.label);
+        } else {
+          totals.outras += value;
+          addDetail('outras', row, value, classification.label);
+        }
       });
     });
+
+    const toRows = (map) => [...map.entries()]
+      .map(([conta, valor]) => ({ conta, valor }))
+      .filter((row) => Math.abs(row.valor) > 0.005)
+      .sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor));
 
     const projetos = totals.obra + totals.adm;
     const capital = totals.emprestimos + totals.aportes;
     const total = projetos + capital + totals.outras;
-    const outrasDetalhes = [...outrasMap.entries()]
-      .map(([nome, valor]) => ({ nome, valor }))
-      .filter((row) => Math.abs(row.valor) > 0.005)
-      .sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor));
 
     return {
       ...totals,
       projetos,
       capital,
       total,
-      outrasDetalhes,
       diferenca: entradasRealizadas - total,
+      items: [
+        { key: 'projetos', label: 'Receitas de Projetos', value: projetos, color: 'var(--success)', details: toRows(detailMaps.projetos) },
+        { key: 'capital', label: 'Empréstimos e Aportes', value: capital, color: 'var(--info)', details: toRows(detailMaps.capital) },
+        { key: 'outras', label: 'Outras Entradas', value: totals.outras, color: 'var(--primary)', details: toRows(detailMaps.outras) },
+      ],
     };
   }, [realizedFilteredData, entradasRealizadas]);
+
+  const outputBreakdown = useMemo(() => {
+    const buckets = {
+      custos: { value: 0, details: new Map() },
+      despesas: { value: 0, details: new Map() },
+      investimentos: { value: 0, details: new Map() },
+      tributos: { value: 0, details: new Map() },
+      outras: { value: 0, details: new Map() },
+    };
+
+    const accountLabel = (row) => {
+      const code = String(row?.contaCodigo || '').trim();
+      const name = String(row?.contaNome || row?.contaDescricao || 'Conta não identificada').trim();
+      return code ? `${code} - ${name}` : name;
+    };
+
+    const add = (bucket, row, value) => {
+      buckets[bucket].value += value;
+      const label = accountLabel(row);
+      buckets[bucket].details.set(label, (buckets[bucket].details.get(label) || 0) + value);
+    };
+
+    realizedFilteredData.forEach((item) => {
+      if (item.natureza !== 'Saída') return;
+      const value = Math.abs(Number(item.valor) || 0);
+      const dreText = [item.dreClasse, item.dreLinha, item.dreDescricao, item.contaDescricao]
+        .filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
+      if (isRevenueTax(item)) add('tributos', item, value);
+      else if (/(INVEST|CAPEX|IMOBILIZ|ATIVO FIXO|ATIVO IMOB)/.test(dreText)) add('investimentos', item, value);
+      else if (dreText.includes('CUSTO')) add('custos', item, value);
+      else if (dreText.includes('DESPESA') || dreText.includes('ADMINISTRAT')) add('despesas', item, value);
+      else add('outras', item, value);
+    });
+
+    const toRows = (map) => [...map.entries()]
+      .map(([conta, valor]) => ({ conta, valor }))
+      .filter((row) => Math.abs(row.valor) > 0.005)
+      .sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor));
+
+    const items = [
+      { key: 'custos', label: 'Custos', value: buckets.custos.value, color: 'var(--warning)', details: toRows(buckets.custos.details) },
+      { key: 'despesas', label: 'Despesas', value: buckets.despesas.value, color: 'var(--danger)', details: toRows(buckets.despesas.details) },
+      { key: 'investimentos', label: 'Investimentos', value: buckets.investimentos.value, color: '#8b5cf6', details: toRows(buckets.investimentos.details) },
+      { key: 'tributos', label: 'Tributos', value: buckets.tributos.value, color: 'var(--primary)', details: toRows(buckets.tributos.details) },
+      { key: 'outras', label: 'Outras Saídas', value: buckets.outras.value, color: 'var(--text-secondary)', details: toRows(buckets.outras.details) },
+    ];
+
+    return { total: items.reduce((sum, item) => sum + item.value, 0), items };
+  }, [realizedFilteredData]);
 
   const taxStatusBreakdown = useMemo(() => ({
     realizado: realizedFilteredData
@@ -576,81 +633,6 @@ export default function VisaoFinanceira() {
       </div>
 
 
-      <div id="report-visao-composicao-entradas" data-report-section className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-          <div>
-            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              Composição das Entradas Realizadas
-              <InfoTooltip title="Composição das Entradas Realizadas" content="Classificação das entradas efetivamente realizadas no período selecionado." />
-            </h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Detalhamento do valor total de Entradas Realizadas.</p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total</span>
-              <strong style={{ fontSize: '18px', color: 'var(--text-main)' }}>{formatCurrency(entryBreakdown.total)}</strong>
-            </div>
-            <ReportAdder
-              sectionKey="visao:composicao-entradas"
-              title="Composição das Entradas Realizadas"
-              componentName="Detalhamento das Entradas"
-              page="Visão Financeira"
-              type="TABLE"
-              data={[
-                { Grupo: 'Receitas de projetos', Classificação: 'Obra', Valor: entryBreakdown.obra },
-                { Grupo: 'Receitas de projetos', Classificação: 'Administrativo', Valor: entryBreakdown.adm },
-                { Grupo: 'Empréstimos e aportes', Classificação: 'Empréstimos', Valor: entryBreakdown.emprestimos },
-                { Grupo: 'Empréstimos e aportes', Classificação: 'Aportes', Valor: entryBreakdown.aportes },
-                ...entryBreakdown.outrasDetalhes.map((row) => ({ Grupo: 'Outras entradas', Classificação: row.nome, Valor: row.valor })),
-              ]}
-              filters={reportFilters}
-              captureId="report-visao-composicao-entradas"
-              presetTags={["executive-financial"]}
-              explanation="Classificação das entradas realizadas no período selecionado."
-            />
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.75rem' }}>
-          <div style={{ padding: '0.9rem 1rem', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-elevated)' }}>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Receitas de Projetos</span>
-            <strong style={{ display: 'block', marginTop: '0.2rem', fontSize: '17px', color: 'var(--success)' }}>{formatCurrency(entryBreakdown.projetos)}</strong>
-            <div style={{ marginTop: '0.65rem', display: 'grid', gap: '0.35rem', fontSize: '11px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}><span style={{ color: 'var(--text-secondary)' }}>Obra</span><strong>{formatCurrency(entryBreakdown.obra)}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}><span style={{ color: 'var(--text-secondary)' }}>Administrativo</span><strong>{formatCurrency(entryBreakdown.adm)}</strong></div>
-            </div>
-          </div>
-
-          <div style={{ padding: '0.9rem 1rem', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-elevated)' }}>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Empréstimos e Aportes</span>
-            <strong style={{ display: 'block', marginTop: '0.2rem', fontSize: '17px', color: 'var(--info)' }}>{formatCurrency(entryBreakdown.capital)}</strong>
-            <div style={{ marginTop: '0.65rem', display: 'grid', gap: '0.35rem', fontSize: '11px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}><span style={{ color: 'var(--text-secondary)' }}>Empréstimos</span><strong>{formatCurrency(entryBreakdown.emprestimos)}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}><span style={{ color: 'var(--text-secondary)' }}>Aportes</span><strong>{formatCurrency(entryBreakdown.aportes)}</strong></div>
-            </div>
-          </div>
-
-          <div style={{ padding: '0.9rem 1rem', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-elevated)' }}>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Outras Entradas</span>
-            <strong style={{ display: 'block', marginTop: '0.2rem', fontSize: '17px', color: 'var(--primary)' }}>{formatCurrency(entryBreakdown.outras)}</strong>
-            <div style={{ marginTop: '0.65rem', display: 'grid', gap: '0.35rem', fontSize: '11px', maxHeight: '92px', overflowY: 'auto', paddingRight: '0.2rem' }}>
-              {entryBreakdown.outrasDetalhes.length > 0 ? entryBreakdown.outrasDetalhes.map((row) => (
-                <div key={row.nome} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
-                  <span style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>{row.nome}</span>
-                  <strong style={{ whiteSpace: 'nowrap' }}>{formatCurrency(row.valor)}</strong>
-                </div>
-              )) : <span style={{ color: 'var(--text-secondary)' }}>Sem outras entradas no período.</span>}
-            </div>
-          </div>
-        </div>
-
-        {Math.abs(entryBreakdown.diferenca) > 0.01 && (
-          <p style={{ marginTop: '0.75rem', fontSize: '11px', color: 'var(--warning)' }}>
-            Diferença de conciliação: {formatCurrency(entryBreakdown.diferenca)}.
-          </p>
-        )}
-      </div>
-
       {/* Grid Principal dos Gráficos (Dashboard) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>
         
@@ -672,6 +654,61 @@ export default function VisaoFinanceira() {
               <MonthlyResultChart data={flowData} />
             </div>
           </div>
+        </div>
+
+
+
+        {/* ROW 1.5: Composição das movimentações realizadas */}
+        <div id="report-visao-composicao-entradas" data-report-section className="card" style={{ padding: '1.25rem', minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <div>
+              <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                Composição das Movimentações Realizadas
+                <InfoTooltip title="Composição das Movimentações Realizadas" content="Distribuição das entradas e saídas realizadas por natureza no período selecionado." />
+              </h2>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Clique em uma faixa ou categoria para ver as contas que compõem o valor.</p>
+            </div>
+            <ReportAdder
+              sectionKey="visao:composicao-movimentacoes"
+              title="Composição das Movimentações Realizadas"
+              componentName="Composição de Entradas e Saídas"
+              page="Visão Financeira"
+              type="TABLE"
+              data={[
+                ...entryBreakdown.items.map((item) => ({ Natureza: 'Entrada', Grupo: item.label, Valor: item.value })),
+                ...outputBreakdown.items.map((item) => ({ Natureza: 'Saída', Grupo: item.label, Valor: item.value })),
+              ]}
+              filters={reportFilters}
+              captureId="report-visao-composicao-entradas"
+              presetTags={["executive-financial"]}
+              explanation="Distribuição das entradas e saídas realizadas por natureza no período selecionado."
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '1.25rem' }}>
+            <div style={{ padding: '0.9rem 1rem', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-elevated)', minWidth: 0 }}>
+              <FinancialCompositionBar
+                title="Entradas realizadas"
+                total={entradasRealizadas}
+                items={entryBreakdown.items}
+                onSelect={(item) => setCompositionDrilldown({ nature: 'Entrada', ...item })}
+              />
+            </div>
+            <div style={{ padding: '0.9rem 1rem', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-elevated)', minWidth: 0 }}>
+              <FinancialCompositionBar
+                title="Saídas realizadas"
+                total={saidasRealizadas}
+                items={outputBreakdown.items}
+                onSelect={(item) => setCompositionDrilldown({ nature: 'Saída', ...item })}
+              />
+            </div>
+          </div>
+
+          {Math.abs(entryBreakdown.diferenca) > 0.01 && (
+            <p style={{ marginTop: '0.65rem', fontSize: '10.5px', color: 'var(--warning)' }}>
+              Diferença de conciliação das entradas: {formatCurrency(entryBreakdown.diferenca)}.
+            </p>
+          )}
         </div>
 
         {/* ROW 2: Status Financeiro e Curva ABC */}
@@ -741,6 +778,51 @@ export default function VisaoFinanceira() {
         </div>
 
       </div>
+
+
+      {compositionDrilldown && (
+        <div
+          onClick={() => setCompositionDrilldown(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 2147482500, background: 'rgba(2, 8, 23, 0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+        >
+          <div
+            className="card"
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: 'min(720px, 100%)', maxHeight: '82vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0 }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', padding: '1rem 1.1rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div>
+                <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{compositionDrilldown.nature}</span>
+                <h3 style={{ fontSize: '15px', color: 'var(--text-main)', marginTop: '0.15rem' }}>{compositionDrilldown.label}</h3>
+                <strong style={{ display: 'block', marginTop: '0.3rem', color: 'var(--primary)', fontSize: '16px' }}>{formatCurrency(compositionDrilldown.value)}</strong>
+              </div>
+              <button type="button" onClick={() => setCompositionDrilldown(null)} aria-label="Fechar detalhamento" className="btn" style={{ padding: '0.35rem', minWidth: 'auto' }}><X size={16} /></button>
+            </div>
+            <div style={{ overflow: 'auto', padding: '0.6rem 1.1rem 1rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                    <th style={{ textAlign: 'left', padding: '0.6rem 0.4rem' }}>Conta / Plano Financeiro</th>
+                    <th style={{ textAlign: 'right', padding: '0.6rem 0.4rem' }}>Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(compositionDrilldown.details || []).map((row) => (
+                    <tr key={row.conta} style={{ borderBottom: '1px solid rgba(148,163,184,0.08)' }}>
+                      <td style={{ padding: '0.65rem 0.4rem', color: 'var(--text-main)' }}>{row.conta}</td>
+                      <td style={{ padding: '0.65rem 0.4rem', textAlign: 'right', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{formatCurrency(row.valor)}</td>
+                    </tr>
+                  ))}
+                  {(!compositionDrilldown.details || compositionDrilldown.details.length === 0) && (
+                    <tr><td colSpan={2} style={{ padding: '1.2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Sem contas detalhadas para esta categoria.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       <style dangerouslySetInnerHTML={{__html: `
         .spinner { animation: spin 1s linear infinite; }
