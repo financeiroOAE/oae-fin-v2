@@ -8,7 +8,7 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.__oaePrisma = prisma;
 
 const SNAPSHOT_ID = 'current';
 const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA', 'RECEBIMENTOS_2026'];
-const CASH_LOGIC_VERSION = 2;
+const CASH_LOGIC_VERSION = 3;
 
 function parseSortDate(value) {
   if (!value) return 0;
