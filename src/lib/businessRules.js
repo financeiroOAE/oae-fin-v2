@@ -177,6 +177,10 @@ function resolveCanonicalSourceProject(rawNome, rawCodigo, exactIndex, projectIn
  * CR_GERAL = Entrada; CP_GERAL = Saída.
  * Linhas sem Data/Conta são ignoradas.
  * Sempre que a identificação da obra for inequívoca, o nome exibido vem da relação oficial PROJETOS_2026.
+ *
+ * Regra CR_GERAL (2026-08-26):
+ * - coluna J / "Valor total título" = faturamento;
+ * - coluna K / "Valor" = valor líquido efetivamente recebido/caixa.
  */
 export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [], financialPlanMap = {}) {
   const isCR = type === 'CR_GERAL';
@@ -250,6 +254,9 @@ export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [
         || ''
       ).trim();
 
+      const valorLiquido = parseBRL(row.Valor);
+      const valorFaturamento = parseBRL(row['Valor total título'] || row['Valor total ttulo']);
+
       return {
         natureza: nature,
         data: row.Data,
@@ -264,9 +271,15 @@ export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [
         centroCustoGenerico,
         origemSienge: String(row.Origem || '').trim(),
         nome: String(row.Nome || '').trim(),
-        valor: parseBRL(row.Valor),
+        // Mantém `valor` como valor operacional do lançamento.
+        // Na CR_GERAL ele vem da coluna K (Valor), que é o líquido/efetivamente recebido.
+        valor: valorLiquido,
+        // Alias explícitos para impedir que faturamento e caixa sejam confundidos.
+        valorCaixa: isCR ? valorLiquido : undefined,
+        valorFaturamento: isCR ? valorFaturamento : undefined,
+        valorBruto: isCR ? valorFaturamento : valorLiquido,
         lancamento: String(row['Lançamento'] || row['Lanamento'] || '').trim(),
-        valorTotalTitulo: parseBRL(row['Valor total título'] || row['Valor total ttulo']),
+        valorTotalTitulo: valorFaturamento,
         contaCodigo: accountCode,
         contaNome: contaNomeOriginal,
         planoCodigo: String(financialPlan.CODIGO || '').trim(),
