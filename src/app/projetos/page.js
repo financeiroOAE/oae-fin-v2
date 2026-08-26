@@ -255,6 +255,8 @@ export default function Projetos() {
   const totalPago = filteredProjetos.reduce((acc, p) => acc + p.pago, 0);
   const receitaLiquidaProjetos = totalRecebido;
 
+  const usarCarteiraCompleta = filterProjetos.length === 0 && filterEmpresas.length === 0 && filterTipos.length === 0;
+
   const previsaoProjetosGeral = useMemo(() => data
     .filter((item) => {
       const status = String(item.status || '').toUpperCase();
