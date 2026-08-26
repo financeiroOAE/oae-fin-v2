@@ -63,11 +63,16 @@ function snapshotNeedsProjectRepair(payload) {
 
 function snapshotNeedsCashRepair(payload) {
   if (!Array.isArray(payload?.data)) return false;
+  if (payload.cashLogicVersion !== 2) return true;
+  if (!(Number(payload.recebimentosLiquidosStats?.sourceNet) > 0)) return true;
   return payload.data.some((item) => {
     if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
     if (!String(item?.status || '').toUpperCase().includes('REALIZADO')) return false;
     if (!String(item?.data || '').endsWith('/2026')) return false;
-    return item?.valorCaixa === undefined || item?.valorCaixa === null || !Number.isFinite(Number(item.valorCaixa));
+    return item?.valorCaixa === undefined
+      || item?.valorCaixa === null
+      || !Number.isFinite(Number(item.valorCaixa))
+      || item?.recebimentoLiquidoFonte === 'CR_GERAL';
   });
 }
 
