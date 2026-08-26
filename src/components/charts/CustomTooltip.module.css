@@ -4,15 +4,12 @@
 
 /*
  * Os dois gráficos de Fluxo de Caixa usam o formato monetário completo no eixo Y.
- * Em telas/card mais estreitos, o Recharts mantém uma área curta para o eixo e o
- * início dos números fica recortado. Compactamos somente a tipografia visual dos
- * ticks desses dois gráficos, preservando o valor completo e sem alterar dados.
+ * Em telas/card mais estreitos, o Recharts pode recortar o início dos números.
+ * Os gráficos reservam a largura necessária ao eixo; aqui mantemos apenas a
+ * tipografia compacta, preservando o valor completo e sem deformar o texto.
  */
 :global(#report-fluxo-anual .recharts-yAxis .recharts-cartesian-axis-tick-value),
 :global(#report-fluxo-evolucao .recharts-yAxis .recharts-cartesian-axis-tick-value) {
   font-size: 9px !important;
   letter-spacing: -0.2px;
-  transform-box: fill-box;
-  transform-origin: right center;
-  transform: scaleX(0.68);
 }

@@ -599,10 +599,10 @@ export default function FluxoDeCaixa() {
           />
           <div style={{ flex: 1, minHeight: '300px', marginTop: '1rem' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={evolutionData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <BarChart data={evolutionData} margin={{ top: 10, right: 12, left: 4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
                 <XAxis dataKey="dataExibicao" stroke="var(--text-secondary)" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} interval={0} angle={-45} textAnchor="end" height={52} />
-                <YAxis stroke="var(--text-secondary)" fontSize={11} tickFormatter={(val) => formatCurrency(val)} axisLine={false} tickLine={false} />
+                <YAxis stroke="var(--text-secondary)" fontSize={9} width={112} tickMargin={6} tickFormatter={(val) => formatCurrency(val)} axisLine={false} tickLine={false} />
                 <RechartsTooltip content={<CustomTooltip />} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
                 <Bar dataKey="Entradas" fill="var(--success)" radius={[4, 4, 0, 0]} maxBarSize={40} />
@@ -778,10 +778,10 @@ export default function FluxoDeCaixa() {
         />
         <div style={{ height: '300px', marginTop: '1rem' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={annualData2026} margin={{ top: 10, right: 18, left: 10, bottom: 0 }}>
+            <ComposedChart data={annualData2026} margin={{ top: 10, right: 18, left: 4, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
               <XAxis dataKey="mesNome" stroke="var(--text-secondary)" fontSize={12} tickMargin={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="var(--text-secondary)" fontSize={12} tickFormatter={(val) => formatCurrency(val)} axisLine={false} tickLine={false} />
+              <YAxis stroke="var(--text-secondary)" fontSize={9} width={112} tickMargin={6} tickFormatter={(val) => formatCurrency(val)} axisLine={false} tickLine={false} />
               <RechartsTooltip content={<CustomTooltip />} />
               <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
               <ReferenceLine y={0} stroke="var(--border-color)" />
