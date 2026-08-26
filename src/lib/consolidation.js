@@ -62,6 +62,28 @@ function normalizeDateTimestamp(item) {
   };
 }
 
+function normalizeProjectAllocationText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
+function isUsableAllocationProject(value) {
+  const normalized = normalizeProjectAllocationText(value);
+  if (!normalized) return false;
+  if (normalized.includes('ADMINISTRA')) return false;
+  return ![
+    'GRUPO OAE',
+    'SEM PROJETO',
+    'PROJETOS',
+    'PROJETO',
+    'PROJETOS GERAL',
+    'PROJETOS GERAIS',
+  ].includes(normalized);
+}
+
 function projectRevenueValue(item, incluirRateioAdm, valueOverride = null) {
   const classification = classifyFinancialEntry(item);
   const value = valueOverride === null ? (Number(item.valor) || 0) : valueOverride;
@@ -109,9 +131,6 @@ export function consolidateFinancialData(baseData, options = {}) {
 
     const statusKey = String(item.status || '').trim().toUpperCase();
     const dateKey = parseDateToLocalMidnight(item.data, item.dataTimestamp);
-    // O mesmo lançamento pode existir no fechamento de 31/12/2025 e voltar a
-    // aparecer na realização de 2026. Sem a data na chave, a linha de 2026
-    // herdava a data antiga e desaparecia do período selecionado.
     const key = `${item.lancamento}|${statusKey}|${dateKey}`;
 
     if (!consolidatedMap.has(key)) {
@@ -129,31 +148,32 @@ export function consolidateFinancialData(baseData, options = {}) {
     consItem.linhasOriginais.push(usarValorCaixa ? { ...item, valorBruto: item.valorBruto ?? item.valor, valor: effectiveValue(item) } : item);
 
     const classification = classifyFinancialEntry(item);
-    // REGRA OFICIAL DE PROJETOS:
-    // CR_GERAL coluna K já contém o valor líquido correto de cada linha.
-    // Não deduplicar, não recalcular e não redistribuir K pela coluna J.
-    // 1010101 = receita direta do projeto; 1010107 = receita administrativa.
     const value = effectiveValue(item);
 
     if (classification.type === 'receita_administrativa') {
       consItem.valorAdministrativo += value;
-      if (!consItem.centroCustoObra && item.projeto && !String(item.projeto).toUpperCase().includes('ADMINISTRA')) {
+      // A linha ADM pode carregar o projeto real do titulo. Ela deve servir de
+      // vinculo quando a outra linha estiver em GRUPO OAE / SEM PROJETO.
+      if (!consItem.centroCustoObra && isUsableAllocationProject(item.projeto)) {
         consItem.centroCustoObra = item.projeto;
       }
     } else if (classification.type === 'receita_projeto') {
       consItem.valorDireto += value;
-      if (item.projeto) consItem.centroCustoObra = item.projeto;
+      // Nunca deixe um centro generico bloquear um projeto valido encontrado
+      // em outra linha do mesmo titulo.
+      if (isUsableAllocationProject(item.projeto)) {
+        consItem.centroCustoObra = item.projeto;
+      }
     } else {
       consItem.valorOutrasEntradas += value;
     }
   });
 
   const processedConsolidated = Array.from(consolidatedMap.values()).map(cons => {
-    const ccFinal = cons.centroCustoObra || cons.projeto || 'ADMINISTRAÇÃO';
+    const projectFromRows = cons.linhasOriginais.find((row) => isUsableAllocationProject(row.projeto))?.projeto;
+    const ccFinal = cons.centroCustoObra || projectFromRows || cons.projeto || 'ADMINISTRAÇÃO';
 
     if (isProjetosPage) {
-      // Sem rateio ADM: somente 1010101.
-      // Com rateio ADM: 1010101 + 1010107, usando os valores reais da coluna K.
       const projectValue = cons.valorDireto + (incluirRateioAdm ? cons.valorAdministrativo : 0);
       if (projectValue === 0) return null;
       return {
