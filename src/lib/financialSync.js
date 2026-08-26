@@ -7,7 +7,8 @@ export const prisma = globalForPrisma.__oaePrisma || new PrismaClient();
 if (process.env.NODE_ENV !== 'production') globalForPrisma.__oaePrisma = prisma;
 
 const SNAPSHOT_ID = 'current';
-const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA'];
+const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA', 'RECEBIMENTOS_2026'];
+const CASH_LOGIC_VERSION = 2;
 
 function parseSortDate(value) {
   if (!value) return 0;
@@ -74,15 +75,26 @@ function enrichCashReceived(crRows, receiptRows) {
   (receiptRows || []).forEach((row, index) => {
     const title = normalizeReceiptTitle(row['Título'] ?? row.Titulo);
     const document = normalizeReceiptDocument(row.Documento);
-    const net = parseReceiptValue(row['Vl Recebido']);
+    const gross = parseReceiptValue(row['Vl. baixa'] ?? row['Vl, baixa']);
+    const discount = parseReceiptValue(row.Desconto);
+    const rawNet = parseReceiptValue(row['Vl Recebido']);
+    // Um recebimento positivo não pode produzir crédito líquido negativo.
+    // Quando a célula da fonte estiver corrompida, recompõe o líquido pela
+    // baixa menos o desconto. Valores positivos divergentes são preservados,
+    // pois podem representar compensações ou ajustes bancários válidos.
+    const invalidNegativeNet = gross >= 0 && rawNet < 0;
+    const net = invalidNegativeNet
+      ? Math.round((gross - discount) * 100) / 100
+      : rawNet;
     if (!title && !document) return;
     const receipt = {
       id: title ? `T:${title}` : `D:${document}:${index}`,
       title,
       document,
       net,
-      gross: parseReceiptValue(row['Vl. baixa'] ?? row['Vl, baixa']),
-      discount: parseReceiptValue(row.Desconto),
+      gross,
+      discount,
+      correctedInvalidNet: invalidNegativeNet,
     };
     receipts.push(receipt);
     if (title) byTitle.set(title, receipt);
@@ -124,14 +136,22 @@ function enrichCashReceived(crRows, receiptRows) {
     matchedGross += receipt.gross;
   });
 
+  let unmatchedRealizedRows = 0;
   const rows = crRows.map((row) => {
     const gross = Number(row.valor) || 0;
     const matched = cashByRow.has(row);
+    const requiresLiquidValue = isRealized2026Entry(row);
+    if (requiresLiquidValue && !matched) unmatchedRealizedRows += 1;
     return {
       ...row,
       valorBruto: gross,
-      valorCaixa: matched ? cashByRow.get(row) : gross,
-      recebimentoLiquidoFonte: matched ? 'RECEBIMENTOS_2026' : 'CR_GERAL',
+      // Entradas realizadas de 2026 só contam como caixa quando conciliadas
+      // com a relação de valores efetivamente creditados. Nunca tratamos o
+      // valor bruto do CR_GERAL como se fosse líquido.
+      valorCaixa: matched ? cashByRow.get(row) : (requiresLiquidValue ? 0 : gross),
+      recebimentoLiquidoFonte: matched
+        ? 'RECEBIMENTOS_2026'
+        : (requiresLiquidValue ? 'NAO_CONCILIADO' : 'CR_GERAL'),
     };
   });
 
@@ -145,6 +165,8 @@ function enrichCashReceived(crRows, receiptRows) {
       matchedNet: Math.round(matchedNet * 100) / 100,
       sourceNet: Math.round(receipts.reduce((sum, item) => sum + item.net, 0) * 100) / 100,
       sourceDiscount: Math.round(receipts.reduce((sum, item) => sum + item.discount, 0) * 100) / 100,
+      correctedInvalidNet: receipts.filter((item) => item.correctedInvalidNet).length,
+      unmatchedRealizedRows,
     },
   };
 }
@@ -263,6 +285,7 @@ async function performFullSync(triggeredBy) {
     somaProjetosFaturado,
     somaProjetosSaldo,
     recebimentosLiquidosStats,
+    cashLogicVersion: CASH_LOGIC_VERSION,
     recordsCount: totalRecords,
     syncedAt,
     message: 'Sincronização concluída com sucesso!',
