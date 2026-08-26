@@ -724,7 +724,7 @@ export default function VisaoFinanceira() {
             ]} filters={reportFilters} captureId="report-visao-status" presetTags={["executive-financial"]} explanation="Receitas de projetos (1010101 + 1010107), pagamentos e tributos dentro do período selecionado." style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.35rem' }}>Status Financeiro Consolidado</h2>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Tributos, receitas de projetos e pagamentos no período selecionado.</p>
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.85rem', alignItems: 'stretch' }}>
               <PieStatusChart realizado={taxStatusBreakdown.realizado} pendente={taxStatusBreakdown.pendente} colorRealizado="var(--primary)" colorPendente="rgba(57, 198, 198, 0.25)" titulo="Tributos" labelRealizado="Pago" labelPendente="A pagar" />
               <PieStatusChart realizado={projectRevenueStatus.realizado.total} pendente={projectRevenueStatus.pendente.total} colorRealizado="var(--success)" colorPendente="rgba(16, 185, 129, 0.3)" titulo="Receitas" labelRealizado="Recebido" labelPendente="A receber" />
               <PieStatusChart realizado={saidasRealizadas} pendente={saidasARealizar} colorRealizado="var(--danger)" colorPendente="rgba(239, 68, 68, 0.3)" titulo="Pagamentos" labelRealizado="Pago" labelPendente="A pagar" />
