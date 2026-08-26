@@ -177,7 +177,7 @@ export default function VisaoFinanceira() {
       month,
     }));
 
-    filteredData.forEach((item) => {
+    realizedFilteredData.forEach((item) => {
       const parts = String(item.data || '').split('/');
       if (parts.length !== 3 || parts[2] !== '2026') return;
       const month = Number(parts[1]) - 1;
@@ -187,7 +187,7 @@ export default function VisaoFinanceira() {
     });
 
     return rows;
-  }, [filteredData]);
+  }, [realizedFilteredData]);
 
   const piePagamentos = [
     { name: 'Pago', value: saidasRealizadas },
