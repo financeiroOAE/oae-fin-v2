@@ -63,7 +63,7 @@ function snapshotNeedsProjectRepair(payload) {
 
 function snapshotNeedsCashRepair(payload) {
   if (!Array.isArray(payload?.data)) return false;
-  if (payload.cashLogicVersion !== 2) return true;
+  if (payload.cashLogicVersion !== 3) return true;
   if (!(Number(payload.recebimentosLiquidosStats?.sourceNet) > 0)) return true;
   return payload.data.some((item) => {
     if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
