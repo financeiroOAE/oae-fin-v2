@@ -52,7 +52,7 @@ export default function ProjectMonthlyFinancialLineChart({ data = [] }) {
           <ReferenceLine y={0} stroke="var(--border-color)" />
           <Tooltip content={<TooltipContent />} />
           <Legend iconType="line" wrapperStyle={{ fontSize: '11px' }} />
-          <Line type="monotone" dataKey="Receitas" name="Receitas" stroke="var(--success)" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
+          <Line type="monotone" dataKey="Receitas" name="Receita Líquida" stroke="var(--success)" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
           <Line type="monotone" dataKey="Custos" name="Custos" stroke="var(--warning)" strokeWidth={2.25} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
           <Line type="monotone" dataKey="Despesas" name="Despesas" stroke="var(--danger)" strokeWidth={2.25} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
         </LineChart>
