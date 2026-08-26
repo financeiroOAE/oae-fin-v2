@@ -1,0 +1,37 @@
+name: Fix Projects Final 2026-08-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/fix-projects-final-2026-08-26.js
+      - .github/workflows/fix-projects-final-2026-08-26.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Aplicar ajuste final
+        run: node scripts/fix-projects-final-2026-08-26.js
+      - name: Commitar mudanca
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/projetos/page.js
+          git commit -m "fix: finalizar consolidacao de receita em Projetos"
+          git push origin main
