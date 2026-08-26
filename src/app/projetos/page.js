@@ -29,6 +29,151 @@ const getYearToDateRange = () => {
   return { start: '2026-01-01', end: localDate(today) };
 };
 
+const FINANCIAL_UNALLOCATED_PROJECT_KEY = '__RECEITA_PROJETO_NAO_ALOCADA__';
+const FINANCIAL_UNALLOCATED_PROJECT_NAME = 'Receita de Projeto não alocada';
+
+const normalizeFinancialProjectLabel = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .trim()
+  .toUpperCase();
+
+const isGenericFinancialProject = (value) => {
+  const normalized = normalizeFinancialProjectLabel(value);
+  if (!normalized) return true;
+  if (normalized.includes('ADMINISTRA')) return true;
+  return [
+    'GRUPO OAE',
+    'SEM PROJETO',
+    'PROJETOS',
+    'PROJETO',
+    'PROJETOS GERAL',
+    'PROJETOS GERAIS'
+  ].includes(normalized);
+};
+
+const getDirectProjectRevenueValue = (item) => {
+  if (
+    item?.valorDireto !== undefined &&
+    item?.valorDireto !== null
+  ) {
+    return Number(item.valorDireto) || 0;
+  }
+
+  const classification = classifyFinancialEntry(item);
+  return classification.type === 'receita_projeto'
+    ? Number(item?.valor) || 0
+    : 0;
+};
+
+const getAdministrativeRevenueValue = (item) => {
+  if (
+    item?.valorAdministrativo !== undefined &&
+    item?.valorAdministrativo !== null
+  ) {
+    return Number(item.valorAdministrativo) || 0;
+  }
+
+  const classification = classifyFinancialEntry(item);
+  return classification.type === 'receita_administrativa'
+    ? Number(item?.valor) || 0
+    : 0;
+};
+
+const isDirectProjectRevenueEntry = (item) => {
+  if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
+  return getDirectProjectRevenueValue(item) !== 0;
+};
+
+const isProjectRelatedRevenueEntry = (item) => {
+  if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
+
+  if (
+    getDirectProjectRevenueValue(item) !== 0 ||
+    getAdministrativeRevenueValue(item) !== 0
+  ) {
+    return true;
+  }
+
+  const classification = classifyFinancialEntry(item);
+  return (
+    classification.type === 'receita_projeto' ||
+    classification.type === 'receita_administrativa'
+  );
+};
+
+const extractFinancialProjectCode = (item) => {
+  const originalRows = Array.isArray(item?.linhasOriginais)
+    ? item.linhasOriginais
+    : [];
+
+  const fields = [
+    item?.projeto,
+    item?.lancamento,
+    item?.titulo,
+    item?.documento,
+    ...originalRows.flatMap((row) => [
+      row?.projeto,
+      row?.lancamento,
+      row?.titulo,
+      row?.documento
+    ])
+  ];
+
+  for (const field of fields) {
+    const match = String(field || '').match(/\bP[.\s-]*(\d{1,6})\b/i);
+    if (match) return String(Number(match[1]));
+  }
+
+  return '';
+};
+
+const getFinancialRevenueProjectIdentity = (item) => {
+  const rawProject = String(item?.projeto || '').trim();
+  const regularKey = getProjectKey(rawProject);
+
+  // Se a CR_GERAL já traz um projeto utilizável, preserva o nome da própria fonte.
+  if (rawProject && !isGenericFinancialProject(rawProject)) {
+    const normalized = normalizeFinancialProjectLabel(rawProject);
+    const fallbackKey = normalized
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    return {
+      projectKey: regularKey || (fallbackKey ? `FINANCEIRO-${fallbackKey}` : ''),
+      projectName: rawProject.replace(/[.\s]+$/g, '')
+    };
+  }
+
+  // Para receitas de projeto/ADM com centro de custo genérico, procura P.xxx
+  // no lançamento/título/documento e também nas linhas originais consolidadas.
+  if (isProjectRelatedRevenueEntry(item)) {
+    const projectCode = extractFinancialProjectCode(item);
+
+    if (projectCode) {
+      const label = `P.${projectCode}`;
+      return {
+        projectKey: getProjectKey(label) || `FINANCEIRO-P-${projectCode}`,
+        projectName: label
+      };
+    }
+
+    // Somente receita direta 1010101 pode originar o bucket não alocado.
+    // Receita exclusivamente administrativa não cria projeto artificial.
+    if (isDirectProjectRevenueEntry(item)) {
+      return {
+        projectKey: FINANCIAL_UNALLOCATED_PROJECT_KEY,
+        projectName: FINANCIAL_UNALLOCATED_PROJECT_NAME
+      };
+    }
+  }
+
+  return {
+    projectKey: regularKey || '',
+    projectName: rawProject.replace(/[.\s]+$/g, '')
+  };
+};
+
 export default function Projetos() {
   const { isReportMode, openReportBuilder, exitReportMode } = useReport();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -134,10 +279,6 @@ export default function Projetos() {
     });
 
     baseData.forEach((item) => {
-      const projectKey = getProjectKey(item.projeto);
-      const projeto = mapaProjetos[projectKey];
-      if (!projeto) return;
-
       let ts = 0;
       if (item.data) {
         const parts = String(item.data).split('/');
@@ -153,11 +294,46 @@ export default function Projetos() {
       // desaparecem só porque vencem depois da Data Final.
       if (isRealizado && (ts < realizadoIni || ts > realizadoFim)) return;
 
+      const revenueIdentity = item.natureza === 'Entrada'
+        ? getFinancialRevenueProjectIdentity(item)
+        : null;
+      const projectKey = revenueIdentity?.projectKey || getProjectKey(item.projeto);
+      let projeto = mapaProjetos[projectKey];
+
+      // Receita válida da CR_GERAL não pode desaparecer somente porque o
+      // projeto não existe na PROJETOS_2026. Nessa situação criamos uma linha
+      // exclusivamente financeira, sem contrato/faturamento/saldo artificiais.
+      if (!projeto && item.natureza === 'Entrada' && isDirectProjectRevenueEntry(item) && projectKey) {
+        const empresaFinanceira = String(item.empresa || '').trim();
+
+        mapaProjetos[projectKey] = {
+          projectKey,
+          nome: revenueIdentity?.projectName || FINANCIAL_UNALLOCATED_PROJECT_NAME,
+          empresas: empresaFinanceira ? [empresaFinanceira] : [],
+          tipos: [],
+          contratado: 0,
+          faturado: 0,
+          saldoContratual: 0,
+          recebido: 0,
+          aReceber: 0,
+          pago: 0,
+          aPagar: 0,
+          receitaDireta: 0,
+          receitaAdm: 0,
+          titulosAdmAssociados: [],
+          somenteFinanceiro: true
+        };
+
+        projeto = mapaProjetos[projectKey];
+      }
+
+      if (!projeto) return;
+
       if (item.natureza === 'Entrada') {
         if (isRealizado) {
           projeto.recebido += Number(item.valor) || 0;
-          projeto.receitaDireta += Number(item.valorDireto) || 0;
-          projeto.receitaAdm += Number(item.valorAdministrativo) || 0;
+          projeto.receitaDireta += getDirectProjectRevenueValue(item);
+          projeto.receitaAdm += getAdministrativeRevenueValue(item);
         } else {
           projeto.aReceber += Number(item.valor) || 0;
         }
@@ -286,7 +462,7 @@ export default function Projetos() {
     let recReceita = 0;
     let recAReceber = 0;
     receitaConsolidada.forEach((item) => {
-      if (item.natureza !== 'Entrada' || !allowedProjects.has(getProjectKey(item.projeto))) return;
+      if (item.natureza !== 'Entrada' || !allowedProjects.has(getFinancialRevenueProjectIdentity(item).projectKey)) return;
       const status = String(item.status || '').toUpperCase();
       const isRealizado = status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO');
       const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A RECEBER') || status.includes('PREVISTO'));
@@ -463,7 +639,7 @@ export default function Projetos() {
     const revenueItems = baseData;
     revenueItems.forEach((item) => {
       if (item.natureza !== 'Entrada') return;
-      if (!usarCarteiraCompleta && !allowedProjects.has(getProjectKey(item.projeto))) return;
+      if (!usarCarteiraCompleta && !allowedProjects.has(getFinancialRevenueProjectIdentity(item).projectKey)) return;
       const status = String(item.status || '').toUpperCase();
       if (!(status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO'))) return;
       const parts = String(item.data || '').split('/');
@@ -517,7 +693,12 @@ export default function Projetos() {
 
   const selectedProjectMoves = useMemo(() => {
     if (!selectedProject) return [];
-    return data.filter(item => getProjectKey(item.projeto) === selectedProject.projectKey);
+    return data.filter((item) => {
+      const itemProjectKey = item.natureza === 'Entrada' && isProjectRelatedRevenueEntry(item)
+        ? getFinancialRevenueProjectIdentity(item).projectKey
+        : getProjectKey(item.projeto);
+      return itemProjectKey === selectedProject.projectKey;
+    });
   }, [selectedProject, data]);
 
   const selectedProjectReportMoves = useMemo(() => {
