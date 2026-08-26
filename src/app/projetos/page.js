@@ -89,12 +89,14 @@ export default function Projetos() {
 
   const projectCashData = useMemo(() => consolidateFinancialData(data, {
     isProjetosPage: true,
-    incluirRateioAdm: true
+    incluirRateioAdm: true,
+    usarValorCaixa: true
   }), [data]);
 
   const baseData = useMemo(() => consolidateFinancialData(data, {
     isProjetosPage: true,
-    incluirRateioAdm
+    incluirRateioAdm,
+    usarValorCaixa: true
   }), [data, incluirRateioAdm]);
 
   const projetosCruzados = useMemo(() => {
@@ -264,7 +266,7 @@ export default function Projetos() {
       const status = String(item.status || '').toUpperCase();
       const isRealizado = status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO');
       const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A RECEBER') || status.includes('PREVISTO'));
-      const value = Number(item.valor) || 0;
+      const value = isRealizado ? (Number(item.valorCaixa ?? item.valor) || 0) : (Number(item.valor) || 0);
 
       let ts = 0;
       if (item.dataTimestamp) ts = Number(item.dataTimestamp) || 0;
@@ -326,7 +328,7 @@ export default function Projetos() {
 
   const dreStats = useMemo(() => {
     const allowedProjects = new Set(filteredProjetos.map((p) => p.projectKey));
-    const receitaConsolidada = consolidateFinancialData(data, { isProjetosPage: true, incluirRateioAdm });
+    const receitaConsolidada = consolidateFinancialData(data, { isProjetosPage: true, incluirRateioAdm, usarValorCaixa: true });
 
     let recReceita = 0;
     let recAReceber = 0;
@@ -518,7 +520,7 @@ export default function Projetos() {
       const originalRows = item.linhasOriginais?.length ? item.linhasOriginais : [item];
       const revenue = originalRows.reduce((sum, row) => {
         const code = String(row.contaCodigo || '').replace(/\D/g, '');
-        return (code === '1010101' || code === '1010107') ? sum + (Number(row.valor) || 0) : sum;
+        return (code === '1010101' || code === '1010107') ? sum + (Number(row.valorCaixa ?? row.valor) || 0) : sum;
       }, 0);
       rows[month].Receitas += revenue;
     });

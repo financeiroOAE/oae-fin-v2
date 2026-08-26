@@ -61,6 +61,16 @@ function snapshotNeedsProjectRepair(payload) {
   });
 }
 
+function snapshotNeedsCashRepair(payload) {
+  if (!Array.isArray(payload?.data)) return false;
+  return payload.data.some((item) => {
+    if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
+    if (!String(item?.status || '').toUpperCase().includes('REALIZADO')) return false;
+    if (!String(item?.data || '').endsWith('/2026')) return false;
+    return item?.valorCaixa === undefined || item?.valorCaixa === null || !Number.isFinite(Number(item.valorCaixa));
+  });
+}
+
 export async function GET(request) {
   const session = await getSession();
   if (!session?.user?.username) {
@@ -73,11 +83,13 @@ export async function GET(request) {
 
   try {
     snapshot = await readCurrentSnapshot();
-    const requiresRepair = snapshotNeedsProjectRepair(snapshot?.payload);
+    const requiresProjectRepair = snapshotNeedsProjectRepair(snapshot?.payload);
+    const requiresCashRepair = snapshotNeedsCashRepair(snapshot?.payload);
+    const requiresRepair = requiresProjectRepair || requiresCashRepair;
     const scheduledDue = !force && !requiresRepair && isDailySyncDue(snapshot?.updatedAt);
 
     if (force || requiresRepair || scheduledDue) {
-      const triggeredBy = force ? username : requiresRepair ? 'AUTO_REPAIR_PROJECTS' : 'AUTO_16:30';
+      const triggeredBy = force ? username : requiresCashRepair ? 'AUTO_REPAIR_CASH' : requiresProjectRepair ? 'AUTO_REPAIR_PROJECTS' : 'AUTO_16:30';
 
       try {
         const payload = await refreshFinancialSnapshot(triggeredBy);

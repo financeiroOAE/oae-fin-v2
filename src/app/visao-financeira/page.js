@@ -96,7 +96,8 @@ export default function VisaoFinanceira() {
   const baseData = useMemo(() => {
     return consolidateFinancialData(rawBaseData, {
       filterProjetos,
-      isProjetosPage: false
+      isProjetosPage: false,
+      usarValorCaixa: true
     });
   }, [rawBaseData, filterProjetos]);
 
