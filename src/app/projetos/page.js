@@ -876,7 +876,13 @@ export default function Projetos() {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)" /> Recebido no período</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+            <ArrowDownCircle size={14} color="var(--success)" /> Recebido no período
+            <InfoTooltip
+              title="Receita Líquida Recebida"
+              content={`Receita líquida recebida: ${formatCurrency(totalRecebido)}. É o valor que efetivamente entrou no caixa no período selecionado.`}
+            />
+          </p>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(totalRecebido)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(16,185,129,0.4)' }}>
@@ -918,7 +924,13 @@ export default function Projetos() {
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '120px' }}>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Receita Realizada de Projetos</p>
+              <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                Receita Realizada de Projetos
+                <InfoTooltip
+                  title="Receita Líquida Realizada"
+                  content={`Receita líquida realizada: ${formatCurrency(dreStats.receita)}. É o valor que efetivamente entrou no caixa e compõe este quadro.`}
+                />
+              </p>
               <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--success)' }}>{formatCurrency(dreStats.receita)}</p>
             </div>
             <div style={{ flex: 1, minWidth: '120px' }}>
@@ -995,7 +1007,7 @@ export default function Projetos() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ReportAdder sectionKey="projetos:evolucao-anual" title="Evolução Financeira dos Projetos — 2026" componentName="Gráfico de Evolução Financeira" page="Projetos" type="CHART" data={monthlyFinancialData} filters={reportFilters} captureId="report-projetos-evolucao-anual" presetTags={["project-executive"]} />
-            <InfoTooltip title="Evolução Financeira 2026" content="Receitas, custos e despesas realizados por mês em 2026." />
+            <InfoTooltip title="Evolução Financeira 2026" content={`Receita líquida realizada: ${formatCurrency(dreStats.receita)}. O gráfico compara receitas, custos e despesas realizados por mês em 2026.`} />
           </div>
         </div>
         <ProjectMonthlyFinancialLineChart data={monthlyFinancialData} />
@@ -1025,7 +1037,7 @@ export default function Projetos() {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <ReportAdder sectionKey="projetos:top-entradas" title="5 Maiores Fontes de Receita — Projetos" componentName="Gráfico Maiores Entradas" page="Projetos" type="TABLE" data={topEntradasData} filters={reportFilters} presetTags={["project-executive"]} />
-              <InfoTooltip title="5 Maiores Fontes de Receita — Projetos" content="Cinco projetos com maior receita recebida no período selecionado." />
+              <InfoTooltip title="5 Maiores Fontes de Receita — Projetos" content={`Cinco projetos com maior receita líquida recebida no período. Receita líquida total: ${formatCurrency(dreStats.receita)}.`} />
             </div>
           </div>
           <RankingBarChart data={topEntradasData} dataKey="Valor" color="var(--success)" emptyMessage="Sem recebimentos realizados em 2026." />
