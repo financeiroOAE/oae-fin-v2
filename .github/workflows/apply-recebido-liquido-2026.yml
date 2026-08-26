@@ -1,0 +1,35 @@
+name: Apply recebido liquido 2026
+
+on:
+  push:
+    branches:
+      - feat-recebido-liquido-2026
+    paths:
+      - .github/workflows/apply-recebido-liquido-2026.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feat-recebido-liquido-2026
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply changes
+        run: node scripts/apply-recebido-liquido-2026.js
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/googleSheets.js src/lib/financialSync.js src/lib/consolidation.js src/app/visao-financeira/page.js src/app/fluxo-caixa/page.js src/app/projetos/page.js src/app/api/sync/route.js
+          git diff --cached --quiet && exit 0
+          git commit -m "feat: usar recebido liquido nas visoes de caixa"
+          git push origin HEAD:feat-recebido-liquido-2026
