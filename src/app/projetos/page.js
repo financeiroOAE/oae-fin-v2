@@ -928,7 +928,7 @@ export default function Projetos() {
                 Receita Realizada de Projetos
                 <InfoTooltip
                   title="Receita Líquida Realizada"
-                  content={`Receita líquida realizada: ${formatCurrency(dreStats.receita)}. É o valor que efetivamente entrou no caixa e compõe este quadro.`}
+                  content={`Receita líquida realizada: ${formatCurrency(totalRecebido)}. É o valor efetivamente creditado, após descontos e retenções identificados na relação de recebimentos.`}
                 />
               </p>
               <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--success)' }}>{formatCurrency(dreStats.receita)}</p>
@@ -1007,7 +1007,7 @@ export default function Projetos() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ReportAdder sectionKey="projetos:evolucao-anual" title="Evolução Financeira dos Projetos — 2026" componentName="Gráfico de Evolução Financeira" page="Projetos" type="CHART" data={monthlyFinancialData} filters={reportFilters} captureId="report-projetos-evolucao-anual" presetTags={["project-executive"]} />
-            <InfoTooltip title="Evolução Financeira 2026" content={`Receita líquida realizada: ${formatCurrency(dreStats.receita)}. O gráfico compara receitas, custos e despesas realizados por mês em 2026.`} />
+            <InfoTooltip title="Evolução Financeira 2026" content={`Receita líquida recebida: ${formatCurrency(totalRecebido)}. O gráfico compara receitas, custos e despesas realizados por mês em 2026.`} />
           </div>
         </div>
         <ProjectMonthlyFinancialLineChart data={monthlyFinancialData} />
@@ -1037,7 +1037,7 @@ export default function Projetos() {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <ReportAdder sectionKey="projetos:top-entradas" title="5 Maiores Fontes de Receita — Projetos" componentName="Gráfico Maiores Entradas" page="Projetos" type="TABLE" data={topEntradasData} filters={reportFilters} presetTags={["project-executive"]} />
-              <InfoTooltip title="5 Maiores Fontes de Receita — Projetos" content={`Cinco projetos com maior receita líquida recebida no período. Receita líquida total: ${formatCurrency(dreStats.receita)}.`} />
+              <InfoTooltip title="5 Maiores Fontes de Receita — Projetos" content={`Cinco projetos com maior receita líquida recebida no período. Receita líquida total: ${formatCurrency(totalRecebido)}.`} />
             </div>
           </div>
           <RankingBarChart data={topEntradasData} dataKey="Valor" color="var(--success)" emptyMessage="Sem recebimentos realizados em 2026." />
