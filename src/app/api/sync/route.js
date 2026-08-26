@@ -9,6 +9,7 @@ import {
 const TIME_ZONE = 'America/Sao_Paulo';
 const SCHEDULE_HOUR = 16;
 const SCHEDULE_MINUTE = 30;
+const CASH_LOGIC_VERSION = 4;
 
 function getZonedParts(date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -63,16 +64,17 @@ function snapshotNeedsProjectRepair(payload) {
 
 function snapshotNeedsCashRepair(payload) {
   if (!Array.isArray(payload?.data)) return false;
-  if (payload.cashLogicVersion !== 3) return true;
-  if (!(Number(payload.recebimentosLiquidosStats?.sourceNet) > 0)) return true;
+  if (payload.cashLogicVersion !== CASH_LOGIC_VERSION) return true;
+  if (payload.recebimentosLiquidosStats?.source !== 'CR_GERAL_K_VALOR') return true;
+
   return payload.data.some((item) => {
     if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
-    if (!String(item?.status || '').toUpperCase().includes('REALIZADO')) return false;
-    if (!String(item?.data || '').endsWith('/2026')) return false;
     return item?.valorCaixa === undefined
       || item?.valorCaixa === null
       || !Number.isFinite(Number(item.valorCaixa))
-      || item?.recebimentoLiquidoFonte === 'CR_GERAL';
+      || item?.valorFaturamento === undefined
+      || item?.valorFaturamento === null
+      || item?.recebimentoLiquidoFonte !== 'CR_GERAL_K_VALOR';
   });
 }
 
@@ -94,7 +96,7 @@ export async function GET(request) {
     const scheduledDue = !force && !requiresRepair && isDailySyncDue(snapshot?.updatedAt);
 
     if (force || requiresRepair || scheduledDue) {
-      const triggeredBy = force ? username : requiresCashRepair ? 'AUTO_REPAIR_CASH' : requiresProjectRepair ? 'AUTO_REPAIR_PROJECTS' : 'AUTO_16:30';
+      const triggeredBy = force ? username : requiresCashRepair ? 'AUTO_REPAIR_CASH_V4' : requiresProjectRepair ? 'AUTO_REPAIR_PROJECTS' : 'AUTO_16:30';
 
       try {
         const payload = await refreshFinancialSnapshot(triggeredBy);
