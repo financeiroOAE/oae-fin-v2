@@ -43,40 +43,39 @@
 
 .card-help-wrap {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 9px;
+  right: 9px;
   z-index: 10000;
   display: inline-flex;
   align-items: center;
 }
 
 .card-help-icon {
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
   padding: 0;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: help;
   font: inherit;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
   line-height: 1;
-  opacity: 0.62;
-  transition: all 0.16s ease;
+  opacity: 0.28;
+  transition: opacity 0.15s ease;
 }
 
 .card-help-icon:hover,
 .card-help-icon:focus-visible {
-  opacity: 1;
+  opacity: 0.62;
   color: var(--text-main);
-  border-color: var(--border-color);
-  background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+  background: transparent;
   outline: none;
 }
 
@@ -86,21 +85,21 @@
   bottom: calc(100% + 8px);
   top: auto;
   z-index: 2147480000;
-  width: min(300px, calc(100vw - 40px));
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--border-color);
-  border-radius: 9px;
+  width: min(250px, calc(100vw - 40px));
+  padding: 0.48rem 0.58rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 6px;
   background: color-mix(in srgb, var(--bg-card) 98%, transparent);
-  box-shadow: 0 16px 36px rgba(0,0,0,0.42);
-  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.26);
+  backdrop-filter: blur(10px);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 400;
-  line-height: 1.45;
+  line-height: 1.4;
   text-transform: none;
   letter-spacing: normal;
   white-space: normal;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .card-help-popover-portal {
@@ -117,22 +116,18 @@
 .card-help-popover strong {
   display: block;
   color: var(--text-main);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   margin-bottom: 0.18rem;
 }
 
 .card-help-popover p {
-  margin: 0 0 0.65rem;
+  margin: 0;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 400;
-  line-height: 1.45;
+  line-height: 1.4;
   text-transform: none;
-}
-
-.card-help-popover p:last-child {
-  margin-bottom: 0;
 }
 
 .finance-responsive-grid {
@@ -188,8 +183,6 @@
   }
 }
 
-
-/* Cards financeiros não criam nova camada ao passar o mouse; dropdowns e tooltips permanecem acima. */
 .card:hover {
   transform: none;
 }
