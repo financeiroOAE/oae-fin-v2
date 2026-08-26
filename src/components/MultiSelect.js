@@ -12,6 +12,14 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
   const menuRef = useRef(null);
   const actualValue = value || selected || [];
 
+  // Em todo o sistema, array vazio significa "sem restrição" = todas as opções.
+  // Isso é importante porque a lista visível do filtro pode ser menor que a base
+  // financeira completa. Selecionar todas não deve transformar "Todos" numa lista
+  // explícita e acidentalmente excluir valores que não aparecem no seletor.
+  const implicitAll = actualValue.length === 0;
+  const explicitAll = options.length > 0 && options.every((opt) => actualValue.includes(opt));
+  const allSelected = implicitAll || explicitAll;
+
   const updateMenuPosition = useCallback(() => {
     if (!ref.current || typeof window === 'undefined') return;
     const rect = ref.current.getBoundingClientRect();
@@ -64,15 +72,21 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
   }, [open, updateMenuPosition]);
 
   const toggle = (opt) => {
+    if (implicitAll) {
+      // Usuário partiu de "Todas" e desmarcou uma opção: passamos a representar
+      // explicitamente todas as demais opções.
+      onChange(options.filter((valueOption) => valueOption !== opt));
+      return;
+    }
     if (actualValue.includes(opt)) onChange(actualValue.filter((v) => v !== opt));
     else onChange([...actualValue, opt]);
   };
 
-  const allSelected = options.length > 0 && options.every((opt) => actualValue.includes(opt));
-
-  const toggleAll = () => {
-    if (allSelected) onChange([]);
-    else onChange([...options]);
+  const selectAll = () => {
+    // "Todas" é representado por [] em todas as páginas. Assim o resultado é
+    // exatamente o mesmo de não aplicar o filtro.
+    onChange([]);
+    setSearchTerm('');
   };
 
   const clear = (event) => {
@@ -83,6 +97,8 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
   const filteredOptions = options.filter((opt) =>
     String(opt).toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const isOptionSelected = (opt) => implicitAll || actualValue.includes(opt);
 
   const checkboxStyle = (checked) => ({
     width: '14px',
@@ -137,7 +153,7 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
         <div
           role="option"
           aria-selected={allSelected}
-          onClick={toggleAll}
+          onClick={selectAll}
           style={{
             padding: '0.55rem 0.75rem',
             borderBottom: '1px solid var(--border-color)',
@@ -155,7 +171,7 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
           <div style={checkboxStyle(allSelected)}>
             {allSelected && <span style={{ color: '#fff', fontSize: '9px', fontWeight: '900' }}>✓</span>}
           </div>
-          <span>{allSelected ? 'Desmarcar todas as opções' : 'Selecionar todas as opções'}</span>
+          <span>{allSelected ? 'Todas as opções' : 'Selecionar todas as opções'}</span>
         </div>
       )}
 
@@ -164,30 +180,33 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
           <div style={{ padding: '0.75rem', fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center' }}>
             Nenhum resultado encontrado
           </div>
-        ) : filteredOptions.map((opt) => (
-          <div
-            key={opt}
-            role="option"
-            aria-selected={actualValue.includes(opt)}
-            onClick={() => toggle(opt)}
-            style={{
-              padding: '0.55rem 0.75rem',
-              fontSize: '13px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '0.5rem',
-              color: actualValue.includes(opt) ? 'var(--primary)' : 'var(--text-main)',
-              background: actualValue.includes(opt) ? 'rgba(56,189,248,0.08)' : 'transparent',
-              lineHeight: 1.35,
-            }}
-          >
-            <div style={checkboxStyle(actualValue.includes(opt))}>
-              {actualValue.includes(opt) && <span style={{ color: '#fff', fontSize: '9px', fontWeight: '900' }}>✓</span>}
+        ) : filteredOptions.map((opt) => {
+          const checked = isOptionSelected(opt);
+          return (
+            <div
+              key={opt}
+              role="option"
+              aria-selected={checked}
+              onClick={() => toggle(opt)}
+              style={{
+                padding: '0.55rem 0.75rem',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.5rem',
+                color: checked ? 'var(--primary)' : 'var(--text-main)',
+                background: checked ? 'rgba(56,189,248,0.08)' : 'transparent',
+                lineHeight: 1.35,
+              }}
+            >
+              <div style={checkboxStyle(checked)}>
+                {checked && <span style={{ color: '#fff', fontSize: '9px', fontWeight: '900' }}>✓</span>}
+              </div>
+              <span title={opt} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: 0 }}>{opt}</span>
             </div>
-            <span title={opt} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: 0 }}>{opt}</span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>,
     document.body
@@ -217,11 +236,11 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
             minWidth: 0,
           }}
         >
-          {actualValue.length === 0 ? (
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary)', userSelect: 'none', flex: 1, minWidth: 0 }}>{placeholder || 'Todos'}</span>
-          ) : allSelected ? (
+          {implicitAll ? (
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)', userSelect: 'none', flex: 1, minWidth: 0 }}>Todas as opções</span>
+          ) : explicitAll ? (
             <span style={{ fontSize: '12px', color: 'var(--text-main)', fontWeight: '600', flex: 1, minWidth: 0, lineHeight: 1.3 }}>
-              Todas as opções selecionadas
+              Todas as opções
             </span>
           ) : actualValue.length > 1 ? (
             <span style={{ fontSize: '12px', color: 'var(--text-main)', fontWeight: '600', flex: 1, minWidth: 0, lineHeight: 1.3 }}>
@@ -246,8 +265,8 @@ export default function MultiSelect({ label, options = [], value, selected, onCh
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginLeft: 'auto' }}>
-            {actualValue.length > 0 && (
-              <span onClick={clear} style={{ color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            {!implicitAll && (
+              <span onClick={clear} title="Usar todas as opções" style={{ color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                 <X size={12} />
               </span>
             )}

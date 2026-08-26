@@ -4,6 +4,17 @@ import { useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
+function compactProjectName(value) {
+  const text = String(value || '').trim();
+  if (!text) return '-';
+  const parts = text.split(/[-_\s]+/).filter(Boolean);
+  const code = parts.shift() || text;
+  const firstNameToken = parts.find((part) => /[A-Za-zÀ-ÿ]/.test(part));
+  if (!firstNameToken) return code;
+  const shortName = firstNameToken.slice(0, 5).toUpperCase();
+  return `${code}-${shortName}`;
+}
+
 export default function ABCClassDonut({ data }) {
   const [expandedClass, setExpandedClass] = useState(null);
 
@@ -47,8 +58,8 @@ export default function ABCClassDonut({ data }) {
 
   return (
     <div style={{ width: '100%', minWidth: 0, maxWidth: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '1rem', flexWrap: 'wrap', minWidth: 0 }}>
-        <div style={{ flex: '0 0 180px', height: '180px', maxWidth: '100%', margin: '0 auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 190px) minmax(0, 1fr)', alignItems: 'center', width: '100%', gap: '1rem', minWidth: 0 }}>
+        <div style={{ width: '100%', height: '180px', maxWidth: '190px', margin: '0 auto' }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -68,7 +79,7 @@ export default function ABCClassDonut({ data }) {
           </ResponsiveContainer>
         </div>
 
-        <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
           {data.map((item) => {
             const perc = total > 0 ? ((item.value / total) * 100).toFixed(1) : 0;
             const isExpanded = expandedClass === item.name;
@@ -81,32 +92,32 @@ export default function ABCClassDonut({ data }) {
                   width: '100%',
                   minWidth: 0,
                   display: 'grid',
-                  gridTemplateColumns: '12px minmax(0, 1fr) auto',
+                  gridTemplateColumns: '10px minmax(0, 1fr) auto',
                   alignItems: 'center',
-                  gap: '0.75rem',
-                  background: isExpanded ? 'rgba(255,255,255,0.04)' : 'transparent',
+                  gap: '0.55rem',
+                  background: isExpanded ? 'rgba(255,255,255,0.035)' : 'transparent',
                   border: `1px solid ${isExpanded ? item.color : 'transparent'}`,
-                  borderRadius: '8px',
-                  padding: '0.6rem 0.75rem',
+                  borderRadius: '7px',
+                  padding: '0.45rem 0.55rem',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   textAlign: 'left',
                 }}
               >
-                <span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: item.color, display: 'block' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: item.color, display: 'block' }} />
                 <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '2px', minWidth: 0 }}>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{item.name}</span>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: item.color, whiteSpace: 'nowrap' }}>{perc}%</span>
+                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1px', minWidth: 0 }}>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{item.name}</span>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: item.color, whiteSpace: 'nowrap' }}>{perc}%</span>
                   </span>
-                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', fontSize: '11px', color: 'var(--text-secondary)', minWidth: 0 }}>
+                  <span style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '10px', color: 'var(--text-secondary)', minWidth: 0 }}>
                     <span style={{ whiteSpace: 'nowrap' }}>{item.count} projeto{item.count !== 1 ? 's' : ''}</span>
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatCurrency(item.value)}</span>
                   </span>
                 </span>
                 {isExpanded
-                  ? <ChevronUp size={14} color="var(--text-secondary)" />
-                  : <ChevronDown size={14} color="var(--text-secondary)" />
+                  ? <ChevronUp size={13} color="var(--text-secondary)" />
+                  : <ChevronDown size={13} color="var(--text-secondary)" />
                 }
               </button>
             );
@@ -116,7 +127,7 @@ export default function ABCClassDonut({ data }) {
 
       {expandedItem?.projects?.length > 0 && (
         <div style={{
-          marginTop: '0.9rem',
+          marginTop: '0.75rem',
           width: '100%',
           maxWidth: '100%',
           minWidth: 0,
@@ -126,26 +137,24 @@ export default function ABCClassDonut({ data }) {
           animation: 'fadeIn 0.2s ease',
         }}>
           <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
-            <table style={{ width: '100%', minWidth: '620px', borderCollapse: 'collapse', fontSize: '11px' }}>
+            <table style={{ width: '100%', minWidth: '0', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '10px' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '0.5rem 0.65rem', textAlign: 'left', fontWeight: '600', width: '42px' }}>#</th>
-                  <th style={{ padding: '0.5rem 0.65rem', textAlign: 'left', fontWeight: '600' }}>Projeto</th>
-                  <th style={{ padding: '0.5rem 0.65rem', textAlign: 'right', fontWeight: '600', whiteSpace: 'nowrap' }}>Contrato</th>
-                  <th style={{ padding: '0.5rem 0.65rem', textAlign: 'right', fontWeight: '600', whiteSpace: 'nowrap' }}>% Total</th>
-                  <th style={{ padding: '0.5rem 0.65rem', textAlign: 'right', fontWeight: '600', whiteSpace: 'nowrap' }}>% Faturado</th>
+                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'left', fontWeight: '600', width: '26%' }}>Projeto</th>
+                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'right', fontWeight: '600', width: '34%' }}>Contrato</th>
+                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'right', fontWeight: '600', width: '20%' }}>% Total</th>
+                  <th style={{ padding: '0.45rem 0.45rem', textAlign: 'right', fontWeight: '600', width: '20%' }}>% Fat.</th>
                 </tr>
               </thead>
               <tbody>
-                {expandedItem.projects.map((p, i) => (
-                  <tr key={p.nome} style={{ borderTop: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.55rem 0.65rem', color: 'var(--text-secondary)' }}>{i + 1}</td>
-                    <td style={{ padding: '0.55rem 0.65rem', color: 'var(--text-main)', fontWeight: '500', overflowWrap: 'anywhere' }}>{p.nome}</td>
-                    <td style={{ padding: '0.55rem 0.65rem', textAlign: 'right', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{formatCurrency(p.contratado)}</td>
-                    <td style={{ padding: '0.55rem 0.65rem', textAlign: 'right', color: expandedItem.color, whiteSpace: 'nowrap' }}>
+                {expandedItem.projects.map((p) => (
+                  <tr key={p.nome} style={{ borderTop: '1px solid var(--border-color)' }} title={p.nome}>
+                    <td style={{ padding: '0.48rem 0.45rem', color: 'var(--text-main)', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{compactProjectName(p.nome)}</td>
+                    <td style={{ padding: '0.48rem 0.45rem', textAlign: 'right', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatCurrency(p.contratado)}</td>
+                    <td style={{ padding: '0.48rem 0.45rem', textAlign: 'right', color: expandedItem.color, whiteSpace: 'nowrap' }}>
                       {total > 0 ? ((p.contratado / total) * 100).toFixed(1) : 0}%
                     </td>
-                    <td style={{ padding: '0.55rem 0.65rem', textAlign: 'right', color: 'var(--success)', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '0.48rem 0.45rem', textAlign: 'right', color: 'var(--success)', whiteSpace: 'nowrap' }}>
                       {p.contratado > 0 ? ((p.faturado / p.contratado) * 100).toFixed(1) : 0}%
                     </td>
                   </tr>
@@ -155,6 +164,14 @@ export default function ABCClassDonut({ data }) {
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        @media (max-width: 620px) {
+          div:first-child > div:first-child {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </div>
   );
 }
