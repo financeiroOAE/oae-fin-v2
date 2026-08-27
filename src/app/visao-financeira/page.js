@@ -418,12 +418,26 @@ export default function VisaoFinanceira() {
   }), [realizedFilteredData, forecastFilteredData]);
 
   const projectFinancialOverview = useMemo(() => {
-    const receitaObra = projectRevenueStatus.realizado.obra;
-    const receitaAdm = projectRevenueStatus.realizado.adm;
-    const receita = projectRevenueStatus.realizado.total;
+    // Esta visao e exclusivamente de OBRAS: usa somente receita direta alocada
+    // a projetos ativos. A parcela administrativa (1010107) nao entra neste grafico.
+    // Para realizados, valorDireto ja carrega a regra de caixa da CR_GERAL coluna K.
+    const receitaObra = realizedFilteredData
+      .filter((item) => item.natureza === 'Entrada' && activeProjectKeys.has(getProjectKey(item.projeto)))
+      .reduce((sum, item) => {
+        if (item?.valorDireto !== undefined && item?.valorDireto !== null) {
+          return sum + (Number(item.valorDireto) || 0);
+        }
+        const classification = classifyFinancialEntry(item);
+        return classification.type === 'receita_projeto'
+          ? sum + (Number(item.valor) || 0)
+          : sum;
+      }, 0);
+
+    const receitaAdm = 0;
+    const receita = receitaObra;
     const saidasProjeto = realizedFilteredData
       .filter((item) => item.natureza === 'Saída')
-      .filter((item) => hasAllocatedProject(item));
+      .filter((item) => activeProjectKeys.has(getProjectKey(item.projeto)));
     const tributos = saidasProjeto
       .filter((item) => isGeneralTax(item))
       .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0);
@@ -433,7 +447,7 @@ export default function VisaoFinanceira() {
     const resultado = receita - saidas - tributos;
     const margem = receita > 0 ? (resultado / receita) * 100 : 0;
     return { receita, receitaObra, receitaAdm, saidas, tributos, resultado, margem };
-  }, [projectRevenueStatus, realizedFilteredData, filterProjetos]);
+  }, [realizedFilteredData, activeProjectKeys]);
 
   const abcDonutData = useMemo(() => {
     const aggregated = new Map();
@@ -809,11 +823,11 @@ export default function VisaoFinanceira() {
         {/* ROW 4: Visão Financeira dos Projetos e Despesas */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1rem' }}>
           <div id="report-visao-projetos-financeiro" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <ReportAdder sectionKey="visao:projetos-financeiro" title="Visão Financeira Geral dos Projetos" componentName="Resultado e Margem dos Projetos" page="Visão Financeira" type="CHART" data={[{ Recebido: projectFinancialOverview.receita, "Custos + Despesas": projectFinancialOverview.saidas, Tributos: projectFinancialOverview.tributos, Resultado: projectFinancialOverview.resultado, Margem: projectFinancialOverview.margem }]} filters={reportFilters} captureId="report-visao-projetos-financeiro" presetTags={["executive-financial", "project-executive"]} style={{ alignSelf: 'flex-end' }} />
+            <ReportAdder sectionKey="visao:projetos-financeiro" title="Visão Financeira Geral dos Projetos" componentName="Resultado e Margem dos Projetos" page="Visão Financeira" type="CHART" data={[{ "Recebido Líquido": projectFinancialOverview.receita, "Custos + Despesas": projectFinancialOverview.saidas, Tributos: projectFinancialOverview.tributos, Resultado: projectFinancialOverview.resultado, Margem: projectFinancialOverview.margem }]} filters={reportFilters} captureId="report-visao-projetos-financeiro" presetTags={["executive-financial", "project-executive"]} style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Visão Financeira Geral dos Projetos</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Margem = Resultado ÷ Recebido Líquido × 100. O Resultado corresponde ao Recebido Líquido menos Custos + Despesas e Tributos realizados.</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Margem = Resultado ÷ Recebido Líquido × 100. Somente valores alocados às obras entram neste gráfico; Administração não é considerada. O Resultado corresponde ao Recebido Líquido menos Custos + Despesas e Tributos realizados.</p>
             <div className="finance-kpi-grid" style={{ marginBottom: '0.75rem' }}>
-              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Recebido</span><strong style={{display:'block',fontSize:'14px',color:'var(--success)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.receita)}</strong></div>
+              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Recebido Líquido</span><strong style={{display:'block',fontSize:'14px',color:'var(--success)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.receita)}</strong></div>
               <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Custos + Despesas</span><strong style={{display:'block',fontSize:'14px',color:'var(--danger)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.saidas)}</strong></div>
               <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Tributos</span><strong style={{display:'block',fontSize:'14px',color:'var(--primary)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.tributos)}</strong></div>
               <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Resultado</span><strong style={{display:'block',fontSize:'14px',color:projectFinancialOverview.resultado >= 0 ? 'var(--success)' : 'var(--danger)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.resultado)}</strong></div>

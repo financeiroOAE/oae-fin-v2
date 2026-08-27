@@ -490,6 +490,19 @@ export default function Projetos() {
   
   const totalRecebidoAdmGlobal = filteredProjetos.reduce((acc, p) => acc + (p.receitaAdm || 0), 0);
 
+  // Tributos de projetos devem considerar somente centros de custo que existem
+  // como obras/projetos ativos na carteira. Administrativo, buckets genericos e
+  // rotulos financeiros sem obra cadastrada ficam fora do total de tributos.
+  const activeProjectTaxKeys = useMemo(() => new Set(
+    projetosBrutos
+      .filter((p) => {
+        const obra = String(p.OBRA || '').trim();
+        return obra && !obra.toUpperCase().includes('ADMINISTRATIVO') && isProjectOngoing(p);
+      })
+      .map((p) => getProjectKey(p.ID || p.OBRA))
+      .filter(Boolean)
+  ), [projetosBrutos]);
+
   function isCDP(planoFinanceiro) {
     const raw = String(planoFinanceiro || '');
     const dashIdx = raw.indexOf(' - ');
@@ -549,6 +562,9 @@ export default function Projetos() {
       const isPendingDre = !dreInfo.trim() || dreInfo.includes('PENDENTE DE CLASSIFICAÇÃO');
 
       if (isProjectTax(item)) {
+        // Imposto administrativo ou associado a centro que nao e uma obra ativa
+        // nao pertence a visao financeira dos projetos.
+        if (!activeProjectTaxKeys.has(getProjectKey(item.projeto))) return;
         if (isRealizado) tributos += valor;
         else tributosAPagar += valor;
       } else if (isPendingDre) {
@@ -582,7 +598,7 @@ export default function Projetos() {
       naoClassificado: nc,
       naoClassificados
     };
-  }, [data, filteredProjetos, realizadoIni, realizadoFim, incluirRateioAdm, usarCarteiraCompleta, receitaLiquidaProjetos, totalAReceber]);
+  }, [data, filteredProjetos, realizadoIni, realizadoFim, incluirRateioAdm, usarCarteiraCompleta, receitaLiquidaProjetos, totalAReceber, activeProjectTaxKeys]);
 
   const taxesData = useMemo(() => {
     const taxesMap = {};
@@ -592,6 +608,7 @@ export default function Projetos() {
     data.forEach(item => {
       if (item.natureza !== 'Saída') return;
       if (!allowedProjects.has(getProjectKey(item.projeto))) return;
+      if (!activeProjectTaxKeys.has(getProjectKey(item.projeto))) return;
 
       let ts = 0;
       if (item.data) {
@@ -611,13 +628,14 @@ export default function Projetos() {
 
     const arr = Object.entries(taxesMap).map(([name, Valor]) => ({ name, Valor })).sort((a, b) => b.Valor - a.Valor);
     return { list: arr, total: totalTaxes };
-  }, [data, filteredProjetos, realizadoIni, realizadoFim]);
+  }, [data, filteredProjetos, realizadoIni, realizadoFim, activeProjectTaxKeys]);
 
   // Uma unica fonte de tributos em Projetos: realizados, no periodo e alocados aos projetos filtrados.
   const tributosProjetos = taxesData.total;
   const margemFinanceira = receitaLiquidaProjetos > 0 ? ((receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - tributosProjetos) / receitaLiquidaProjetos) * 100 : null;
   const resultadoGerencial = receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - tributosProjetos;
-  const taxPercentage = receitaLiquidaProjetos > 0 ? (tributosProjetos / receitaLiquidaProjetos) * 100 : 0;
+  // A aliquota efetiva de tributos e calculada sobre o FATURAMENTO, nao sobre o caixa recebido.
+  const taxPercentage = totalFaturado > 0 ? (tributosProjetos / totalFaturado) * 100 : 0;
 
   const abcDonutData = useMemo(() => {
     const projects = [...filteredProjetos].filter(p => p.contratado > 0).sort((a, b) => b.contratado - a.contratado);
@@ -1188,10 +1206,10 @@ export default function Projetos() {
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--primary)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
             <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><Percent size={14} color="var(--primary)" /> Tributos sobre Receita e Lucro</p>
-            <ReportAdder sectionKey="projetos:impostos" title="Tributos sobre Receita e Lucro" componentName="Resumo de Impostos" page="Projetos" type="SUMMARY" data={[{ "Total de Impostos": taxesData.total, "% sobre Recebido Líquido": taxPercentage }]} filters={reportFilters} />
+            <ReportAdder sectionKey="projetos:impostos" title="Tributos sobre Receita e Lucro" componentName="Resumo de Impostos" page="Projetos" type="SUMMARY" data={[{ "Total de Impostos": taxesData.total, "% sobre Faturamento": taxPercentage }]} filters={reportFilters} />
           </div>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(taxesData.total)}</p>
-          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}><strong style={{ color: 'var(--primary)' }}>{taxPercentage.toFixed(2).replace('.', ',')}%</strong> do Recebido Líquido</p>
+          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}><strong style={{ color: 'var(--primary)' }}>{taxPercentage.toFixed(2).replace('.', ',')}%</strong> do Faturamento</p>
         </div>
       </div>
 
@@ -1352,7 +1370,7 @@ export default function Projetos() {
             <div>
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Tributos sobre Receita e Lucro</h2>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Total de Tributos: <strong style={{color:'var(--text-main)'}}>{formatCurrency(taxesData.total)}</strong> ({taxPercentage.toFixed(2).replace('.', ',')}% sobre o Recebido Líquido)
+                Total de Tributos: <strong style={{color:'var(--text-main)'}}>{formatCurrency(taxesData.total)}</strong> ({taxPercentage.toFixed(2).replace('.', ',')}% sobre o Faturamento)
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
