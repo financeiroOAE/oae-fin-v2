@@ -399,7 +399,8 @@ export default function Projetos() {
     });
   }, [projetosCruzados, filterProjetos, filterEmpresas, filterTipos, colFilterProjeto, colFilterEmpresa, colFilterMinFaturadoPerc]);
 
-  const listaProjetos = Array.from(new Set([...projetosCruzados.map(p => p.nome), 'ADMINISTRAÇÃO'])).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  // Regra oficial dos filtros de Projetos: exibir os nomes da relação PROJETOS_2026 / centro de custo, sem códigos financeiros P.xxx e sem duplicidade.
+  const listaProjetos = getActiveProjectNames(projetosBrutos, true);
   const listaEmpresas = Array.from(new Set(projetosCruzados.flatMap(p => p.empresas))).sort();
   const listaTipos = Array.from(new Set(projetosCruzados.flatMap(p => p.tipos))).sort();
 
@@ -1199,8 +1200,8 @@ export default function Projetos() {
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Faturamento, custos, despesas e tributos em 2026</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <ReportAdder sectionKey="projetos:composicao" title="Composição Financeira" componentName="Composição Financeira - Projetos" page="Projetos" type="SUMMARY" data={[{ "Faturado em 2026": totalFaturado2026, "Receita Líquida Realizada": receitaLiquidaProjetos, "Custos Diretos": dreStats.custo, "Despesas": dreStats.despesa, "Tributos": dreStats.tributos, "Não Classificado": dreStats.naoClassificado }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Composição gerencial baseada no faturamento de 2026, mantendo a receita líquida realizada como informação complementar." />
-              <InfoTooltip title="Composição Financeira" content={`Faturado em 2026: ${formatCurrency(totalFaturado2026)}. Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. Custos, despesas e tributos são comparados ao faturamento neste card.`} />
+              <ReportAdder sectionKey="projetos:composicao" title="Composição Financeira" componentName="Composição Financeira - Projetos" page="Projetos" type="SUMMARY" data={[{ "Faturado": totalFaturado2026, "Receita Líquida Realizada": receitaLiquidaProjetos, "Custos Diretos": dreStats.custo, "Despesas": dreStats.despesa, "Tributos": dreStats.tributos, "Não Classificado": dreStats.naoClassificado }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Composição gerencial baseada no faturamento da carteira, mantendo a receita líquida realizada como informação complementar." />
+              <InfoTooltip title="Composição Financeira" content={`Faturado: ${formatCurrency(totalFaturado2026)}. Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. Custos, despesas e tributos são comparados ao faturamento neste card.`} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
@@ -1208,8 +1209,8 @@ export default function Projetos() {
               <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
                 FATURADO 2026
                 <InfoTooltip
-                  title="Faturado em 2026"
-                  content={`Faturado em 2026: ${formatCurrency(totalFaturado2026)}. Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. A receita líquida é o valor efetivamente creditado após descontos e retenções.`}
+                  title="Faturado"
+                  content={`Faturado: ${formatCurrency(totalFaturado2026)}. Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. A receita líquida é o valor efetivamente creditado após descontos e retenções.`}
                 />
               </p>
               <p title={`Receita Líquida: ${formatCurrency(receitaLiquidaProjetos)}`} style={{ fontSize: 'clamp(14px, 1.25vw, 18px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', color: 'var(--success)', cursor: 'help' }}>{formatCurrency(totalFaturado2026)}</p>
