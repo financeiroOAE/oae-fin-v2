@@ -418,11 +418,11 @@ export default function VisaoFinanceira() {
   }), [realizedFilteredData, forecastFilteredData]);
 
   const projectFinancialOverview = useMemo(() => {
-    // Esta visao e exclusivamente de OBRAS: usa somente receita direta alocada
-    // a projetos ativos. A parcela administrativa (1010107) nao entra neste grafico.
+    // Esta visao e exclusivamente de OBRAS: usa somente valores alocados a
+    // centro de custo real. Administracao e buckets genericos ficam fora.
     // Para realizados, valorDireto ja carrega a regra de caixa da CR_GERAL coluna K.
     const receitaObra = realizedFilteredData
-      .filter((item) => item.natureza === 'Entrada' && activeProjectKeys.has(getProjectKey(item.projeto)))
+      .filter((item) => item.natureza === 'Entrada' && hasAllocatedProject(item))
       .reduce((sum, item) => {
         if (item?.valorDireto !== undefined && item?.valorDireto !== null) {
           return sum + (Number(item.valorDireto) || 0);
@@ -437,7 +437,7 @@ export default function VisaoFinanceira() {
     const receita = receitaObra;
     const saidasProjeto = realizedFilteredData
       .filter((item) => item.natureza === 'Saída')
-      .filter((item) => activeProjectKeys.has(getProjectKey(item.projeto)));
+      .filter((item) => hasAllocatedProject(item));
     const tributos = saidasProjeto
       .filter((item) => isGeneralTax(item))
       .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0);
@@ -447,7 +447,7 @@ export default function VisaoFinanceira() {
     const resultado = receita - saidas - tributos;
     const margem = receita > 0 ? (resultado / receita) * 100 : 0;
     return { receita, receitaObra, receitaAdm, saidas, tributos, resultado, margem };
-  }, [realizedFilteredData, activeProjectKeys]);
+  }, [realizedFilteredData]);
 
   const abcDonutData = useMemo(() => {
     const aggregated = new Map();

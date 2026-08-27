@@ -497,18 +497,21 @@ export default function Projetos() {
   
   const totalRecebidoAdmGlobal = filteredProjetos.reduce((acc, p) => acc + (p.receitaAdm || 0), 0);
 
-  // Tributos de projetos devem considerar somente centros de custo que existem
-  // como obras/projetos ativos na carteira. Administrativo, buckets genericos e
-  // rotulos financeiros sem obra cadastrada ficam fora do total de tributos.
-  const activeProjectTaxKeys = useMemo(() => new Set(
-    projetosBrutos
+  // Escopo de impostos dos projetos: qualquer lancamento tributario efetivamente
+  // alocado a uma obra/centro de custo real. Administracao e buckets genericos ficam fora.
+  // Quando ha filtro global de projeto/empresa/tipo, o imposto acompanha esse recorte.
+  const hasGlobalProjectScopeFilter = filterProjetos.length > 0 || filterEmpresas.length > 0 || filterTipos.length > 0;
+  const globalProjectTaxKeys = useMemo(() => new Set(
+    projetosCruzados
       .filter((p) => {
-        const obra = String(p.OBRA || '').trim();
-        return obra && !obra.toUpperCase().includes('ADMINISTRATIVO') && isProjectOngoing(p);
+        if (filterProjetos.length > 0 && !filterProjetos.includes(p.nome)) return false;
+        if (filterEmpresas.length > 0 && !p.empresas.some((empresa) => filterEmpresas.includes(empresa))) return false;
+        if (filterTipos.length > 0 && !p.tipos.some((tipo) => filterTipos.includes(tipo))) return false;
+        return true;
       })
-      .map((p) => getProjectKey(p.ID || p.OBRA))
+      .map((p) => p.projectKey)
       .filter(Boolean)
-  ), [projetosBrutos]);
+  ), [projetosCruzados, filterProjetos, filterEmpresas, filterTipos]);
 
   function isCDP(planoFinanceiro) {
     const raw = String(planoFinanceiro || '');
@@ -548,7 +551,8 @@ export default function Projetos() {
     const naoClassificados = [];
 
     data.forEach((item) => {
-      if (item.natureza !== 'Saída' || !allowedProjects.has(getProjectKey(item.projeto))) return;
+      if (item.natureza !== 'Saída') return;
+      const itemProjectKey = getProjectKey(item.projeto);
       const projetoNome = String(item.projeto || '').toUpperCase();
       if (projetoNome.includes('ADMINISTRA')) return;
 
@@ -569,12 +573,18 @@ export default function Projetos() {
       const isPendingDre = !dreInfo.trim() || dreInfo.includes('PENDENTE DE CLASSIFICAÇÃO');
 
       if (isProjectTax(item)) {
-        // Imposto administrativo ou associado a centro que nao e uma obra ativa
-        // nao pertence a visao financeira dos projetos.
-        if (!activeProjectTaxKeys.has(getProjectKey(item.projeto))) return;
+        const isAllocatedWork = !isGenericFinancialProject(item.projeto);
+        const taxInScope = isAllocatedWork && (!hasGlobalProjectScopeFilter || globalProjectTaxKeys.has(itemProjectKey));
+        if (!taxInScope) return;
         if (isRealizado) tributos += valor;
         else tributosAPagar += valor;
-      } else if (isPendingDre) {
+        return;
+      }
+
+      // Custos e despesas continuam seguindo o conjunto de projetos exibidos.
+      if (!allowedProjects.has(itemProjectKey)) return;
+
+      if (isPendingDre) {
         if (isRealizado) {
           nc += valor;
           naoClassificados.push(item);
@@ -605,7 +615,7 @@ export default function Projetos() {
       naoClassificado: nc,
       naoClassificados
     };
-  }, [data, filteredProjetos, realizadoIni, realizadoFim, incluirRateioAdm, usarCarteiraCompleta, receitaLiquidaProjetos, totalAReceber, activeProjectTaxKeys]);
+  }, [data, filteredProjetos, realizadoIni, realizadoFim, incluirRateioAdm, usarCarteiraCompleta, receitaLiquidaProjetos, totalAReceber, hasGlobalProjectScopeFilter, globalProjectTaxKeys]);
 
   const taxesData = useMemo(() => {
     const taxesMap = {};
@@ -614,8 +624,9 @@ export default function Projetos() {
 
     data.forEach(item => {
       if (item.natureza !== 'Saída') return;
-      if (!allowedProjects.has(getProjectKey(item.projeto))) return;
-      if (!activeProjectTaxKeys.has(getProjectKey(item.projeto))) return;
+      const itemProjectKey = getProjectKey(item.projeto);
+      if (isGenericFinancialProject(item.projeto)) return;
+      if (hasGlobalProjectScopeFilter && !globalProjectTaxKeys.has(itemProjectKey)) return;
 
       let ts = 0;
       if (item.data) {
@@ -635,7 +646,7 @@ export default function Projetos() {
 
     const arr = Object.entries(taxesMap).map(([name, Valor]) => ({ name, Valor })).sort((a, b) => b.Valor - a.Valor);
     return { list: arr, total: totalTaxes };
-  }, [data, filteredProjetos, realizadoIni, realizadoFim, activeProjectTaxKeys]);
+  }, [data, realizadoIni, realizadoFim, hasGlobalProjectScopeFilter, globalProjectTaxKeys]);
 
   // Uma unica fonte de tributos em Projetos: realizados, no periodo e alocados aos projetos filtrados.
   const tributosProjetos = taxesData.total;
