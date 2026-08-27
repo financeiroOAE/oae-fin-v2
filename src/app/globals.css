@@ -889,3 +889,93 @@ tbody tr:hover {
   .dre-responsive-table th:not(:first-child),
   .dre-responsive-table td:not(:first-child) { font-size: 6.5px !important; padding-left: 0.08rem !important; padding-right: 0.08rem !important; }
 }
+
+
+/* === FIX DRE DESCRIPTION LAYOUT 2026-08-26 === */
+/*
+ * A DRE possui 12 meses + total (e, opcionalmente, retroativo).
+ * Nao comprimir todas as colunas para caber no viewport: isso fazia a
+ * descricao quebrar caractere por caractere. A tabela passa a preservar
+ * larguras legiveis e o proprio card assume a rolagem horizontal.
+ */
+.dre-responsive-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dre-responsive-table {
+  width: max-content !important;
+  min-width: 100% !important;
+  table-layout: auto !important;
+}
+
+.dre-responsive-table th,
+.dre-responsive-table td {
+  resize: none !important;
+}
+
+.dre-responsive-table th:first-child,
+.dre-responsive-table td:first-child {
+  width: 340px !important;
+  min-width: 340px !important;
+  max-width: 340px !important;
+  position: sticky !important;
+  left: 0;
+  z-index: 3;
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+}
+
+.dre-responsive-table td:first-child {
+  display: table-cell !important;
+}
+
+.dre-responsive-table th:first-child *,
+.dre-responsive-table td:first-child * {
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+}
+
+.dre-responsive-table th:not(:first-child),
+.dre-responsive-table td:not(:first-child) {
+  width: 110px !important;
+  min-width: 110px !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dre-responsive-table th:last-child,
+.dre-responsive-table td:last-child {
+  width: 135px !important;
+  min-width: 135px !important;
+}
+
+@media (max-width: 820px) {
+  .dre-responsive-table th:first-child,
+  .dre-responsive-table td:first-child {
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 280px !important;
+    font-size: 10px !important;
+  }
+
+  .dre-responsive-table th:not(:first-child),
+  .dre-responsive-table td:not(:first-child) {
+    width: 100px !important;
+    min-width: 100px !important;
+    font-size: 9px !important;
+  }
+}
