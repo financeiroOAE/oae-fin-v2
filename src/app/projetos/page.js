@@ -641,8 +641,9 @@ export default function Projetos() {
   const tributosProjetos = taxesData.total;
   const margemFinanceira = receitaLiquidaProjetos > 0 ? ((receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - tributosProjetos) / receitaLiquidaProjetos) * 100 : null;
   const resultadoGerencial = receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - tributosProjetos;
-  // A aliquota efetiva de tributos e calculada sobre o FATURAMENTO, nao sobre o caixa recebido.
-  const taxPercentage = totalFaturado > 0 ? (tributosProjetos / totalFaturado) * 100 : 0;
+  // A aliquota efetiva de tributos usa como base o faturamento anual consolidado da coluna dedicada.
+  // Na interface, a descricao permanece apenas como "sobre o Faturamento".
+  const taxPercentage = totalFaturado2026 > 0 ? (tributosProjetos / totalFaturado2026) * 100 : 0;
 
   const abcDonutData = useMemo(() => {
     const projects = [...filteredProjetos].filter(p => p.contratado > 0).sort((a, b) => b.contratado - a.contratado);
