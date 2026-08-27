@@ -814,9 +814,20 @@ tbody tr:hover {
 .dre-responsive-table td:first-child {
   width: 22%;
   position: static !important;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
   padding-left: 0.55rem !important;
   padding-right: 0.35rem !important;
+}
+.dre-responsive-table .dre-description-cell {
+  display: table-cell !important;
+}
+.dre-responsive-table .dre-description-cell > div,
+.dre-responsive-table .dre-description-cell span {
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
 }
 .dre-responsive-table th:not(:first-child),
 .dre-responsive-table td:not(:first-child) {

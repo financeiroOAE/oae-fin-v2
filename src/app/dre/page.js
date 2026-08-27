@@ -515,17 +515,18 @@ function DreAccountRow({ account, meses, showMonths, onAccountClick, paddingLeft
       onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
       onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.01)"}
     >
-      <td style={{
+      <td className="dre-description-cell" style={{
         padding: `0.625rem 1rem 0.625rem ${paddingLeft}`, fontSize: "12px",
         color: "var(--text-secondary)", position: "sticky", left: 0, zIndex: 1,
-        background: "rgba(6,24,48,0.98)", whiteSpace: "nowrap",
-        display: "flex", alignItems: "center", gap: "0.5rem",
+        background: "rgba(6,24,48,0.98)", whiteSpace: "normal",
       }}>
-        <span style={{ color: "var(--text-secondary)", fontSize: "11px", fontWeight: "700", flexShrink: 0 }}>→</span>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: "280px" }} title={account.label}>
-          {account.label}
-        </span>
-        <FileText size={10} color="rgba(168,181,198,0.4)" style={{ flexShrink: 0 }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+          <span style={{ color: "var(--text-secondary)", fontSize: "11px", fontWeight: "700", flexShrink: 0 }}>→</span>
+          <span style={{ flex: 1, minWidth: 0, whiteSpace: "normal", overflowWrap: "normal", wordBreak: "normal", lineHeight: 1.25 }} title={account.label}>
+            {account.label}
+          </span>
+          <FileText size={10} color="rgba(168,181,198,0.4)" style={{ flexShrink: 0 }} />
+        </div>
       </td>
       {showMonths && meses.map(m => (
         <td key={m.key} style={{
