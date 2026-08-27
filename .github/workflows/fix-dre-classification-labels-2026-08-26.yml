@@ -1,0 +1,42 @@
+name: Fix DRE Classification Labels 2026-08-26
+
+on:
+  push:
+    paths:
+      - 'scripts/fix-dre-classification-labels-2026-08-26.js'
+      - '.github/workflows/fix-dre-classification-labels-2026-08-26.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Aplicar correcao visual DRE
+        run: node scripts/fix-dre-classification-labels-2026-08-26.js
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Gerar Prisma
+        run: npx prisma generate
+      - name: Validar build
+        run: npm run build
+      - name: Commitar mudancas validadas
+        run: |
+          if git diff --quiet; then
+            echo "Sem mudancas para commitar"
+            exit 0
+          fi
+          git config user.name "financeiroOAE"
+          git config user.email "financeiro@oliveiraaraujo.eng.br"
+          git add src/app/dre/page.js src/app/globals.css
+          git commit -m "fix: corrige nomes das classificacoes da DRE"
+          git push
