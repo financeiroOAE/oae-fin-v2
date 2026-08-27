@@ -15,7 +15,7 @@ import InfoTooltip from "@/components/InfoTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
-import { classifyFinancialEntry, isPartnerWithdrawal, isRevenueTax } from "@/lib/financialClassification";
+import { classifyFinancialEntry, isPartnerWithdrawal, isRevenueTax, isProjectTax } from "@/lib/financialClassification";
 import { getActiveProjects, getActiveProjectNames, getProjectKey } from "@/lib/projectRules";
 
 const getYearToDateRange = () => {
@@ -310,7 +310,7 @@ export default function VisaoFinanceira() {
       total,
       diferenca: entradasRealizadas - total,
       items: [
-        { key: 'projetos', label: 'Receitas de Projetos', value: projetos, color: 'var(--success)', details: toRows(detailMaps.projetos) },
+        { key: 'projetos', label: 'Receita Líquida de Projetos', value: projetos, color: 'var(--success)', details: toRows(detailMaps.projetos) },
         { key: 'capital', label: 'Empréstimos e Aportes', value: capital, color: 'var(--info)', details: toRows(detailMaps.capital) },
         { key: 'outras', label: 'Outras Entradas', value: totals.outras, color: 'var(--primary)', details: toRows(detailMaps.outras) },
       ],
@@ -380,13 +380,20 @@ export default function VisaoFinanceira() {
     const receitaObra = projectRevenueStatus.realizado.obra;
     const receitaAdm = projectRevenueStatus.realizado.adm;
     const receita = projectRevenueStatus.realizado.total;
-    const saidas = realizedFilteredData
+    const projectOutputs = realizedFilteredData
       .filter((item) => item.natureza === 'Saída')
-      .filter((item) => filterProjetos.length > 0 || !String(item.projeto || '').toUpperCase().includes('ADMINISTRA'))
+      .filter((item) => filterProjetos.length > 0 || !String(item.projeto || '').toUpperCase().includes('ADMINISTRA'));
+    const isDirectProjectTax = (item) => !String(item.projeto || '').toUpperCase().includes('ADMINISTRA') && isProjectTax(item);
+    const tributos = projectOutputs
+      .filter(isDirectProjectTax)
       .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0);
-    const resultado = receita - saidas;
+    const custosDespesas = projectOutputs
+      .filter((item) => !isDirectProjectTax(item))
+      .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0);
+    const saidas = custosDespesas + tributos;
+    const resultado = receita - custosDespesas - tributos;
     const margem = receita > 0 ? (resultado / receita) * 100 : 0;
-    return { receita, receitaObra, receitaAdm, saidas, resultado, margem };
+    return { receita, receitaObra, receitaAdm, custosDespesas, tributos, saidas, resultado, margem };
   }, [projectRevenueStatus, realizedFilteredData, filterProjetos]);
 
   const abcDonutData = useMemo(() => {
@@ -591,7 +598,7 @@ export default function VisaoFinanceira() {
       {/* KPIs Principais */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" data-report-section style={{ padding: '1.5rem' }}>
-          <ReportAdder sectionKey="visao:kpis" title="Resumo Executivo Financeiro" componentName="Indicadores Financeiros" page="Visão Financeira" type="SUMMARY" data={[{ "Saldo Bancário": totalBancario, "Saldo Contratos": somaProjetos, "Resultado Realizado": resultadoRealizado, "Resultado Previsto": resultadoPrevisto, "Entradas Realizadas": entradasRealizadas, "A Receber": entradasARealizar, Pago: saidasRealizadas, "A Pagar": saidasARealizar }]} columnFormats={{ "Saldo Bancário": "currency", "Saldo Contratos": "currency", "Resultado Realizado": "currency", "Resultado Previsto": "currency", "Entradas Realizadas": "currency", "A Receber": "currency", Pago: "currency", "A Pagar": "currency" }} filters={reportFilters} presetTags={["executive-financial"]} explanation="Consolidação dos principais saldos e resultados conforme os filtros ativos." style={{ float: 'right' }} />
+          <ReportAdder sectionKey="visao:kpis" title="Resumo Executivo Financeiro" componentName="Indicadores Financeiros" page="Visão Financeira" type="SUMMARY" data={[{ "Saldo Bancário": totalBancario, "Saldo Contratos": somaProjetos, "Resultado Realizado": resultadoRealizado, "Resultado Previsto": resultadoPrevisto, "Entradas Líquidas Realizadas": entradasRealizadas, "A Receber": entradasARealizar, Pago: saidasRealizadas, "A Pagar": saidasARealizar }]} columnFormats={{ "Saldo Bancário": "currency", "Saldo Contratos": "currency", "Resultado Realizado": "currency", "Resultado Previsto": "currency", "Entradas Líquidas Realizadas": "currency", "A Receber": "currency", Pago: "currency", "A Pagar": "currency" }} filters={reportFilters} presetTags={["executive-financial"]} explanation="Consolidação dos principais saldos e resultados conforme os filtros ativos." style={{ float: 'right' }} />
           <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Landmark size={16} color="var(--primary)"/> Saldo Bancário Total</p>
           <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalBancario)}</p>
         </div>
@@ -616,7 +623,7 @@ export default function VisaoFinanceira() {
       {/* KPIs Secundários */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)"/> Entradas Realizadas</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)"/> Entradas Líquidas Realizadas</p>
           <p style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(entradasRealizadas)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(16, 185, 129, 0.4)' }}>
@@ -716,7 +723,7 @@ export default function VisaoFinanceira() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1.5rem', alignItems: 'stretch' }}>
           <div id="report-visao-status" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%' }}>
             <ReportAdder sectionKey="visao:status" title="Status Financeiro Consolidado" componentName="Tributos, Receitas e Pagamentos" page="Visão Financeira" type="CHART" data={[
-              { name: 'Receitas Recebidas', value: projectRevenueStatus.realizado.total },
+              { name: 'Receitas Líquidas Recebidas', value: projectRevenueStatus.realizado.total },
               { name: 'Receitas A Receber', value: projectRevenueStatus.pendente.total },
               { name: 'Pagamentos Realizados', value: saidasRealizadas },
               { name: 'Pagamentos A Realizar', value: saidasARealizar },
@@ -727,7 +734,7 @@ export default function VisaoFinanceira() {
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Tributos, receitas de projetos e pagamentos no período selecionado.</p>
             <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.85rem', alignItems: 'stretch' }}>
               <PieStatusChart realizado={taxStatusBreakdown.realizado} pendente={taxStatusBreakdown.pendente} colorRealizado="var(--primary)" colorPendente="rgba(57, 198, 198, 0.25)" titulo="Tributos" labelRealizado="Pago" labelPendente="A pagar" />
-              <PieStatusChart realizado={projectRevenueStatus.realizado.total} pendente={projectRevenueStatus.pendente.total} colorRealizado="var(--success)" colorPendente="rgba(16, 185, 129, 0.3)" titulo="Receitas" labelRealizado="Recebido" labelPendente="A receber" />
+              <PieStatusChart realizado={projectRevenueStatus.realizado.total} pendente={projectRevenueStatus.pendente.total} colorRealizado="var(--success)" colorPendente="rgba(16, 185, 129, 0.3)" titulo="Receitas" labelRealizado="Recebido Líquido" labelPendente="A receber" />
               <PieStatusChart realizado={saidasRealizadas} pendente={saidasARealizar} colorRealizado="var(--danger)" colorPendente="rgba(239, 68, 68, 0.3)" titulo="Pagamentos" labelRealizado="Pago" labelPendente="A pagar" />
             </div>
           </div>
@@ -742,9 +749,9 @@ export default function VisaoFinanceira() {
         {/* ROW 3: Centro de Custo */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1rem' }}>
           <div id="report-visao-centros-entrada" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <ReportAdder sectionKey="visao:centros-entrada" title="10 Projetos por Receita de Projetos" componentName="Ranking de Entradas" page="Visão Financeira" type="CHART" data={topProjetosEntradas} filters={reportFilters} captureId="report-visao-centros-entrada" style={{ alignSelf: 'flex-end' }} />
-            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>10 Projetos por Receita de Projetos</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Projetos com maior volume de receita no período selecionado; Administração, empréstimos e aportes não entram neste ranking.</p>
+            <ReportAdder sectionKey="visao:centros-entrada" title="10 Projetos por Receita Líquida" componentName="Ranking de Entradas" page="Visão Financeira" type="CHART" data={topProjetosEntradas} filters={reportFilters} captureId="report-visao-centros-entrada" style={{ alignSelf: 'flex-end' }} />
+            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>10 Projetos por Receita Líquida</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Projetos com maior volume efetivamente recebido no período; Administração, empréstimos e aportes não entram neste ranking.</p>
             <div style={{ flex: 1, minHeight: '360px' }}>
               <TopBarChart data={topProjetosEntradas} color="var(--success)" />
             </div>
@@ -762,16 +769,17 @@ export default function VisaoFinanceira() {
         {/* ROW 4: Visão Financeira dos Projetos e Despesas */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1rem' }}>
           <div id="report-visao-projetos-financeiro" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <ReportAdder sectionKey="visao:projetos-financeiro" title="Visão Financeira Geral dos Projetos" componentName="Resultado e Margem dos Projetos" page="Visão Financeira" type="CHART" data={[{ Recebido: projectFinancialOverview.receita, "Custos + Despesas": projectFinancialOverview.saidas, Resultado: projectFinancialOverview.resultado, Margem: projectFinancialOverview.margem }]} filters={reportFilters} captureId="report-visao-projetos-financeiro" presetTags={["executive-financial", "project-executive"]} style={{ alignSelf: 'flex-end' }} />
+            <ReportAdder sectionKey="visao:projetos-financeiro" title="Visão Financeira Geral dos Projetos" componentName="Resultado e Margem dos Projetos" page="Visão Financeira" type="CHART" data={[{ "Recebido Líquido": projectFinancialOverview.receita, "Custos + Despesas": projectFinancialOverview.custosDespesas, Tributos: projectFinancialOverview.tributos, Resultado: projectFinancialOverview.resultado, Margem: projectFinancialOverview.margem }]} filters={reportFilters} captureId="report-visao-projetos-financeiro" presetTags={["executive-financial", "project-executive"]} explanation="Recebido Líquido menos custos, despesas e tributos. Tributos são destacados e não são descontados duas vezes." style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Visão Financeira Geral dos Projetos</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Recebido de projetos (obra + administrativo vinculado) versus saídas realizadas das obras.</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Recebido Líquido de projetos versus custos, despesas e tributos realizados das obras.</p>
             <div className="finance-kpi-grid" style={{ marginBottom: '0.75rem' }}>
-              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Recebido</span><strong style={{display:'block',fontSize:'14px',color:'var(--success)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.receita)}</strong></div>
-              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Custos + Despesas</span><strong style={{display:'block',fontSize:'14px',color:'var(--danger)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.saidas)}</strong></div>
+              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Recebido Líquido</span><strong style={{display:'block',fontSize:'14px',color:'var(--success)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.receita)}</strong></div>
+              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Custos + Despesas</span><strong style={{display:'block',fontSize:'14px',color:'var(--danger)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.custosDespesas)}</strong></div>
+              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Tributos</span><strong style={{display:'block',fontSize:'14px',color:'var(--primary)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.tributos)}</strong></div>
               <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Resultado</span><strong style={{display:'block',fontSize:'14px',color:projectFinancialOverview.resultado >= 0 ? 'var(--success)' : 'var(--danger)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.resultado)}</strong></div>
               <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Margem</span><strong style={{display:'block',fontSize:'14px',color:projectFinancialOverview.margem >= 0 ? 'var(--success)' : 'var(--danger)'}}>{projectFinancialOverview.margem.toFixed(2).replace('.', ',')}%</strong></div>
             </div>
-            <div className="finance-chart-frame"><ProjectFinancialOverviewChart recebido={projectFinancialOverview.receita} saidas={projectFinancialOverview.saidas} resultado={projectFinancialOverview.resultado} /></div>
+            <div className="finance-chart-frame"><ProjectFinancialOverviewChart recebido={projectFinancialOverview.receita} custosDespesas={projectFinancialOverview.custosDespesas} tributos={projectFinancialOverview.tributos} resultado={projectFinancialOverview.resultado} /></div>
           </div>
           <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
             <AccountBarChart data={topContasSaidas} title="Despesas por Plano de Conta" infoContent="Saídas agrupadas por plano de conta no período selecionado, sem retiradas dos sócios." color="var(--danger)" />
@@ -847,3 +855,4 @@ export default function VisaoFinanceira() {
     </div>
   );
 }
+

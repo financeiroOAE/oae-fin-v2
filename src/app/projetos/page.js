@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   RefreshCw, AlertCircle, Database, Building2, 
   FileText, Target, ArrowDownCircle, ArrowUpCircle, ArrowDown, ArrowUp,
   Percent, Briefcase, X, ArrowUpDown, ArrowUpAZ, ArrowDownAZ, LayoutDashboard,
-  FilterX, PieChart, Activity, ChevronLeft, ChevronRight, FileSpreadsheet
+  FilterX, PieChart, Activity, ChevronLeft, ChevronRight
 } from "lucide-react";
 import DataTable from "@/components/DataTable";
 import ABCClassDonut from "@/components/charts/ABCClassDonut";
@@ -17,11 +17,63 @@ import InfoTooltip from "@/components/InfoTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
-import { exportReportToPdf } from "@/lib/reportExport";
-import { isRevenueTax, getRevenueTaxLabel, classifyFinancialEntry, isTeamExpense } from "@/lib/financialClassification";
-import { getProjectKey, isProjectOngoing, getActiveProjectNames, isGeneralProjectsBucket } from "@/lib/projectRules";
+import { isProjectTax, getProjectTaxLabel, classifyFinancialEntry, isTeamExpense } from "@/lib/financialClassification";
+import { getProjectKey, isProjectOngoing, isGeneralProjectsBucket } from "@/lib/projectRules";
 
 const TABLE_PAGE_SIZE = 15;
+
+const PROJECT_INFO = {
+  contratado: 'Representa o valor total dos contratos dos projetos selecionados. Permite visualizar o tamanho da carteira contratada.',
+  faturado: 'Representa a parcela dos contratos que já foi transformada em faturamento ao cliente. O valor faturado não significa necessariamente que já foi recebido.',
+  faturado2026: 'Representa quanto dos contratos foi faturado especificamente durante o exercício de 2026.',
+  percentualFaturado: 'Indica quanto do valor total contratado já foi faturado. Um percentual de 36,07% significa que 36,07% do contrato já foi convertido em faturamento.',
+  saldoContratual: 'Representa a parcela do contrato que ainda não foi faturada, indicando o potencial de faturamento restante da carteira.',
+  recebidoLiquido: 'Representa o valor que efetivamente entrou no caixa após descontos, retenções ou diferenças entre o faturado e o recebido.',
+  aReceber: 'Representa valores reconhecidos para recebimento que ainda não entraram no caixa.',
+  pago: 'Representa as saídas financeiras que já foram efetivamente pagas.',
+  aPagar: 'Representa compromissos financeiros previstos ou assumidos que ainda não foram pagos.',
+  resultado: 'Representa a diferença entre as entradas líquidas realizadas e as saídas consideradas na análise, demonstrando o saldo financeiro gerado pelos projetos.',
+  margem: 'Indica proporcionalmente quanto da receita permanece como resultado após os custos, despesas e tributos considerados no cálculo.',
+  custosDespesas: 'Representa os recursos consumidos na execução e manutenção dos projetos no período analisado.',
+  tributos: 'Representa os impostos e encargos relacionados ao faturamento, à receita e ao resultado dos projetos, demonstrando o impacto tributário da operação.',
+  percentualTributos: 'Indica o peso dos tributos em relação à receita bruta realizada no mesmo período e para os mesmos projetos selecionados.',
+  inss: 'Representa os encargos de INSS diretamente atribuídos às obras e projetos, permitindo visualizar seu impacto na operação.',
+};
+
+function projectBilling2026(project) {
+  return Number(
+    project?.FATURADO_2026
+    ?? project?.['FATURADO EM 2026']
+    ?? project?.['FATURADO 2026']
+    ?? project?.['FATURAMENTO EM 2026']
+    ?? project?.['FATURAMENTO 2026']
+  ) || 0;
+}
+
+function buildPeriodMonths(startValue, endValue) {
+  const start = startValue ? new Date(`${startValue}T00:00:00`) : new Date('2026-01-01T00:00:00');
+  const end = endValue ? new Date(`${endValue}T23:59:59`) : new Date('2026-12-31T23:59:59');
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return [];
+  const rows = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (cursor <= end) {
+    rows.push({
+      key: `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`,
+      mes: cursor.toLocaleDateString('pt-BR', { month: 'short', year: start.getFullYear() === end.getFullYear() ? undefined : '2-digit' }).replace('.', ''),
+      Receitas: 0,
+      Custos: 0,
+      Despesas: 0,
+      Tributos: 0,
+    });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return rows;
+}
+
+function SortIndicator({ active, direction }) {
+  if (!active) return <ArrowUpDown size={12} style={{ opacity: 0.3 }} />;
+  return direction === 'asc' ? <ArrowUpAZ size={12} /> : <ArrowDownAZ size={12} />;
+}
 
 const getYearToDateRange = () => {
   const today = new Date();
@@ -234,7 +286,7 @@ export default function Projetos() {
 
   // Regra de Projetos: receita/recebido realizado usa a coluna K da CR_GERAL,
   // preservando a consolidacao por titulo e o toggle de rateio administrativo.
-  const baseData = useMemo(() => consolidateFinancialData(data, {
+  const projectFinancialData = useMemo(() => consolidateFinancialData(data, {
     isProjetosPage: true,
     incluirRateioAdm,
     usarValorCaixa: true
@@ -257,6 +309,7 @@ export default function Projetos() {
           tipos: [],
           contratado: 0,
           faturado: 0,
+          faturado2026: 0,
           saldoContratual: 0,
           recebido: 0,
           aReceber: 0,
@@ -264,6 +317,8 @@ export default function Projetos() {
           aPagar: 0,
           receitaDireta: 0,
           receitaAdm: 0,
+          tributosPago: 0,
+          tributosAPagar: 0,
           titulosAdmAssociados: []
         };
       }
@@ -275,10 +330,11 @@ export default function Projetos() {
       if (tipo && !projeto.tipos.includes(tipo)) projeto.tipos.push(tipo);
       projeto.contratado += Number(p.CONTRATO) || 0;
       projeto.faturado += Number(p['NF FATURADAS']) || 0;
+      projeto.faturado2026 += projectBilling2026(p);
       projeto.saldoContratual += Number(p['SALDO CONTRATUAL']) || 0;
     });
 
-    baseData.forEach((item) => {
+    projectFinancialData.forEach((item) => {
       let ts = 0;
       if (item.data) {
         const parts = String(item.data).split('/');
@@ -290,9 +346,7 @@ export default function Projetos() {
       const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A RECEBER') || status.includes('A PAGAR') || status.includes('PREVISTO'));
       if (!isRealizado && !isPrevisto) return;
 
-      // Realizados seguem o período; títulos em aberto são posição atual e não
-      // desaparecem só porque vencem depois da Data Final.
-      if (isRealizado && (ts < realizadoIni || ts > realizadoFim)) return;
+      if (ts < realizadoIni || ts > realizadoFim) return;
 
       const revenueIdentity = item.natureza === 'Entrada'
         ? getFinancialRevenueProjectIdentity(item)
@@ -313,6 +367,7 @@ export default function Projetos() {
           tipos: [],
           contratado: 0,
           faturado: 0,
+          faturado2026: 0,
           saldoContratual: 0,
           recebido: 0,
           aReceber: 0,
@@ -320,6 +375,8 @@ export default function Projetos() {
           aPagar: 0,
           receitaDireta: 0,
           receitaAdm: 0,
+          tributosPago: 0,
+          tributosAPagar: 0,
           titulosAdmAssociados: [],
           somenteFinanceiro: true
         };
@@ -338,8 +395,13 @@ export default function Projetos() {
           projeto.aReceber += Number(item.valor) || 0;
         }
       } else if (item.natureza === 'Saída') {
-        if (isRealizado) projeto.pago += Math.abs(Number(item.valor) || 0);
-        else projeto.aPagar += Math.abs(Number(item.valor) || 0);
+        const value = Math.abs(Number(item.valor) || 0);
+        if (isRealizado) projeto.pago += value;
+        else projeto.aPagar += value;
+        if (isProjectTax(item)) {
+          if (isRealizado) projeto.tributosPago += value;
+          else projeto.tributosAPagar += value;
+        }
       }
     });
 
@@ -351,7 +413,7 @@ export default function Projetos() {
       resultadoCaixa: p.recebido - p.pago,
       receitaConsideradaTooltip: p.receitaDireta + (incluirRateioAdm ? p.receitaAdm : 0)
     }));
-  }, [projetosBrutos, baseData, realizadoIni, realizadoFim, incluirRateioAdm]);
+  }, [projetosBrutos, projectFinancialData, realizadoIni, realizadoFim, incluirRateioAdm]);
 
   const filteredProjetos = useMemo(() => {
     return projetosCruzados.filter(p => {
@@ -413,14 +475,14 @@ export default function Projetos() {
     return Object.entries(map).map(([empresa, valor]) => ({ empresa, valor })).sort((a, b) => b.valor - a.valor);
   }, [kpiModal, filteredProjetos]);
 
-  const SortIcon = ({ columnKey }) => {
-    if (sortConfig.key !== columnKey) return <ArrowUpDown size={12} style={{ opacity: 0.3 }} />;
-    return sortConfig.direction === 'asc' ? <ArrowUpAZ size={12} /> : <ArrowDownAZ size={12} />;
-  };
-
   // KPIs
   const totalContratado = filteredProjetos.reduce((acc, p) => acc + p.contratado, 0);
   const totalFaturado = filteredProjetos.reduce((acc, p) => acc + p.faturado, 0);
+  const rangeIncludes2026 = dIni <= new Date('2026-12-31T23:59:59').getTime()
+    && dFim >= new Date('2026-01-01T00:00:00').getTime();
+  const totalFaturado2026 = rangeIncludes2026
+    ? filteredProjetos.reduce((acc, p) => acc + p.faturado2026, 0)
+    : 0;
   const totalSaldo = filteredProjetos.reduce((acc, p) => acc + p.saldoContratual, 0);
   const percentTotalFaturado = totalContratado > 0 ? totalFaturado / totalContratado : 0;
 
@@ -431,30 +493,30 @@ export default function Projetos() {
   const totalPago = filteredProjetos.reduce((acc, p) => acc + p.pago, 0);
   const receitaLiquidaProjetos = totalRecebido;
 
-  const usarCarteiraCompleta = filterProjetos.length === 0 && filterEmpresas.length === 0 && filterTipos.length === 0;
+  const usarCarteiraCompleta = filterProjetos.length === 0
+    && filterEmpresas.length === 0
+    && filterTipos.length === 0
+    && !colFilterProjeto
+    && !colFilterEmpresa
+    && !colFilterMinFaturadoPerc;
 
   const previsaoProjetosGeral = useMemo(() => data
     .filter((item) => {
       const status = String(item.status || '').toUpperCase();
+      const parts = String(item.data || '').split('/');
+      const timestamp = parts.length === 3 ? new Date(parts[2], Number(parts[1]) - 1, parts[0]).getTime() : 0;
       return item.natureza === 'Saída'
         && (status.includes('A REALIZAR') || status.includes('A PAGAR') || status.includes('PREVISTO'))
-        && isGeneralProjectsBucket(item.projeto);
+        && isGeneralProjectsBucket(item.projeto)
+        && timestamp >= dIni
+        && timestamp <= dFim;
     })
-    .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0), [data]);
+    .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0), [data, dIni, dFim]);
 
   const incluirPrevisaoGeral = usarCarteiraCompleta;
   const totalAPagar = filteredProjetos.reduce((acc, p) => acc + p.aPagar, 0) + (incluirPrevisaoGeral ? previsaoProjetosGeral : 0);
   const totalResultado = receitaLiquidaProjetos - totalPago;
   
-  const totalRecebidoAdmGlobal = filteredProjetos.reduce((acc, p) => acc + (p.receitaAdm || 0), 0);
-
-  function isCDP(planoFinanceiro) {
-    const raw = String(planoFinanceiro || '');
-    const dashIdx = raw.indexOf(' - ');
-    const descricao = dashIdx >= 0 ? raw.slice(dashIdx + 3) : raw;
-    return descricao.trim().toUpperCase().startsWith('C.D.P');
-  }
-
   const dreStats = useMemo(() => {
     const allowedProjects = new Set(filteredProjetos.map((p) => p.projectKey));
     const receitaConsolidada = consolidateFinancialData(data, { isProjetosPage: true, incluirRateioAdm, usarValorCaixa: true });
@@ -473,7 +535,7 @@ export default function Projetos() {
         if (parts.length === 3) ts = new Date(parts[2], parts[1] - 1, parts[0]).getTime();
       }
       if (isRealizado && ts >= realizadoIni && ts <= realizadoFim) recReceita += Number(item.valor) || 0;
-      if (isPrevisto) recAReceber += Number(item.valor) || 0;
+      if (isPrevisto && ts >= realizadoIni && ts <= realizadoFim) recAReceber += Number(item.valor) || 0;
     });
 
     let cPago = 0;
@@ -500,13 +562,13 @@ export default function Projetos() {
       const isRealizado = status.includes('REALIZADO') || status.includes('PAGO') || status.includes('EFETIVADO');
       const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A PAGAR') || status.includes('PREVISTO'));
       if (!isRealizado && !isPrevisto) return;
-      if (isRealizado && (ts < realizadoIni || ts > realizadoFim)) return;
+      if (ts < realizadoIni || ts > realizadoFim) return;
 
       const valor = Math.abs(Number(item.valor) || 0);
       const dreInfo = [item.dreClasse, item.dreLinha, item.dreDescricao].filter(Boolean).join(' ').toUpperCase();
       const isPendingDre = !dreInfo.trim() || dreInfo.includes('PENDENTE DE CLASSIFICAÇÃO');
 
-      if (isRevenueTax(item)) {
+      if (isProjectTax(item)) {
         if (isRealizado) tributos += valor;
         else tributosAPagar += valor;
       } else if (isPendingDre) {
@@ -560,8 +622,8 @@ export default function Projetos() {
       const isRealizado = st.includes('REALIZADO') || st.includes('PAGO') || st.includes('EFETIVADO');
       if (!isRealizado || ts < realizadoIni || ts > realizadoFim) return;
 
-      if (!isRevenueTax(item)) return;
-      const taxCategory = getRevenueTaxLabel(item);
+      if (!isProjectTax(item)) return;
+      const taxCategory = getProjectTaxLabel(item);
       const val = Math.abs(item.valor || 0);
       taxesMap[taxCategory] = (taxesMap[taxCategory] || 0) + val;
       totalTaxes += val;
@@ -571,9 +633,33 @@ export default function Projetos() {
     return { list: arr, total: totalTaxes };
   }, [data, filteredProjetos, realizadoIni, realizadoFim]);
 
+  const grossRevenueTaxBase = useMemo(() => {
+    const allowedProjects = new Set(filteredProjetos.map((project) => project.projectKey));
+    const grossProjectEntries = consolidateFinancialData(data, {
+      isProjetosPage: true,
+      incluirRateioAdm,
+      usarValorCaixa: false,
+    });
+
+    return grossProjectEntries.reduce((total, item) => {
+      if (item.natureza !== 'Entrada' || !allowedProjects.has(getProjectKey(item.projeto))) return total;
+      const status = String(item.status || '').toUpperCase();
+      const isRealized = status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO');
+      if (!isRealized) return total;
+
+      let timestamp = Number(item.dataTimestamp) || 0;
+      if (!timestamp && item.data) {
+        const parts = String(item.data).split('/');
+        if (parts.length === 3) timestamp = new Date(parts[2], Number(parts[1]) - 1, parts[0]).getTime();
+      }
+      if (timestamp < realizadoIni || timestamp > realizadoFim) return total;
+      return total + (Number(item.valor) || 0);
+    }, 0);
+  }, [data, filteredProjetos, incluirRateioAdm, realizadoIni, realizadoFim]);
+
   const margemFinanceira = receitaLiquidaProjetos > 0 ? ((receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - dreStats.tributos) / receitaLiquidaProjetos) * 100 : null;
   const resultadoGerencial = receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - dreStats.tributos;
-  const taxPercentage = totalFaturado > 0 ? (taxesData.total / totalFaturado) * 100 : 0;
+  const taxPercentage = grossRevenueTaxBase > 0 ? (taxesData.total / grossRevenueTaxBase) * 100 : null;
 
   const abcDonutData = useMemo(() => {
     const projects = [...filteredProjetos].filter(p => p.contratado > 0).sort((a, b) => b.contratado - a.contratado);
@@ -632,21 +718,20 @@ export default function Projetos() {
   }, [data, filteredProjetos, dIni, dFim]);
 
   const monthlyFinancialData = useMemo(() => {
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const rows = months.map((mes, index) => ({ mes, month: index, Receitas: 0, Custos: 0, Despesas: 0 }));
+    const rows = buildPeriodMonths(filterDataInicial, filterDataFinal);
+    const byMonth = new Map(rows.map((row) => [row.key, row]));
     const allowedProjects = new Set(filteredProjetos.map((project) => project.projectKey));
 
-    const revenueItems = baseData;
-    revenueItems.forEach((item) => {
+    projectFinancialData.forEach((item) => {
       if (item.natureza !== 'Entrada') return;
-      if (!usarCarteiraCompleta && !allowedProjects.has(getFinancialRevenueProjectIdentity(item).projectKey)) return;
+      if (!allowedProjects.has(getFinancialRevenueProjectIdentity(item).projectKey)) return;
       const status = String(item.status || '').toUpperCase();
       if (!(status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO'))) return;
       const parts = String(item.data || '').split('/');
-      if (parts.length !== 3 || parts[2] !== '2026') return;
-      const month = Number(parts[1]) - 1;
-      if (month < 0 || month > 11) return;
-      rows[month].Receitas += Number(item.valor) || 0;
+      if (parts.length !== 3) return;
+      const row = byMonth.get(`${parts[2]}-${String(parts[1]).padStart(2, '0')}`);
+      if (!row) return;
+      row.Receitas += Number(item.valor) || 0;
     });
 
     data.forEach((item) => {
@@ -655,20 +740,23 @@ export default function Projetos() {
       const status = String(item.status || '').toUpperCase();
       if (!(status.includes('REALIZADO') || status.includes('PAGO') || status.includes('EFETIVADO'))) return;
       const parts = String(item.data || '').split('/');
-      if (parts.length !== 3 || parts[2] !== '2026') return;
-      const month = Number(parts[1]) - 1;
-      if (month < 0 || month > 11) return;
-      if (isRevenueTax(item)) return;
+      if (parts.length !== 3) return;
+      const row = byMonth.get(`${parts[2]}-${String(parts[1]).padStart(2, '0')}`);
+      if (!row) return;
+      const value = Math.abs(Number(item.valor) || 0);
+      if (isProjectTax(item)) {
+        row.Tributos += value;
+        return;
+      }
 
       const dreText = [item.dreClasse, item.dreLinha, item.dreDescricao].filter(Boolean).join(' ').toUpperCase();
       if (!dreText || dreText.includes('PENDENTE DE CLASSIFICAÇÃO')) return;
-      const value = Math.abs(Number(item.valor) || 0);
-      if (dreText.includes('CUSTO')) rows[month].Custos += value;
-      else rows[month].Despesas += value;
+      if (dreText.includes('CUSTO')) row.Custos += value;
+      else row.Despesas += value;
     });
 
     return rows;
-  }, [data, filteredProjetos, baseData, usarCarteiraCompleta]);
+  }, [data, filteredProjetos, projectFinancialData, filterDataInicial, filterDataFinal]);
 
   const reportFilters = {
     "Data inicial": filterDataInicial || "Todas",
@@ -680,14 +768,15 @@ export default function Projetos() {
   };
   const projectReportRows = sortedProjetos.map((project) => ({
     Projeto: project.nome,
-    Empresa: project.empresa,
     Contratado: project.contratado,
-    Faturado: project.faturado,
-    Saldo: project.saldoContratual,
-    Recebido: project.recebido,
+    "Faturado Acumulado": project.faturado,
+    "Faturado em 2026": rangeIncludes2026 ? project.faturado2026 : 0,
+    "Saldo Contratual": project.saldoContratual,
+    "Recebido Líquido": project.recebido,
     "A Receber": project.aReceber,
     Pago: project.pago,
     "A Pagar": project.aPagar,
+    Tributos: project.tributosPago,
     Resultado: project.resultadoCaixa,
   }));
 
@@ -712,51 +801,40 @@ export default function Projetos() {
     });
   }, [selectedProjectMoves, filterDataInicial, filterDataFinal]);
 
-  const projectReportFileName = useCallback(() => {
-    const base = String(selectedProject?.nome || 'projeto')
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9_-]+/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .slice(0, 70) || 'projeto';
-    return base;
-  }, [selectedProject]);
+  const selectedProjectReportFilters = useMemo(() => ({
+    Projeto: selectedProject?.nome || 'Nenhum',
+    Empresa: selectedProject?.empresa || 'Todas',
+    Tipo: selectedProject?.tipo || 'Todos',
+    'Data inicial': filterDataInicial || 'Todas',
+    'Data final': filterDataFinal || 'Todas',
+  }), [selectedProject, filterDataInicial, filterDataFinal]);
 
-  const exportSelectedProjectExcel = useCallback(async () => {
-    if (!selectedProject) return;
-    const XLSX = await import('xlsx');
-    const rows = selectedProjectReportMoves.map((item) => ({
-      Data: item.data || '',
-      Natureza: item.natureza || '',
-      Status: item.status || '',
-      Projeto: item.projeto || selectedProject.nome,
-      'Nome / Fornecedor': item.nome || '',
-      Conta: item.contaNome || item.contaDescricao || item.contaCodigo || '',
-      Documento: item.documento || '',
-      Lancamento: item.lancamento || '',
-      Valor: Number(item.valor) || 0,
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    worksheet['!cols'] = [
-      { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 30 }, { wch: 34 },
-      { wch: 36 }, { wch: 18 }, { wch: 16 }, { wch: 16 },
-    ];
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Movimentacoes');
-    XLSX.writeFile(workbook, `Movimentacoes_${projectReportFileName()}.xlsx`);
-  }, [selectedProject, selectedProjectReportMoves, projectReportFileName]);
+  const selectedProjectContractRows = useMemo(() => selectedProject ? [{
+    Projeto: selectedProject.nome,
+    Empresa: selectedProject.empresa || '',
+    Tipo: selectedProject.tipo || '',
+    Contratado: Number(selectedProject.contratado) || 0,
+    'Faturado Acumulado': Number(selectedProject.faturado) || 0,
+    'Faturado em 2026': rangeIncludes2026 ? Number(selectedProject.faturado2026) || 0 : 0,
+    '% Faturado': Number(selectedProject.percentFaturado) || 0,
+    'Saldo Contratual': Number(selectedProject.saldoContratual) || 0,
+  }] : [], [selectedProject, rangeIncludes2026]);
 
-  const exportSelectedProjectPdf = useCallback(async () => {
-    if (!selectedProject) return;
+  const selectedProjectFinancialRows = useMemo(() => selectedProject ? [{
+    'Recebido Líquido': Number(selectedProject.recebido) || 0,
+    'A Receber': Number(selectedProject.aReceber) || 0,
+    Pago: Number(selectedProject.pago) || 0,
+    'A Pagar': Number(selectedProject.aPagar) || 0,
+    'Tributos Pagos (incluídos em Pago)': Number(selectedProject.tributosPago) || 0,
+    'Tributos a Pagar (incluídos em A Pagar)': Number(selectedProject.tributosAPagar) || 0,
+    'Resultado de Caixa': Number(selectedProject.resultadoCaixa) || 0,
+  }] : [], [selectedProject]);
 
-    const filters = {
-      Projeto: selectedProject.nome,
-      Empresa: selectedProject.empresa || 'Todas',
-      Tipo: selectedProject.tipo || 'Todos',
-      'Data inicial': filterDataInicial || 'Todas',
-      'Data final': filterDataFinal || 'Todas',
-    };
-
-    const movementRows = selectedProjectReportMoves.map((item) => ({
+  const selectedProjectMovementReportRows = useMemo(() => selectedProjectReportMoves.map((item) => {
+    const isEntry = item.natureza === 'Entrada';
+    const status = String(item.status || '').toUpperCase();
+    const isRealized = status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('PAGO') || status.includes('EFETIVADO');
+    return {
       Data: item.data || '',
       Natureza: item.natureza || '',
       Situação: item.status || '',
@@ -764,88 +842,10 @@ export default function Projetos() {
       Conta: item.contaNome || item.contaDescricao || item.contaCodigo || '',
       Documento: item.documento || '',
       Lançamento: item.lancamento || '',
-      Valor: Number(item.valor) || 0,
-    }));
-
-    const reportItems = [
-      {
-        id: 'projeto-resumo-contratual',
-        sectionKey: 'projeto:resumo-contratual',
-        title: 'Resumo Contratual',
-        page: 'Projetos',
-        type: 'TABLE',
-        data: [{
-          Projeto: selectedProject.nome,
-          Empresa: selectedProject.empresa || '',
-          Tipo: selectedProject.tipo || '',
-          Contratado: Number(selectedProject.contratado) || 0,
-          Faturado: Number(selectedProject.faturado) || 0,
-          '% Faturado': Number(selectedProject.percentFaturado) || 0,
-          'Saldo Contratual': Number(selectedProject.saldoContratual) || 0,
-        }],
-        columns: [
-          { key: 'Projeto', label: 'Projeto' },
-          { key: 'Empresa', label: 'Empresa' },
-          { key: 'Tipo', label: 'Tipo' },
-          { key: 'Contratado', label: 'Contratado', format: 'currency' },
-          { key: 'Faturado', label: 'Faturado', format: 'currency' },
-          { key: '% Faturado', label: '% Faturado', format: 'percent' },
-          { key: 'Saldo Contratual', label: 'Saldo Contratual', format: 'currency' },
-        ],
-        filters,
-        explanation: 'Posição contratual do projeto selecionado.',
-      },
-      {
-        id: 'projeto-resumo-financeiro',
-        sectionKey: 'projeto:resumo-financeiro',
-        title: 'Resumo Financeiro',
-        page: 'Projetos',
-        type: 'TABLE',
-        data: [{
-          Recebido: Number(selectedProject.recebido) || 0,
-          'A Receber': Number(selectedProject.aReceber) || 0,
-          Pago: Number(selectedProject.pago) || 0,
-          'A Pagar': Number(selectedProject.aPagar) || 0,
-          Resultado: Number(selectedProject.resultadoCaixa) || 0,
-        }],
-        columns: [
-          { key: 'Recebido', label: 'Recebido', format: 'currency' },
-          { key: 'A Receber', label: 'A Receber', format: 'currency' },
-          { key: 'Pago', label: 'Pago', format: 'currency' },
-          { key: 'A Pagar', label: 'A Pagar', format: 'currency' },
-          { key: 'Resultado', label: 'Resultado', format: 'currency' },
-        ],
-        filters,
-        explanation: 'Movimentação financeira do projeto no período selecionado.',
-      },
-      {
-        id: 'projeto-movimentacoes',
-        sectionKey: 'projeto:movimentacoes',
-        title: 'Movimentações do Período',
-        page: 'Projetos',
-        type: 'TABLE',
-        data: movementRows,
-        columns: [
-          { key: 'Data', label: 'Data', format: 'date' },
-          { key: 'Natureza', label: 'Natureza' },
-          { key: 'Situação', label: 'Situação' },
-          { key: 'Nome / Fornecedor', label: 'Nome / Fornecedor' },
-          { key: 'Conta', label: 'Conta' },
-          { key: 'Documento', label: 'Documento' },
-          { key: 'Lançamento', label: 'Lançamento' },
-          { key: 'Valor', label: 'Valor', format: 'currency' },
-        ],
-        filters,
-        explanation: 'Extrato das movimentações que compõem a posição financeira do projeto no período.',
-      },
-    ];
-
-    await exportReportToPdf(reportItems, {
-      title: `Relatório Executivo — ${selectedProject.nome}`,
-      orientation: 'auto',
-      includeExplanations: true,
-    });
-  }, [selectedProject, selectedProjectReportMoves, filterDataInicial, filterDataFinal]);
+      'Valor Base': Number(item.valorBruto ?? item.valor) || 0,
+      'Valor Financeiro': isEntry && isRealized ? Number(item.valorCaixa ?? item.valor) || 0 : Number(item.valor) || 0,
+    };
+  }), [selectedProjectReportMoves]);
 
   const selectedProjectTeamCosts = useMemo(() => {
     if (!selectedProject) return [];
@@ -968,22 +968,26 @@ export default function Projetos() {
 
       {/* 3. KPIs Contratos */}
       <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Consolidado de Contratos</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="project-contract-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" onClick={() => setKpiModal('contratado')} style={{ padding: '1.5rem', borderLeft: '4px solid var(--purple)', cursor: 'pointer', transition: 'all 0.2s ease' }} title="Clique para ver por empresa" onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'none'}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><FileText size={16} color="var(--purple)" /> Valor Contratado</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><FileText size={16} color="var(--purple)" /> Valor Contratado <InfoTooltip title="Valor Contratado" content={PROJECT_INFO.contratado} /></p>
           <p style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalContratado)}</p>
         </div>
         <div className="card" onClick={() => setKpiModal('faturado')} style={{ padding: '1.5rem', borderLeft: '4px solid var(--primary)', cursor: 'pointer', transition: 'all 0.2s ease' }} title="Clique para ver por empresa" onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'none'}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Target size={16} color="var(--primary)" /> Faturado</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Target size={16} color="var(--primary)" /> Faturado <InfoTooltip title="Faturado" content={PROJECT_INFO.faturado} /></p>
           <p style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalFaturado)}</p>
         </div>
-        <div className="card" onClick={() => setKpiModal('saldo')} style={{ padding: '1.5rem', borderLeft: '4px solid var(--warning)', cursor: 'pointer', transition: 'all 0.2s ease' }} title="Clique para ver por empresa" onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'none'}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Briefcase size={16} color="var(--warning)" /> Saldo Contratual</p>
-          <p style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalSaldo)}</p>
+        <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid var(--info)' }}>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Target size={16} color="var(--info)" /> Faturado em 2026 <InfoTooltip title="Faturado em 2026" content={PROJECT_INFO.faturado2026} /></p>
+          <p style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalFaturado2026)}</p>
         </div>
         <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid var(--success)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Percent size={16} color="var(--success)" /> % Faturado</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Percent size={16} color="var(--success)" /> % Faturado <InfoTooltip title="% Faturado" content={PROJECT_INFO.percentualFaturado} /></p>
           <p style={{ fontSize: '22px', fontWeight: '700', color: 'var(--success)' }}>{formatPercent(percentTotalFaturado)}</p>
+        </div>
+        <div className="card" onClick={() => setKpiModal('saldo')} style={{ padding: '1.5rem', borderLeft: '4px solid var(--warning)', cursor: 'pointer', transition: 'all 0.2s ease' }} title="Clique para ver por empresa" onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'none'}>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Briefcase size={16} color="var(--warning)" /> Saldo Contratual <InfoTooltip title="Saldo Contratual" content={PROJECT_INFO.saldoContratual} /></p>
+          <p style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalSaldo)}</p>
         </div>
       </div>
 
@@ -1006,33 +1010,33 @@ export default function Projetos() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
           <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-            <ArrowDownCircle size={14} color="var(--success)" /> Recebido no período
+            <ArrowDownCircle size={14} color="var(--success)" /> Recebido Líquido no período
             <InfoTooltip
-              title="Receita Líquida Recebida"
-              content={`Receita líquida recebida: ${formatCurrency(receitaLiquidaProjetos)}. É o valor que efetivamente entrou no caixa no período selecionado.`}
+              title="Recebido Líquido"
+              content={PROJECT_INFO.recebidoLiquido}
             />
           </p>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(receitaLiquidaProjetos)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(16,185,129,0.4)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowUpCircle size={14} color="var(--success)" /> A Receber</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowUpCircle size={14} color="var(--success)" /> A Receber <InfoTooltip title="A Receber" content={PROJECT_INFO.aReceber} /></p>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(totalAReceber)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--danger)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowUp size={14} color="var(--danger)" /> Pago no período</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowUp size={14} color="var(--danger)" /> Pago no período <InfoTooltip title="Pago" content={PROJECT_INFO.pago} /></p>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(totalPago)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(239,68,68,0.4)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDown size={14} color="var(--danger)" /> A Pagar</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDown size={14} color="var(--danger)" /> A Pagar <InfoTooltip title="A Pagar" content={PROJECT_INFO.aPagar} /></p>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(totalAPagar)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--primary)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><Percent size={14} color="var(--primary)" /> Tributos sobre Receita e Lucro</p>
-            <ReportAdder sectionKey="projetos:impostos" title="Tributos sobre Receita e Lucro" componentName="Resumo de Impostos" page="Projetos" type="SUMMARY" data={[{ "Total de Impostos": taxesData.total, "% sobre o Faturamento": taxPercentage }]} filters={reportFilters} />
+            <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><Percent size={14} color="var(--primary)" /> Tributos sobre Receita e Lucro <InfoTooltip title="Tributos sobre Receita e Lucro" content={PROJECT_INFO.tributos} /></p>
+            <ReportAdder sectionKey="projetos:impostos" title="Tributos sobre Receita e Lucro" componentName="Resumo de Tributos" page="Projetos" type="SUMMARY" data={[{ "Total de Tributos": taxesData.total, "Receita Bruta no Período": grossRevenueTaxBase, "% sobre Receita Bruta": taxPercentage }]} filters={reportFilters} explanation="Tributos diretamente associados aos projetos filtrados, incluindo o INSS alocado. O percentual usa a receita bruta realizada no mesmo período e nos mesmos projetos." />
           </div>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(taxesData.total)}</p>
-          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}><strong style={{ color: 'var(--primary)' }}>{taxPercentage.toFixed(2).replace('.', ',')}%</strong> da receita de projetos</p>
+          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}><strong style={{ color: 'var(--primary)' }}>{taxPercentage === null ? '—' : `${taxPercentage.toFixed(2).replace('.', ',')}%`}</strong> sobre a receita bruta do período</p>
         </div>
       </div>
 
@@ -1044,26 +1048,26 @@ export default function Projetos() {
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <PieChart size={16} color="var(--primary)" /> Composição Financeira
               </h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Classificação dos valores realizados em 2026</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Classificação dos valores realizados no período selecionado</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <ReportAdder sectionKey="projetos:composicao" title="Composição Financeira" componentName="Composição Financeira - Projetos" page="Projetos" type="SUMMARY" data={[{ "Receita Líquida de Projetos": receitaLiquidaProjetos, "Custos Diretos": dreStats.custo, "Despesas": dreStats.despesa, "Tributos": dreStats.tributos, "Não Classificado": dreStats.naoClassificado }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Composição gerencial da receita líquida, custos e despesas dos projetos selecionados." />
-              <InfoTooltip title="Composição Financeira (DRE)" content="Receita, custos, despesas, tributos e valores não classificados dos projetos selecionados." />
+              <InfoTooltip title="Composição Financeira" content="Mostra como o Recebido Líquido é consumido por custos, despesas e tributos, evidenciando a composição do resultado dos projetos." />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '120px' }}>
               <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                Receita Realizada de Projetos
+                Receita Líquida Realizada
                 <InfoTooltip
                   title="Receita Líquida Realizada"
-                  content={`Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. É o valor efetivamente creditado, após descontos e retenções identificados na relação de recebimentos.`}
+                  content={PROJECT_INFO.recebidoLiquido}
                 />
               </p>
               <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--success)' }}>{formatCurrency(receitaLiquidaProjetos)}</p>
             </div>
             <div style={{ flex: 1, minWidth: '120px' }}>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Custos Diretos</p>
+              <p style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Custos Diretos <InfoTooltip title="Custos e Despesas" content={PROJECT_INFO.custosDespesas} /></p>
               <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--warning)' }}>{formatCurrency(dreStats.custo)}</p>
               {receitaLiquidaProjetos > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.custo / receitaLiquidaProjetos) * 100).toFixed(1)}% da Receita</span>}
             </div>
@@ -1073,9 +1077,9 @@ export default function Projetos() {
               {receitaLiquidaProjetos > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.despesa / receitaLiquidaProjetos) * 100).toFixed(1)}% da Receita</span>}
             </div>
             <div style={{ flex: 1, minWidth: '120px' }}>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Tributos</p>
+              <p style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Tributos <InfoTooltip title="Tributos" content={PROJECT_INFO.tributos} /></p>
               <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--primary)' }}>{formatCurrency(dreStats.tributos)}</p>
-              {receitaLiquidaProjetos > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.tributos / receitaLiquidaProjetos) * 100).toFixed(1)}% da Receita</span>}
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{taxPercentage === null ? 'Base não disponível' : `${taxPercentage.toFixed(1).replace('.', ',')}% sobre receita bruta`}</span>
             </div>
           </div>
           {receitaLiquidaProjetos > 0 && (
@@ -1101,11 +1105,11 @@ export default function Projetos() {
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Activity size={16} color="var(--primary)" /> Resultado Gerencial
               </h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Receita realizada - Custos - Despesas - Tributos</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Recebido Líquido − Custos − Despesas − Tributos</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <ReportAdder sectionKey="projetos:resultado" title="Resultado Gerencial" componentName="Cards Resultado Gerencial" page="Projetos" type="SUMMARY" data={[{ "Resultado Gerencial": resultadoGerencial, "Margem de Resultado (%)": margemFinanceira }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Resultado após custos, despesas e tributos dos projetos, com a margem correspondente." />
-              <InfoTooltip title="Resultado e Margem" content="Resultado gerencial e margem dos projetos selecionados." />
+              <InfoTooltip title="Resultado e Margem" content={`${PROJECT_INFO.resultado} ${PROJECT_INFO.margem}`} />
             </div>
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -1131,12 +1135,12 @@ export default function Projetos() {
       <div id="report-projetos-evolucao-anual" data-report-section className="card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
           <div>
-            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Evolução Financeira dos Projetos — 2026</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Receitas, custos e despesas realizados por mês. Os filtros de projeto, empresa e tipo continuam válidos.</p>
+            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Evolução Financeira dos Projetos</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Recebido Líquido, custos, despesas e tributos realizados no período filtrado.</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ReportAdder sectionKey="projetos:evolucao-anual" title="Evolução Financeira dos Projetos — 2026" componentName="Gráfico de Evolução Financeira" page="Projetos" type="CHART" data={monthlyFinancialData} filters={reportFilters} captureId="report-projetos-evolucao-anual" presetTags={["project-executive"]} />
-            <InfoTooltip title="Evolução Financeira 2026" content={`Receita líquida recebida: ${formatCurrency(receitaLiquidaProjetos)}. O gráfico compara receitas líquidas, custos e despesas realizados por mês em 2026.`} />
+            <ReportAdder sectionKey="projetos:evolucao-anual" title="Evolução Financeira dos Projetos" componentName="Gráfico de Evolução Financeira" page="Projetos" type="CHART" data={monthlyFinancialData} filters={reportFilters} captureId="report-projetos-evolucao-anual" presetTags={["project-executive"]} explanation="Evolução mensal do Recebido Líquido, custos, despesas e tributos dos projetos filtrados." />
+            <InfoTooltip title="Evolução Financeira" content="Permite comparar mensalmente o Recebido Líquido com custos, despesas e tributos, identificando variações na geração de resultado." />
           </div>
         </div>
         <ProjectMonthlyFinancialLineChart data={monthlyFinancialData} />
@@ -1161,12 +1165,12 @@ export default function Projetos() {
         <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: '1 1 400px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>5 Maiores Fontes de Receita — Projetos</h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Projetos com maior receita recebida no período selecionado</p>
+              <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>5 Maiores Fontes de Receita Líquida — Projetos</h2>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Projetos com maior Recebido Líquido no período selecionado</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <ReportAdder sectionKey="projetos:top-entradas" title="5 Maiores Fontes de Receita — Projetos" componentName="Gráfico Maiores Entradas" page="Projetos" type="TABLE" data={topEntradasData} filters={reportFilters} presetTags={["project-executive"]} />
-              <InfoTooltip title="5 Maiores Fontes de Receita — Projetos" content={`Cinco projetos com maior receita líquida recebida no período. Receita líquida total: ${formatCurrency(receitaLiquidaProjetos)}.`} />
+              <ReportAdder sectionKey="projetos:top-entradas" title="5 Maiores Fontes de Receita Líquida — Projetos" componentName="Gráfico Maiores Entradas" page="Projetos" type="TABLE" data={topEntradasData} filters={reportFilters} presetTags={["project-executive"]} />
+              <InfoTooltip title="5 Maiores Fontes de Receita Líquida — Projetos" content="Apresenta os projetos com maior valor efetivamente recebido no período, apoiando a análise de concentração das entradas líquidas." />
             </div>
           </div>
           <RankingBarChart data={topEntradasData} dataKey="Valor" color="var(--success)" emptyMessage="Sem recebimentos realizados em 2026." />
@@ -1193,12 +1197,12 @@ export default function Projetos() {
             <div>
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Tributos sobre Receita e Lucro</h2>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Total de Impostos: <strong style={{color:'var(--text-main)'}}>{formatCurrency(taxesData.total)}</strong> ({taxPercentage.toFixed(2).replace('.', ',')}% sobre o faturamento)
+                Total de Tributos: <strong style={{color:'var(--text-main)'}}>{formatCurrency(taxesData.total)}</strong> ({taxPercentage === null ? 'base indisponível' : `${taxPercentage.toFixed(2).replace('.', ',')}% sobre a receita bruta do período`})
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <ReportAdder sectionKey="projetos:impostos-chart" title="Tributos sobre Receita e Lucro" componentName="Gráfico Impostos" page="Projetos" type="TABLE" data={taxesData.list} filters={reportFilters} presetTags={["project-executive"]} />
-              <InfoTooltip title="Tributos sobre Receita e Lucro" content="Tributos sobre receita e lucro vinculados aos projetos selecionados." />
+              <ReportAdder sectionKey="projetos:impostos-chart" title="Tributos sobre Receita e Lucro" componentName="Gráfico de Tributos" page="Projetos" type="TABLE" data={taxesData.list} filters={reportFilters} presetTags={["project-executive"]} explanation="Ranking dos tributos diretamente alocados aos projetos, incluindo INSS quando vinculado a obra ou centro de custo." />
+              <InfoTooltip title="Tributos sobre Receita e Lucro" content={`${PROJECT_INFO.tributos} ${PROJECT_INFO.inss}`} />
             </div>
           </div>
           <RankingBarChart data={taxesData.list} dataKey="Valor" color="var(--primary)" emptyMessage="Sem impostos registrados no período." onClickItem={(cat) => setTaxDrillDown && setTaxDrillDown(cat.name)} />
@@ -1235,43 +1239,34 @@ export default function Projetos() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>Relatório Executivo de Projetos</h2>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <ReportAdder sectionKey="projetos:relatorio-executivo" title="Relatório Executivo de Projetos" componentName="Tabela de Projetos" page="Projetos" type="TABLE" data={projectReportRows} dataSets={{ summary: [{ Projetos: projectReportRows.length, "Total Contratado": totalContratado, "Total Faturado": totalFaturado, "Saldo Contratual": totalSaldo, "Resultado de Caixa": totalResultado }], visible: projectReportRows.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE), all: projectReportRows }} detailMode="visible" detailOptions={["summary", "visible", "all"]} filters={reportFilters} presetTags={["project-executive"]} explanation="Posição executiva dos contratos, faturamento e caixa dos projetos filtrados." />
+          <ReportAdder sectionKey="projetos:relatorio-executivo" title="Relatório Executivo de Projetos" componentName="Tabela de Projetos" page="Projetos" type="TABLE" data={projectReportRows} dataSets={{ summary: [{ Projetos: projectReportRows.length, "Total Contratado": totalContratado, "Faturado Acumulado": totalFaturado, "Faturado em 2026": totalFaturado2026, "Recebido Líquido": receitaLiquidaProjetos, Pago: totalPago, "A Receber": totalAReceber, "A Pagar": totalAPagar, Tributos: taxesData.total, "Resultado de Caixa": totalResultado }], visible: projectReportRows.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE), all: projectReportRows }} detailMode="visible" detailOptions={["summary", "visible", "all"]} filters={reportFilters} presetTags={["project-executive"]} explanation="Posição executiva contratual e financeira dos projetos filtrados, com Recebido Líquido, compromissos, pagamentos e resultado de caixa." />
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
             Mostrando {paginatedProjetos.length} de {sortedProjetos.length} projetos
           </span>
         </div>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1rem' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse' }}>
+      <div className="card project-executive-card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1rem' }}>
+        <div className="project-executive-filters">
+          <input type="text" placeholder="Filtrar projeto..." value={colFilterProjeto} onChange={e => { setColFilterProjeto(e.target.value); setTablePage(1); }} />
+          <input type="text" placeholder="Filtrar empresa..." value={colFilterEmpresa} onChange={e => { setColFilterEmpresa(e.target.value); setTablePage(1); }} />
+          <input type="number" placeholder="% faturado mínimo" value={colFilterMinFaturadoPerc} onChange={e => { setColFilterMinFaturadoPerc(e.target.value); setTablePage(1); }} />
+        </div>
+        <div className="project-executive-table-wrap">
+          <table className="project-executive-table">
+            <colgroup><col className="project-col-name" />{Array.from({ length: 9 }, (_, index) => <col key={index} />)}</colgroup>
             <thead style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-color)' }}>
               <tr style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'left', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('nome')}>Projeto / Obra <SortIcon columnKey="nome" /></th>
-                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'left', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('empresa')}>Empresa <SortIcon columnKey="empresa" /></th>
-                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('contratado')}>Contratado <SortIcon columnKey="contratado" /></th>
-                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('faturado')}>Faturado <SortIcon columnKey="faturado" /></th>
-                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('percentFaturado')}>% Fat. <SortIcon columnKey="percentFaturado" /></th>
-                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('saldoContratual')}>Saldo <SortIcon columnKey="saldoContratual" /></th>
-                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('recebido')}>Recebido <SortIcon columnKey="recebido" /></th>
-                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('pago')}>Pago <SortIcon columnKey="pago" /></th>
-                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('resultadoCaixa')}>Resultado <SortIcon columnKey="resultadoCaixa" /></th>
-              </tr>
-              <tr style={{ borderTop: 'none' }}>
-                <th style={{ padding: '0 1rem 0.75rem 1rem' }}>
-                  <input type="text" placeholder="Filtrar projeto..." value={colFilterProjeto} onChange={e => { setColFilterProjeto(e.target.value); setTablePage(1); }}
-                    style={{ width: '100%', height: '24px', fontSize: '11px', padding: '0 0.25rem', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }} />
-                </th>
-                <th style={{ padding: '0 1rem 0.75rem 1rem' }}>
-                  <input type="text" placeholder="Filtrar empresa..." value={colFilterEmpresa} onChange={e => { setColFilterEmpresa(e.target.value); setTablePage(1); }}
-                    style={{ width: '100%', height: '24px', fontSize: '11px', padding: '0 0.25rem', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }} />
-                </th>
-                <th colSpan={2} style={{ padding: '0 1rem 0.75rem 1rem' }}></th>
-                <th style={{ padding: '0 1rem 0.75rem 1rem' }}>
-                  <input type="number" placeholder="Min %" value={colFilterMinFaturadoPerc} onChange={e => { setColFilterMinFaturadoPerc(e.target.value); setTablePage(1); }}
-                    style={{ width: '100%', height: '24px', fontSize: '11px', padding: '0 0.25rem', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px', textAlign: 'center' }} />
-                </th>
-                <th colSpan={4} style={{ padding: '0 1rem 0.75rem 1rem' }}></th>
+                <th onClick={() => handleSort('nome')}>Projeto / Obra <SortIndicator active={sortConfig.key === 'nome'} direction={sortConfig.direction} /></th>
+                <th onClick={() => handleSort('contratado')}>Contratado <SortIndicator active={sortConfig.key === 'contratado'} direction={sortConfig.direction} /></th>
+                <th onClick={() => handleSort('faturado')}>Faturado <SortIndicator active={sortConfig.key === 'faturado'} direction={sortConfig.direction} /></th>
+                <th onClick={() => handleSort('faturado2026')}>Fat. 2026 <SortIndicator active={sortConfig.key === 'faturado2026'} direction={sortConfig.direction} /></th>
+                <th onClick={() => handleSort('saldoContratual')}>Saldo <SortIndicator active={sortConfig.key === 'saldoContratual'} direction={sortConfig.direction} /></th>
+                <th onClick={() => handleSort('recebido')}>Rec. Líq. <SortIndicator active={sortConfig.key === 'recebido'} direction={sortConfig.direction} /></th>
+                <th onClick={() => handleSort('aReceber')}>A Receber <SortIndicator active={sortConfig.key === 'aReceber'} direction={sortConfig.direction} /></th>
+                <th onClick={() => handleSort('pago')}>Pago <SortIndicator active={sortConfig.key === 'pago'} direction={sortConfig.direction} /></th>
+                <th onClick={() => handleSort('aPagar')}>A Pagar <SortIndicator active={sortConfig.key === 'aPagar'} direction={sortConfig.direction} /></th>
+                <th onClick={() => handleSort('resultadoCaixa')}>Resultado <SortIndicator active={sortConfig.key === 'resultadoCaixa'} direction={sortConfig.direction} /></th>
               </tr>
             </thead>
             <tbody style={{ fontSize: '13px' }}>
@@ -1280,19 +1275,20 @@ export default function Projetos() {
                   style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s', cursor: 'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '0.85rem 1rem', fontWeight: '500', color: 'var(--primary)' }}>{p.nome}</td>
-                  <td style={{ padding: '0.85rem 1rem', color: 'var(--text-main)' }}>{p.empresa}</td>
-                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--text-main)' }}>{formatCurrency(p.contratado)}</td>
-                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--text-main)' }}>{formatCurrency(p.faturado)}</td>
-                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: '500', color: p.percentFaturado >= 1 ? 'var(--success)' : 'var(--text-main)' }}>{formatPercent(p.percentFaturado)}</td>
-                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--text-main)' }}>{formatCurrency(p.saldoContratual)}</td>
-                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--success)' }}>{formatCurrency(p.recebido)}</td>
-                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--danger)' }}>{formatCurrency(p.pago)}</td>
-                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: '600', color: p.resultadoCaixa >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(p.resultadoCaixa)}</td>
+                  <td data-label="Projeto / Obra" style={{ fontWeight: '600', color: 'var(--primary)' }}>{p.nome}</td>
+                  <td data-label="Contratado">{formatCurrency(p.contratado)}</td>
+                  <td data-label="Faturado">{formatCurrency(p.faturado)}</td>
+                  <td data-label="Faturado em 2026">{formatCurrency(rangeIncludes2026 ? p.faturado2026 : 0)}</td>
+                  <td data-label="Saldo Contratual">{formatCurrency(p.saldoContratual)}</td>
+                  <td data-label="Recebido Líquido" style={{ color: 'var(--success)' }}>{formatCurrency(p.recebido)}</td>
+                  <td data-label="A Receber" style={{ color: 'var(--success)' }}>{formatCurrency(p.aReceber)}</td>
+                  <td data-label="Pago" style={{ color: 'var(--danger)' }}>{formatCurrency(p.pago)}</td>
+                  <td data-label="A Pagar" style={{ color: 'var(--danger)' }}>{formatCurrency(p.aPagar)}</td>
+                  <td data-label="Resultado" style={{ fontWeight: '700', color: p.resultadoCaixa >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(p.resultadoCaixa)}</td>
                 </tr>
               ))}
               {paginatedProjetos.length === 0 && (
-                <tr><td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>Nenhum projeto encontrado com os filtros aplicados.</td></tr>
+                <tr><td colSpan={10} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>Nenhum projeto encontrado com os filtros aplicados.</td></tr>
               )}
             </tbody>
           </table>
@@ -1345,17 +1341,19 @@ export default function Projetos() {
       {selectedProject && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', justifyContent: 'flex-end', backdropFilter: 'blur(2px)' }}>
           <div style={{ width: '100%', maxWidth: '1000px', height: '100%', backgroundColor: 'var(--bg-main)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', boxShadow: '-10px 0 30px rgba(0,0,0,0.5)', animation: 'slideIn 0.3s ease-out' }}>
+            <div hidden aria-hidden="true">
+              <ReportAdder sectionKey={`projetos:individual:${selectedProject.projectKey}:contrato`} title={`Resumo Contratual — ${selectedProject.nome}`} componentName="Resumo Contratual do Projeto" page="Projetos" type="TABLE" data={selectedProjectContractRows} columns={[{ key: 'Projeto', label: 'Projeto' }, { key: 'Empresa', label: 'Empresa' }, { key: 'Tipo', label: 'Tipo' }, { key: 'Contratado', label: 'Contratado', format: 'currency' }, { key: 'Faturado Acumulado', label: 'Faturado Acumulado', format: 'currency' }, { key: 'Faturado em 2026', label: 'Faturado em 2026', format: 'currency' }, { key: '% Faturado', label: '% Faturado', format: 'percent' }, { key: 'Saldo Contratual', label: 'Saldo Contratual', format: 'currency' }]} filters={selectedProjectReportFilters} presetTags={["project-executive"]} explanation="Posição contratual do projeto selecionado, separando faturamento acumulado e faturamento do exercício de 2026." />
+              <ReportAdder sectionKey={`projetos:individual:${selectedProject.projectKey}:financeiro`} title={`Resumo Financeiro — ${selectedProject.nome}`} componentName="Resumo Financeiro do Projeto" page="Projetos" type="SUMMARY" data={selectedProjectFinancialRows} filters={selectedProjectReportFilters} presetTags={["project-executive"]} explanation="Posição de caixa do projeto. Os tributos são destacados para análise, mas já integram Pago e A Pagar e não são descontados novamente." />
+              <ReportAdder sectionKey={`projetos:individual:${selectedProject.projectKey}:movimentos`} title={`Movimentações — ${selectedProject.nome}`} componentName="Movimentações do Projeto" page="Projetos" type="TABLE" data={selectedProjectMovementReportRows} filters={selectedProjectReportFilters} presetTags={["project-executive"]} explanation="Detalhamento das entradas e saídas que compõem o Recebido Líquido, Pago, A Receber e A Pagar do projeto no período selecionado." />
+            </div>
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-elevated)' }}>
               <div>
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>{selectedProject.empresa} • {selectedProject.tipo}</span>
                 <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--primary)' }}>{selectedProject.nome}</h2>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <button onClick={exportSelectedProjectPdf} className="btn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
-                  <FileText size={14} /> Gerar PDF
-                </button>
-                <button onClick={exportSelectedProjectExcel} className="btn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
-                  <FileSpreadsheet size={14} /> Exportar Excel
+                <button onClick={() => { setSelectedProject(null); openReportBuilder('Projetos'); }} className="btn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                  <FileText size={14} /> Gerar Relatório
                 </button>
                 <button onClick={() => setSelectedProject(null)} className="btn" style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%' }}>
                   <X size={20} color="var(--text-secondary)" />
@@ -1366,9 +1364,10 @@ export default function Projetos() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
                 <div className="card" style={{ padding: '1.5rem', borderTop: '3px solid var(--purple)' }}>
                   <h3 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Visão Contratual</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Contratado</span><strong style={{ color: 'var(--text-main)' }}>{formatCurrency(selectedProject.contratado)}</strong></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Faturado</span><strong style={{ color: 'var(--text-main)' }}>{formatCurrency(selectedProject.faturado)}</strong></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Contratado</span><strong style={{ color: 'var(--text-main)' }}>{formatCurrency(selectedProject.contratado)}</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Faturado Acumulado</span><strong style={{ color: 'var(--text-main)' }}>{formatCurrency(selectedProject.faturado)}</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Faturado em 2026</span><strong style={{ color: 'var(--info)' }}>{formatCurrency(rangeIncludes2026 ? selectedProject.faturado2026 : 0)}</strong></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>% Faturado</span><strong style={{ color: 'var(--success)' }}>{formatPercent(selectedProject.percentFaturado)}</strong></div>
                     <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.25rem 0' }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px' }}><span style={{ color: 'var(--text-main)' }}>Saldo Contratual</span><strong style={{ color: 'var(--warning)' }}>{formatCurrency(selectedProject.saldoContratual)}</strong></div>
@@ -1377,7 +1376,7 @@ export default function Projetos() {
                 <div className="card" style={{ padding: '1.5rem', borderTop: '3px solid var(--primary)' }}>
                     <h3 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Visão Financeira (Caixa)</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Recebido (Direto)</span><strong style={{ color: 'var(--success)' }}>{formatCurrency(selectedProject.recebido - (incluirRateioAdm ? (selectedProject.receitaAdm || 0) : 0))}</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Recebido Líquido (Direto)</span><strong style={{ color: 'var(--success)' }}>{formatCurrency(selectedProject.recebido - (incluirRateioAdm ? (selectedProject.receitaAdm || 0) : 0))}</strong></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>A Receber (Direto)</span><strong style={{ color: 'var(--success)', opacity: 0.8 }}>{formatCurrency(selectedProject.aReceber)}</strong></div>
                       <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.25rem 0' }} />
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1390,7 +1389,7 @@ export default function Projetos() {
                       
                       {incluirRateioAdm && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(16,185,129,0.1)', padding: '0.5rem', borderRadius: '4px' }}>
-                          <span style={{ color: 'var(--text-main)', fontSize: '12px' }}>Total Receita (Vinculada)</span>
+                          <span style={{ color: 'var(--text-main)', fontSize: '12px' }}>Recebido Líquido Total</span>
                           <strong style={{ color: 'var(--success)' }}>{formatCurrency(selectedProject.receitaConsideradaTooltip || 0)}</strong>
                         </div>
                       )}
@@ -1398,6 +1397,7 @@ export default function Projetos() {
                       <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.25rem 0' }} />
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Pago</span><strong style={{ color: 'var(--danger)' }}>{formatCurrency(selectedProject.pago)}</strong></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>A Pagar</span><strong style={{ color: 'var(--danger)', opacity: 0.8 }}>{formatCurrency(selectedProject.aPagar)}</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}><span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>Tributos incluídos em Pago <InfoTooltip title="Tributos do Projeto" content={`${PROJECT_INFO.tributos} ${PROJECT_INFO.inss}`} /></span><strong style={{ color: 'var(--primary)' }}>{formatCurrency(selectedProject.tributosPago)}</strong></div>
                       <div style={{ height: '1px', background: 'var(--border-color)', margin: '0.25rem 0' }} />
                       
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px' }}>

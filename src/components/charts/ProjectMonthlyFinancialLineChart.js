@@ -55,8 +55,10 @@ export default function ProjectMonthlyFinancialLineChart({ data = [] }) {
           <Line type="monotone" dataKey="Receitas" name="Receita Líquida" stroke="var(--success)" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
           <Line type="monotone" dataKey="Custos" name="Custos" stroke="var(--warning)" strokeWidth={2.25} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
           <Line type="monotone" dataKey="Despesas" name="Despesas" stroke="var(--danger)" strokeWidth={2.25} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
+          <Line type="monotone" dataKey="Tributos" name="Tributos" stroke="var(--primary)" strokeWidth={2.25} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
         </LineChart>
       </ResponsiveContainer>
     </div>
   );
 }
+

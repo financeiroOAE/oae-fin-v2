@@ -10,6 +10,25 @@ const SNAPSHOT_ID = 'current';
 const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA'];
 const CASH_LOGIC_VERSION = 4;
 
+function readProjectBilling2026(project) {
+  const aliases = [
+    'FATURADO EM 2026',
+    'FATURADO 2026',
+    'FATURAMENTO EM 2026',
+    'FATURAMENTO 2026',
+  ];
+  const normalizedEntries = Object.entries(project || {}).map(([key, value]) => [
+    String(key || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase(),
+    value,
+  ]);
+  const explicit = normalizedEntries.find(([key]) => aliases.includes(key));
+  if (explicit) return parseBRL(explicit[1]);
+
+  // A fonte oficial definiu o indicador na coluna L. O fallback posicional
+  // preserva a leitura mesmo se o cabeçalho for renomeado na planilha.
+  return parseBRL(Object.values(project || {})[11]);
+}
+
 function parseSortDate(value) {
   if (!value) return 0;
   const raw = String(value).trim();
@@ -76,6 +95,7 @@ async function performFullSync(triggeredBy) {
       ...proj,
       CONTRATO: parseBRL(proj.CONTRATO),
       'NF FATURADAS': parseBRL(proj['NF FATURADAS']),
+      FATURADO_2026: readProjectBilling2026(proj),
       'SALDO CONTRATUAL': parseBRL(proj['SALDO CONTRATUAL']),
     }));
 
@@ -127,6 +147,7 @@ async function performFullSync(triggeredBy) {
     .reduce((acc, row) => acc + (Number(row.valorCaixa) || 0), 0);
   const somaProjetosContrato = projetos.reduce((acc, row) => acc + row.CONTRATO, 0);
   const somaProjetosFaturado = projetos.reduce((acc, row) => acc + row['NF FATURADAS'], 0);
+  const somaProjetosFaturado2026 = projetos.reduce((acc, row) => acc + row.FATURADO_2026, 0);
   const somaProjetosSaldo = projetos.reduce((acc, row) => acc + row['SALDO CONTRATUAL'], 0);
 
   const recebimentosLiquidosStats = {
@@ -146,6 +167,7 @@ async function performFullSync(triggeredBy) {
   console.log(`Soma recebida realizada pela coluna K: ${somaCRRealizado}`);
   console.log(`Soma de PROJETOS_2026.CONTRATO: ${somaProjetosContrato}`);
   console.log(`Soma de PROJETOS_2026.NF FATURADAS: ${somaProjetosFaturado}`);
+  console.log(`Soma de PROJETOS_2026.FATURADO_2026: ${somaProjetosFaturado2026}`);
   console.log(`Soma de PROJETOS_2026.SALDO_CONTRATUAL: ${somaProjetosSaldo}`);
   console.log(`Tempo de processamento: ${Date.now() - startedAt}ms`);
   console.log('------------------------------------------');
@@ -159,6 +181,7 @@ async function performFullSync(triggeredBy) {
     saldosBancarios: empresas,
     somaProjetosContrato,
     somaProjetosFaturado,
+    somaProjetosFaturado2026,
     somaProjetosSaldo,
     somaCRFaturamento,
     somaCRLiquido,
@@ -180,6 +203,7 @@ async function performFullSync(triggeredBy) {
         syncedAt,
         somaProjetosContrato,
         somaProjetosFaturado,
+        somaProjetosFaturado2026,
         somaProjetosSaldo,
         somaCRFaturamento,
         somaCRLiquido,

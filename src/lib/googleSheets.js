@@ -30,7 +30,7 @@ export async function batchReadSheets() {
 
   const ranges = [
     'EMPRESAS!A:J',
-    'PROJETOS_2026!A:I',
+    'PROJETOS_2026!A:L',
     'CENTROS_CUSTO!A:E',
     'PLANOS_FINANCEIROS!A:E',
     'CP_GERAL!A:L',
@@ -95,3 +95,4 @@ export async function batchReadSheets() {
     throw error;
   }
 }
+
