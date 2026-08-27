@@ -54,8 +54,6 @@ function isDailySyncDue(snapshotUpdatedAt) {
 }
 
 function snapshotNeedsProjectRepair(payload) {
-  // Snapshots anteriores a leitura da coluna L nao possuem FATURADO_2026.
-  // Nesse caso a primeira abertura apos o deploy refaz a sincronizacao automaticamente.
   if (!Array.isArray(payload?.projetos)) return true;
   if (payload.projetos.some((project) => project?.FATURADO_2026 === undefined || project?.FATURADO_2026 === null)) return true;
   if (!Array.isArray(payload?.data)) return false;
@@ -89,10 +87,12 @@ export async function GET(request) {
   }
 
   const username = session.user.username;
-  const force = new URL(request.url).searchParams.get('force') === '1';
   let snapshot = null;
 
   try {
+    // Route handlers do Next recebem NextRequest; usar nextUrl evita reconstruir/parsing manual da URL.
+    const force = request.nextUrl?.searchParams?.get('force') === '1';
+
     snapshot = await readCurrentSnapshot();
     const requiresProjectRepair = snapshotNeedsProjectRepair(snapshot?.payload);
     const requiresCashRepair = snapshotNeedsCashRepair(snapshot?.payload);
