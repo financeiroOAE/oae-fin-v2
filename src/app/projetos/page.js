@@ -1097,7 +1097,7 @@ export default function Projetos() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '120px' }}>
+            <div style={{ flex: '1 1 120px', minWidth: 0, overflow: 'hidden' }}>
               <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
                 RECEITA LÍQUIDA
                 <InfoTooltip
@@ -1105,21 +1105,21 @@ export default function Projetos() {
                   content={`Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. É o valor efetivamente creditado, após descontos e retenções identificados na relação de recebimentos.`}
                 />
               </p>
-              <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--success)' }}>{formatCurrency(receitaLiquidaProjetos)}</p>
+              <p style={{ fontSize: 'clamp(14px, 1.25vw, 18px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', color: 'var(--success)' }}>{formatCurrency(receitaLiquidaProjetos)}</p>
             </div>
-            <div style={{ flex: 1, minWidth: '120px' }}>
+            <div style={{ flex: '1 1 120px', minWidth: 0, overflow: 'hidden' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Custos Diretos</p>
-              <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--warning)' }}>{formatCurrency(dreStats.custo)}</p>
+              <p style={{ fontSize: 'clamp(14px, 1.25vw, 18px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', color: 'var(--warning)' }}>{formatCurrency(dreStats.custo)}</p>
               {receitaLiquidaProjetos > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.custo / receitaLiquidaProjetos) * 100).toFixed(1)}% da Receita</span>}
             </div>
-            <div style={{ flex: 1, minWidth: '120px' }}>
+            <div style={{ flex: '1 1 120px', minWidth: 0, overflow: 'hidden' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Outras Despesas</p>
-              <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--danger)' }}>{formatCurrency(dreStats.despesa)}</p>
+              <p style={{ fontSize: 'clamp(14px, 1.25vw, 18px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', color: 'var(--danger)' }}>{formatCurrency(dreStats.despesa)}</p>
               {receitaLiquidaProjetos > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.despesa / receitaLiquidaProjetos) * 100).toFixed(1)}% da Receita</span>}
             </div>
-            <div style={{ flex: 1, minWidth: '120px' }}>
+            <div style={{ flex: '1 1 120px', minWidth: 0, overflow: 'hidden' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Tributos</p>
-              <p style={{ fontSize: '19px', fontWeight: '700', color: 'var(--primary)' }}>{formatCurrency(dreStats.tributos)}</p>
+              <p style={{ fontSize: 'clamp(14px, 1.25vw, 18px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', color: 'var(--primary)' }}>{formatCurrency(dreStats.tributos)}</p>
               {receitaLiquidaProjetos > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.tributos / receitaLiquidaProjetos) * 100).toFixed(1)}% da Receita</span>}
             </div>
           </div>
@@ -1154,7 +1154,7 @@ export default function Projetos() {
             </div>
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <p style={{ fontSize: '28px', fontWeight: '700', color: resultadoGerencial >= 0 ? 'var(--success)' : 'var(--danger)', letterSpacing: '-1px' }}>
+            <p style={{ fontSize: 'clamp(20px, 2vw, 26px)', fontWeight: '700', color: resultadoGerencial >= 0 ? 'var(--success)' : 'var(--danger)', letterSpacing: '-0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums' }}>
               {formatCurrency(resultadoGerencial)}
             </p>
             <div style={{ marginTop: '1rem' }}>
