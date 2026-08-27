@@ -322,9 +322,9 @@ export default function Projetos() {
       const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A RECEBER') || status.includes('A PAGAR') || status.includes('PREVISTO'));
       if (!isRealizado && !isPrevisto) return;
 
-      // Realizados seguem o período; títulos em aberto são posição atual e não
-      // desaparecem só porque vencem depois da Data Final.
-      if (isRealizado && (ts < realizadoIni || ts > realizadoFim)) return;
+      // Todos os valores do Consolidado de Caixa obedecem ao período selecionado.
+      // Isso vale tanto para realizados quanto para A Receber / A Pagar.
+      if (ts < realizadoIni || ts > realizadoFim) return;
 
       const revenueIdentity = item.natureza === 'Entrada'
         ? getFinancialRevenueProjectIdentity(item)
@@ -478,11 +478,18 @@ export default function Projetos() {
   const previsaoProjetosGeral = useMemo(() => data
     .filter((item) => {
       const status = String(item.status || '').toUpperCase();
-      return item.natureza === 'Saída'
-        && (status.includes('A REALIZAR') || status.includes('A PAGAR') || status.includes('PREVISTO'))
-        && isGeneralProjectsBucket(item.projeto);
+      if (item.natureza !== 'Saída'
+        || !(status.includes('A REALIZAR') || status.includes('A PAGAR') || status.includes('PREVISTO'))
+        || !isGeneralProjectsBucket(item.projeto)) return false;
+
+      let ts = 0;
+      if (item.data) {
+        const parts = String(item.data).split('/');
+        if (parts.length === 3) ts = new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+      }
+      return ts >= realizadoIni && ts <= realizadoFim;
     })
-    .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0), [data]);
+    .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0), [data, realizadoIni, realizadoFim]);
 
   const incluirPrevisaoGeral = usarCarteiraCompleta;
   const totalAPagar = filteredProjetos.reduce((acc, p) => acc + p.aPagar, 0) + (incluirPrevisaoGeral ? previsaoProjetosGeral : 0);
@@ -528,7 +535,7 @@ export default function Projetos() {
         if (parts.length === 3) ts = new Date(parts[2], parts[1] - 1, parts[0]).getTime();
       }
       if (isRealizado && ts >= realizadoIni && ts <= realizadoFim) recReceita += Number(item.valor) || 0;
-      if (isPrevisto) recAReceber += Number(item.valor) || 0;
+      if (isPrevisto && ts >= realizadoIni && ts <= realizadoFim) recAReceber += Number(item.valor) || 0;
     });
 
     let cPago = 0;
@@ -555,7 +562,7 @@ export default function Projetos() {
       const isRealizado = status.includes('REALIZADO') || status.includes('PAGO') || status.includes('EFETIVADO');
       const isPrevisto = !isRealizado && (status.includes('A REALIZAR') || status.includes('A PAGAR') || status.includes('PREVISTO'));
       if (!isRealizado && !isPrevisto) return;
-      if (isRealizado && (ts < realizadoIni || ts > realizadoFim)) return;
+      if (ts < realizadoIni || ts > realizadoFim) return;
 
       const valor = Math.abs(Number(item.valor) || 0);
       const dreInfo = [item.dreClasse, item.dreLinha, item.dreDescricao].filter(Boolean).join(' ').toUpperCase();
@@ -1010,7 +1017,7 @@ export default function Projetos() {
   const selectedProjectTeamCosts = useMemo(() => {
     if (!selectedProject) return [];
     const map = {};
-    selectedProjectMoves.forEach(item => {
+    selectedProjectReportMoves.forEach(item => {
       if (item.natureza !== 'Saída') return;
       if (!isTeamExpense(item)) return;
       const account = item.contaNome || item.contaDescricao || item.contaCodigo || 'Equipe não identificada';
@@ -1022,7 +1029,7 @@ export default function Projetos() {
       map[account].Total += value;
     });
     return Object.values(map).sort((a, b) => b.Total - a.Total);
-  }, [selectedProject, selectedProjectMoves]);
+  }, [selectedProject, selectedProjectReportMoves]);
 
   const clearAllFilters = () => {
     setFilterProjetos([]); setFilterEmpresas([]); setFilterTipos([]);
