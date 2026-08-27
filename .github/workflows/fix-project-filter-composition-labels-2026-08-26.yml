@@ -1,0 +1,47 @@
+name: Fix Project Filters and Composition Labels 2026-08-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/fix-project-filter-composition-labels-2026-08-26.js
+      - .github/workflows/fix-project-filter-composition-labels-2026-08-26.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/oae_ci
+      JWT_SECRET: ci_only_secret_for_build_validation
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Aplicar correções de Projetos
+        run: node scripts/fix-project-filter-composition-labels-2026-08-26.js
+      - name: Instalar dependências
+        run: npm ci
+      - name: Gerar Prisma
+        run: npx prisma generate
+      - name: Validar build
+        run: npm run build
+      - name: Commitar mudanças validadas
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/projetos/page.js
+          git commit -m "fix: restaurar filtros oficiais de projetos e remover 2026 da composição"
+          git push origin main
