@@ -336,7 +336,13 @@ export default function FluxoDeCaixa() {
     baseData.forEach(item => {
       const status = String(item.status || '').trim().toUpperCase();
       const forecastOnly = item.natureza === 'Entrada' && isForecastOnlyReceivableDocument(item);
-      const isForecast = status === 'A REALIZAR' || forecastOnly;
+
+      // PCT/PRV sao documentos auxiliares de previsao e nao devem compor
+      // a receita prevista do Fluxo de Caixa de 7 dias, mesmo quando a origem
+      // vier com status A REALIZAR.
+      if (forecastOnly) return;
+
+      const isForecast = status === 'A REALIZAR';
       if(isForecast && map[item.dataTimestamp]) {
         if (item.natureza === 'Entrada') {
           map[item.dataTimestamp].Entradas += item.valor;
