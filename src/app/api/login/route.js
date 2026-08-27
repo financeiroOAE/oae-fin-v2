@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
 import { createSession } from '@/lib/auth';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request) {
   try {
@@ -40,11 +38,10 @@ export async function POST(request) {
         where: { id: user.id },
         data: { passwordHash: newHash, mustChangePass: false },
       });
-      
+
       user.mustChangePass = false;
     }
 
-    // Cria a sessão com JWT
     let permissions = [];
     try { permissions = JSON.parse(user.menuPermissions || '[]'); } catch { permissions = []; }
     const sessionPayload = {
@@ -56,14 +53,15 @@ export async function POST(request) {
       isActive: user.isActive,
       mustChangePass: user.mustChangePass,
     };
+
     await createSession(sessionPayload);
 
     return NextResponse.json({ success: true, message: 'Autenticado com sucesso' });
-
   } catch (error) {
     console.error('Login error:', error);
-    return NextResponse.json({ error: 'Erro interno no servidor' }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
+    return NextResponse.json({
+      error: 'Erro interno no servidor',
+      details: process.env.NODE_ENV === 'production' ? undefined : error?.message,
+    }, { status: 500 });
   }
 }
