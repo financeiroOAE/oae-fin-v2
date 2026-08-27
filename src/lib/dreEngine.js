@@ -224,38 +224,20 @@ export function filterDreItems(baseData, {
   const dIni = filterDataInicial ? new Date(filterDataInicial + 'T00:00:00').getTime() : 0;
   const dFim = filterDataFinal ? new Date(filterDataFinal + 'T23:59:59').getTime() : Infinity;
 
-  // Data de corte = Início do dia de hoje
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const hojeTs = hoje.getTime();
-  const endOf2026 = new Date('2026-12-31T23:59:59').getTime();
-
   return baseData.filter(item => {
     // Verificar status
     const statusUpper = String(item.status || '').toUpperCase();
     const isRealizado = statusUpper.includes('REALIZADO') || statusUpper.includes('PAGO') || statusUpper.includes('RECEBIDO') || statusUpper === 'EFETIVADO';
     const isPrevisto = !isRealizado && (statusUpper.includes('A REALIZAR') || statusUpper.includes('A RECEBER') || statusUpper.includes('A PAGAR') || statusUpper.includes('PREVISTO'));
 
-    const ts = item.dataTimestamp || 0;
-
-    // Lógica da visão
+    // Lógica da visão: o período selecionado é a regra temporal.
     if (visao === 'REALIZADO') {
       if (!isRealizado) return false;
     } else if (visao === 'SOMENTE_PREVISAO') {
       if (!isPrevisto) return false;
-      if (ts < hojeTs || ts > endOf2026) return false;
     } else if (visao === 'REALIZADO_PREVISAO') {
-      if (isRealizado) {
-        // Se for realizado, só considera até a data de hoje (para evitar incluir "realizados" com data futura se existir erro na base, embora improvável, o usuário pediu "lançamentos até a data atual")
-        // Na verdade, o seguro é incluir todos os realizados até hoje.
-        if (ts > hojeTs) return false; // Ignora realizados com data no futuro? Apenas por segurança.
-      } else if (isPrevisto) {
-        if (ts < hojeTs || ts > endOf2026) return false;
-      } else {
-        return false; // Status desconhecido
-      }
+      if (!isRealizado && !isPrevisto) return false;
     }
-
     // Filtro para "Fora da DRE" ou "Não Incluir" com base na Classe ou Linha
     const dreClasseUpper = String(item.dreClasse || '').toUpperCase();
     const dreLinhaUpper = String(item.dreLinha || '').toUpperCase();

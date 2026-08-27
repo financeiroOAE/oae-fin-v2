@@ -465,7 +465,13 @@ export default function Projetos() {
   const totalRecebido = filteredProjetos.reduce((acc, p) => acc + p.recebido, 0);
   const totalAReceber = filteredProjetos.reduce((acc, p) => acc + p.aReceber, 0);
   const totalPago = filteredProjetos.reduce((acc, p) => acc + p.pago, 0);
-  const receitaLiquidaProjetos = totalRecebido;
+  // Receita liquida dos projetos acompanha o botao de rateio administrativo.
+  // A base consolidada usa o valor efetivamente recebido da CR_GERAL (coluna K).
+  const receitaLiquidaProjetos = filteredProjetos.reduce((acc, p) => {
+    const direta = Number(p.receitaDireta) || 0;
+    const adm = incluirRateioAdm ? (Number(p.receitaAdm) || 0) : 0;
+    return acc + direta + adm;
+  }, 0);
 
   const usarCarteiraCompleta = filterProjetos.length === 0 && filterEmpresas.length === 0 && filterTipos.length === 0;
 
@@ -607,11 +613,11 @@ export default function Projetos() {
     return { list: arr, total: totalTaxes };
   }, [data, filteredProjetos, realizadoIni, realizadoFim]);
 
-  const margemFinanceira = receitaLiquidaProjetos > 0 ? ((receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - dreStats.tributos) / receitaLiquidaProjetos) * 100 : null;
-  const resultadoGerencial = receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - dreStats.tributos;
-  // Base unica para o peso tributario: Recebido Liquido do mesmo periodo e dos mesmos filtros.
-  // Isso evita comparar tributos do periodo com um faturamento contratual acumulado de outra base temporal.
-  const taxPercentage = receitaLiquidaProjetos > 0 ? (taxesData.total / receitaLiquidaProjetos) * 100 : 0;
+  // Uma unica fonte de tributos em Projetos: realizados, no periodo e alocados aos projetos filtrados.
+  const tributosProjetos = taxesData.total;
+  const margemFinanceira = receitaLiquidaProjetos > 0 ? ((receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - tributosProjetos) / receitaLiquidaProjetos) * 100 : null;
+  const resultadoGerencial = receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - tributosProjetos;
+  const taxPercentage = receitaLiquidaProjetos > 0 ? (tributosProjetos / receitaLiquidaProjetos) * 100 : 0;
 
   const abcDonutData = useMemo(() => {
     const projects = [...filteredProjetos].filter(p => p.contratado > 0).sort((a, b) => b.contratado - a.contratado);
@@ -1197,46 +1203,46 @@ export default function Projetos() {
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <PieChart size={16} color="var(--primary)" /> Composição Financeira
               </h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Faturamento, custos, despesas e tributos em 2026</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Receita, custos, despesas e tributos no período selecionado</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <ReportAdder sectionKey="projetos:composicao" title="Composição Financeira" componentName="Composição Financeira - Projetos" page="Projetos" type="SUMMARY" data={[{ "Faturado": totalFaturado2026, "Receita Líquida Realizada": receitaLiquidaProjetos, "Custos Diretos": dreStats.custo, "Despesas": dreStats.despesa, "Tributos": dreStats.tributos, "Não Classificado": dreStats.naoClassificado }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Composição gerencial baseada no faturamento da carteira, mantendo a receita líquida realizada como informação complementar." />
-              <InfoTooltip title="Composição Financeira" content={`Faturado: ${formatCurrency(totalFaturado2026)}. Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. Custos, despesas e tributos são comparados ao faturamento neste card.`} />
+              <ReportAdder sectionKey="projetos:composicao" title="Composição Financeira" componentName="Composição Financeira - Projetos" page="Projetos" type="SUMMARY" data={[{ "Receita Líquida Realizada": receitaLiquidaProjetos, "Custos Diretos": dreStats.custo, "Despesas": dreStats.despesa, "Tributos": tributosProjetos, "Não Classificado": dreStats.naoClassificado }]} filters={reportFilters} presetTags={["project-executive"]} explanation="Composição gerencial baseada na receita líquida realizada dos projetos no período. O rateio administrativo acompanha o botão do painel." />
+              <InfoTooltip title="Composição Financeira" content={`Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. O valor acompanha o período, os filtros e o botão de rateio administrativo.`} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 135px', minWidth: 0, overflow: 'visible' }}>
               <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                FATURADO 2026
+                RECEITA
                 <InfoTooltip
-                  title="Faturado"
-                  content={`Faturado: ${formatCurrency(totalFaturado2026)}. Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. A receita líquida é o valor efetivamente creditado após descontos e retenções.`}
+                  title="Receita Líquida Realizada"
+                  content={`Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. Inclui a parcela administrativa somente quando o rateio estiver ligado.`}
                 />
               </p>
-              <p title={`Faturado em 2026: ${formatCurrency(totalFaturado2026)}`} style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--success)', cursor: 'help' }}>{formatCurrency(totalFaturado2026)}</p>
+              <p title={`Receita Líquida Realizada: ${formatCurrency(receitaLiquidaProjetos)}`} style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--success)', cursor: 'help' }}>{formatCurrency(receitaLiquidaProjetos)}</p>
             </div>
             <div style={{ flex: '1 1 135px', minWidth: 0, overflow: 'visible' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Custos Diretos</p>
               <p style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--warning)' }}>{formatCurrency(dreStats.custo)}</p>
-              {totalFaturado2026 > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.custo / totalFaturado2026) * 100).toFixed(1)}% do Faturado</span>}
+              {receitaLiquidaProjetos > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.custo / receitaLiquidaProjetos) * 100).toFixed(1)}% da Receita</span>}
             </div>
             <div style={{ flex: '1 1 135px', minWidth: 0, overflow: 'visible' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Outras Despesas</p>
               <p style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--danger)' }}>{formatCurrency(dreStats.despesa)}</p>
-              {totalFaturado2026 > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.despesa / totalFaturado2026) * 100).toFixed(1)}% do Faturado</span>}
+              {receitaLiquidaProjetos > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.despesa / receitaLiquidaProjetos) * 100).toFixed(1)}% da Receita</span>}
             </div>
             <div style={{ flex: '1 1 135px', minWidth: 0, overflow: 'visible' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Tributos</p>
-              <p style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--primary)' }}>{formatCurrency(dreStats.tributos)}</p>
-              {totalFaturado2026 > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.tributos / totalFaturado2026) * 100).toFixed(1)}% do Faturado</span>}
+              <p style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--primary)' }}>{formatCurrency(tributosProjetos)}</p>
+              {receitaLiquidaProjetos > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((tributosProjetos / receitaLiquidaProjetos) * 100).toFixed(1)}% da Receita</span>}
             </div>
           </div>
-          {totalFaturado2026 > 0 && (
+          {receitaLiquidaProjetos > 0 && (
             <div style={{ width: '100%', height: '12px', background: 'var(--bg-main)', borderRadius: '6px', display: 'flex', overflow: 'hidden' }}>
-              <div style={{ width: `${Math.max(0, 100 - ((dreStats.custo + dreStats.despesa + dreStats.tributos) / totalFaturado2026) * 100)}%`, background: 'var(--success)', transition: 'width 0.3s ease' }} />
-              <div style={{ width: `${(dreStats.custo / totalFaturado2026) * 100}%`, background: 'var(--warning)', transition: 'width 0.3s ease' }} />
-              <div style={{ width: `${(dreStats.despesa / totalFaturado2026) * 100}%`, background: 'var(--danger)', transition: 'width 0.3s ease' }} />
-              <div style={{ width: `${(dreStats.tributos / totalFaturado2026) * 100}%`, background: 'var(--primary)', transition: 'width 0.3s ease' }} />
+              <div style={{ width: `${Math.max(0, 100 - ((dreStats.custo + dreStats.despesa + tributosProjetos) / receitaLiquidaProjetos) * 100)}%`, background: 'var(--success)', transition: 'width 0.3s ease' }} />
+              <div style={{ width: `${(dreStats.custo / receitaLiquidaProjetos) * 100}%`, background: 'var(--warning)', transition: 'width 0.3s ease' }} />
+              <div style={{ width: `${(dreStats.despesa / receitaLiquidaProjetos) * 100}%`, background: 'var(--danger)', transition: 'width 0.3s ease' }} />
+              <div style={{ width: `${(tributosProjetos / receitaLiquidaProjetos) * 100}%`, background: 'var(--primary)', transition: 'width 0.3s ease' }} />
             </div>
           )}
           {dreStats.naoClassificado > 0 && (

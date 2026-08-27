@@ -616,10 +616,9 @@ export default function Dre() {
 
   const projetosDisponiveis = useMemo(() => getActiveProjectNames(projetosBrutos, true), [projetosBrutos]);
 
-  const annualView = visao !== 'REALIZADO';
-  const annualRange = getDreDateRange(visao);
-  const effectiveDataInicial = annualView ? annualRange.start : filterDataInicial;
-  const effectiveDataFinal = annualView ? annualRange.end : filterDataFinal;
+  // Todas as visoes respeitam o periodo escolhido, inclusive previsoes.
+  const effectiveDataInicial = filterDataInicial;
+  const effectiveDataFinal = filterDataFinal;
 
   // ── Filtros com exclusão "Fora da DRE" e regra 80/20 ADM ────────────────────
   const filteredItems = useMemo(() => {
@@ -924,11 +923,11 @@ export default function Dre() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem", minWidth: "140px" }}>
             <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>Data Inicial</label>
-            <input type="date" value={effectiveDataInicial} disabled={annualView} onChange={e => setFilterDataInicial(e.target.value)} title={annualView ? "A visão anual usa o ano completo" : undefined} style={{ height: "38px", padding: "0 0.75rem", background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-main)", fontSize: "13px", opacity: annualView ? 0.7 : 1 }} />
+            <input type="date" value={effectiveDataInicial} onChange={e => setFilterDataInicial(e.target.value)} style={{ height: "38px", padding: "0 0.75rem", background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-main)", fontSize: "13px", opacity: 1 }} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem", minWidth: "140px" }}>
             <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>Data Final</label>
-            <input type="date" value={effectiveDataFinal} disabled={annualView} onChange={e => setFilterDataFinal(e.target.value)} title={annualView ? "A visão anual usa o ano completo" : undefined} style={{ height: "38px", padding: "0 0.75rem", background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-main)", fontSize: "13px", opacity: annualView ? 0.7 : 1 }} />
+            <input type="date" value={effectiveDataFinal} onChange={e => setFilterDataFinal(e.target.value)} style={{ height: "38px", padding: "0 0.75rem", background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-main)", fontSize: "13px", opacity: 1 }} />
           </div>
           <div style={{ flex: "1 1 200px", display: "flex", flexDirection: "column", gap: "0.375rem" }}>
             <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>Projeto / Obra</label>
