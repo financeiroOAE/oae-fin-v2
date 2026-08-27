@@ -693,7 +693,9 @@ export default function Dre() {
     if (includeRetroactive && retroactiveItems.length === 0) setIncludeRetroactive(false);
   }, [includeRetroactive, retroactiveItems.length]);
 
-  const baseMeses = useMemo(() => buildMeses(effectiveDataInicial, effectiveDataFinal), [effectiveDataInicial, effectiveDataFinal]);
+  // A DRE permanece anual na leitura: Jan-Dez ficam visiveis mesmo quando o filtro
+  // de realizado termina no mes corrente. Meses fora do periodo filtrado aparecem zerados.
+  const baseMeses = useMemo(() => buildMeses('2026-01-01', '2026-12-31'), []);
   const meses = useMemo(() => includeRetroactive && retroactiveItems.length > 0
     ? [{ key: 'RETRO-2026', label: 'Retroativo 2026', retroactive: true }, ...baseMeses]
     : baseMeses, [baseMeses, includeRetroactive, retroactiveItems.length]);
@@ -1022,8 +1024,8 @@ export default function Dre() {
           </div>
         </div>
 
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: showMonths ? `${300 + meses.length * 130}px` : "600px" }}>
+        <div className="dre-responsive-wrap">
+          <table className="dre-responsive-table" style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
             <thead>
               <tr style={{ background: "var(--bg-elevated)", borderBottom: "2px solid var(--border-color)" }}>
                 <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "12px", fontWeight: "700", color: "var(--text-secondary)", textTransform: "uppercase", position: "sticky", left: 0, zIndex: 2, background: "var(--bg-elevated)", minWidth: "280px", whiteSpace: "nowrap" }}>Descrição</th>

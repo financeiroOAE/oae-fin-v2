@@ -76,6 +76,7 @@ async function performFullSync(triggeredBy) {
       ...proj,
       CONTRATO: parseBRL(proj.CONTRATO),
       'NF FATURADAS': parseBRL(proj['NF FATURADAS']),
+      FATURADO_2026: parseBRL(proj.FATURADO_2026_COL_L),
       'SALDO CONTRATUAL': parseBRL(proj['SALDO CONTRATUAL']),
     }));
 

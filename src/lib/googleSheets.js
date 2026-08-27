@@ -30,7 +30,7 @@ export async function batchReadSheets() {
 
   const ranges = [
     'EMPRESAS!A:J',
-    'PROJETOS_2026!A:I',
+    'PROJETOS_2026!A:L',
     'CENTROS_CUSTO!A:E',
     'PLANOS_FINANCEIROS!A:E',
     'CP_GERAL!A:L',
@@ -77,6 +77,13 @@ export async function batchReadSheets() {
             if (!header) return;
             rowData[header] = row[index] ?? '';
           });
+
+          // Coluna L da PROJETOS_2026: faturamento acumulado do ano de 2026.
+          // O alias por posicao evita depender de variacoes no texto do cabecalho da planilha.
+          if (sheetName === 'PROJETOS_2026') {
+            rowData.FATURADO_2026_COL_L = row[11] ?? '';
+          }
+
           return rowData;
         });
 

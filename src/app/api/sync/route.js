@@ -54,6 +54,10 @@ function isDailySyncDue(snapshotUpdatedAt) {
 }
 
 function snapshotNeedsProjectRepair(payload) {
+  // Snapshots anteriores a leitura da coluna L nao possuem FATURADO_2026.
+  // Nesse caso a primeira abertura apos o deploy refaz a sincronizacao automaticamente.
+  if (!Array.isArray(payload?.projetos)) return true;
+  if (payload.projetos.some((project) => project?.FATURADO_2026 === undefined || project?.FATURADO_2026 === null)) return true;
   if (!Array.isArray(payload?.data)) return false;
   return payload.data.some((item) => {
     if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return false;

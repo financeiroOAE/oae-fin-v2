@@ -174,6 +174,29 @@ const getFinancialRevenueProjectIdentity = (item) => {
   };
 };
 
+const normalizeProjectTaxText = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .trim()
+  .toUpperCase();
+
+const isAllocatedProjectInss = (item) => {
+  const text = normalizeProjectTaxText([
+    item?.contaNome,
+    item?.contaDescricao,
+    item?.planoFinanceiro,
+    item?.dreClasse,
+    item?.dreLinha,
+    item?.dreDescricao,
+  ].filter(Boolean).join(' '));
+  return /\bINSS\b/.test(text);
+};
+
+// Na pagina de Projetos, INSS diretamente alocado a obra/centro de custo e tributo do projeto.
+// A verificacao de projeto permitido acontece antes desta classificacao, evitando INSS administrativo generico.
+const isProjectTax = (item) => isRevenueTax(item) || isAllocatedProjectInss(item);
+const getProjectTaxLabel = (item) => isAllocatedProjectInss(item) ? 'INSS' : getRevenueTaxLabel(item);
+
 export default function Projetos() {
   const { isReportMode, openReportBuilder, exitReportMode } = useReport();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -257,6 +280,7 @@ export default function Projetos() {
           tipos: [],
           contratado: 0,
           faturado: 0,
+          faturado2026: 0,
           saldoContratual: 0,
           recebido: 0,
           aReceber: 0,
@@ -275,6 +299,7 @@ export default function Projetos() {
       if (tipo && !projeto.tipos.includes(tipo)) projeto.tipos.push(tipo);
       projeto.contratado += Number(p.CONTRATO) || 0;
       projeto.faturado += Number(p['NF FATURADAS']) || 0;
+      projeto.faturado2026 += Number(p.FATURADO_2026) || 0;
       projeto.saldoContratual += Number(p['SALDO CONTRATUAL']) || 0;
     });
 
@@ -313,6 +338,7 @@ export default function Projetos() {
           tipos: [],
           contratado: 0,
           faturado: 0,
+          faturado2026: 0,
           saldoContratual: 0,
           recebido: 0,
           aReceber: 0,
@@ -421,6 +447,7 @@ export default function Projetos() {
   // KPIs
   const totalContratado = filteredProjetos.reduce((acc, p) => acc + p.contratado, 0);
   const totalFaturado = filteredProjetos.reduce((acc, p) => acc + p.faturado, 0);
+  const totalFaturado2026 = filteredProjetos.reduce((acc, p) => acc + p.faturado2026, 0);
   const totalSaldo = filteredProjetos.reduce((acc, p) => acc + p.saldoContratual, 0);
   const percentTotalFaturado = totalContratado > 0 ? totalFaturado / totalContratado : 0;
 
@@ -506,7 +533,7 @@ export default function Projetos() {
       const dreInfo = [item.dreClasse, item.dreLinha, item.dreDescricao].filter(Boolean).join(' ').toUpperCase();
       const isPendingDre = !dreInfo.trim() || dreInfo.includes('PENDENTE DE CLASSIFICAÇÃO');
 
-      if (isRevenueTax(item)) {
+      if (isProjectTax(item)) {
         if (isRealizado) tributos += valor;
         else tributosAPagar += valor;
       } else if (isPendingDre) {
@@ -560,8 +587,8 @@ export default function Projetos() {
       const isRealizado = st.includes('REALIZADO') || st.includes('PAGO') || st.includes('EFETIVADO');
       if (!isRealizado || ts < realizadoIni || ts > realizadoFim) return;
 
-      if (!isRevenueTax(item)) return;
-      const taxCategory = getRevenueTaxLabel(item);
+      if (!isProjectTax(item)) return;
+      const taxCategory = getProjectTaxLabel(item);
       const val = Math.abs(item.valor || 0);
       taxesMap[taxCategory] = (taxesMap[taxCategory] || 0) + val;
       totalTaxes += val;
@@ -573,7 +600,9 @@ export default function Projetos() {
 
   const margemFinanceira = receitaLiquidaProjetos > 0 ? ((receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - dreStats.tributos) / receitaLiquidaProjetos) * 100 : null;
   const resultadoGerencial = receitaLiquidaProjetos - dreStats.custo - dreStats.despesa - dreStats.tributos;
-  const taxPercentage = totalFaturado > 0 ? (taxesData.total / totalFaturado) * 100 : 0;
+  // Base unica para o peso tributario: Recebido Liquido do mesmo periodo e dos mesmos filtros.
+  // Isso evita comparar tributos do periodo com um faturamento contratual acumulado de outra base temporal.
+  const taxPercentage = receitaLiquidaProjetos > 0 ? (taxesData.total / receitaLiquidaProjetos) * 100 : 0;
 
   const abcDonutData = useMemo(() => {
     const projects = [...filteredProjetos].filter(p => p.contratado > 0).sort((a, b) => b.contratado - a.contratado);
@@ -658,7 +687,7 @@ export default function Projetos() {
       if (parts.length !== 3 || parts[2] !== '2026') return;
       const month = Number(parts[1]) - 1;
       if (month < 0 || month > 11) return;
-      if (isRevenueTax(item)) return;
+      if (isProjectTax(item)) return;
 
       const dreText = [item.dreClasse, item.dreLinha, item.dreDescricao].filter(Boolean).join(' ').toUpperCase();
       if (!dreText || dreText.includes('PENDENTE DE CLASSIFICAÇÃO')) return;
@@ -683,8 +712,9 @@ export default function Projetos() {
     Empresa: project.empresa,
     Contratado: project.contratado,
     Faturado: project.faturado,
+    "Faturado em 2026": project.faturado2026,
     Saldo: project.saldoContratual,
-    Recebido: project.recebido,
+    "Recebido Líquido": project.recebido,
     "A Receber": project.aReceber,
     Pago: project.pago,
     "A Pagar": project.aPagar,
@@ -977,6 +1007,13 @@ export default function Projetos() {
           <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Target size={16} color="var(--primary)" /> Faturado</p>
           <p style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalFaturado)}</p>
         </div>
+        <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid var(--info)' }}>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}>
+            <Target size={16} color="var(--info)" /> Faturado em 2026
+            <InfoTooltip title="Faturado em 2026" content="Faturamento anual de 2026 registrado para os projetos exibidos. O valor acompanha os filtros de projeto, empresa e tipo." />
+          </p>
+          <p style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalFaturado2026)}</p>
+        </div>
         <div className="card" onClick={() => setKpiModal('saldo')} style={{ padding: '1.5rem', borderLeft: '4px solid var(--warning)', cursor: 'pointer', transition: 'all 0.2s ease' }} title="Clique para ver por empresa" onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'none'}>
           <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Briefcase size={16} color="var(--warning)" /> Saldo Contratual</p>
           <p style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(totalSaldo)}</p>
@@ -1006,7 +1043,7 @@ export default function Projetos() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
           <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-            <ArrowDownCircle size={14} color="var(--success)" /> Recebido no período
+            <ArrowDownCircle size={14} color="var(--success)" /> Recebido Líquido no período
             <InfoTooltip
               title="Receita Líquida Recebida"
               content={`Receita líquida recebida: ${formatCurrency(receitaLiquidaProjetos)}. É o valor que efetivamente entrou no caixa no período selecionado.`}
@@ -1029,10 +1066,10 @@ export default function Projetos() {
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--primary)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
             <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><Percent size={14} color="var(--primary)" /> Tributos sobre Receita e Lucro</p>
-            <ReportAdder sectionKey="projetos:impostos" title="Tributos sobre Receita e Lucro" componentName="Resumo de Impostos" page="Projetos" type="SUMMARY" data={[{ "Total de Impostos": taxesData.total, "% sobre o Faturamento": taxPercentage }]} filters={reportFilters} />
+            <ReportAdder sectionKey="projetos:impostos" title="Tributos sobre Receita e Lucro" componentName="Resumo de Impostos" page="Projetos" type="SUMMARY" data={[{ "Total de Impostos": taxesData.total, "% sobre Recebido Líquido": taxPercentage }]} filters={reportFilters} />
           </div>
           <p style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(taxesData.total)}</p>
-          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}><strong style={{ color: 'var(--primary)' }}>{taxPercentage.toFixed(2).replace('.', ',')}%</strong> da receita de projetos</p>
+          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}><strong style={{ color: 'var(--primary)' }}>{taxPercentage.toFixed(2).replace('.', ',')}%</strong> do Recebido Líquido</p>
         </div>
       </div>
 
@@ -1054,7 +1091,7 @@ export default function Projetos() {
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '120px' }}>
               <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                Receita Realizada de Projetos
+                Receita Líquida Realizada de Projetos
                 <InfoTooltip
                   title="Receita Líquida Realizada"
                   content={`Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. É o valor efetivamente creditado, após descontos e retenções identificados na relação de recebimentos.`}
@@ -1193,7 +1230,7 @@ export default function Projetos() {
             <div>
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Tributos sobre Receita e Lucro</h2>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Total de Impostos: <strong style={{color:'var(--text-main)'}}>{formatCurrency(taxesData.total)}</strong> ({taxPercentage.toFixed(2).replace('.', ',')}% sobre o faturamento)
+                Total de Tributos: <strong style={{color:'var(--text-main)'}}>{formatCurrency(taxesData.total)}</strong> ({taxPercentage.toFixed(2).replace('.', ',')}% sobre o Recebido Líquido)
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -1235,7 +1272,7 @@ export default function Projetos() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>Relatório Executivo de Projetos</h2>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <ReportAdder sectionKey="projetos:relatorio-executivo" title="Relatório Executivo de Projetos" componentName="Tabela de Projetos" page="Projetos" type="TABLE" data={projectReportRows} dataSets={{ summary: [{ Projetos: projectReportRows.length, "Total Contratado": totalContratado, "Total Faturado": totalFaturado, "Saldo Contratual": totalSaldo, "Resultado de Caixa": totalResultado }], visible: projectReportRows.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE), all: projectReportRows }} detailMode="visible" detailOptions={["summary", "visible", "all"]} filters={reportFilters} presetTags={["project-executive"]} explanation="Posição executiva dos contratos, faturamento e caixa dos projetos filtrados." />
+          <ReportAdder sectionKey="projetos:relatorio-executivo" title="Relatório Executivo de Projetos" componentName="Tabela de Projetos" page="Projetos" type="TABLE" data={projectReportRows} dataSets={{ summary: [{ Projetos: projectReportRows.length, "Total Contratado": totalContratado, "Total Faturado": totalFaturado, "Faturado em 2026": totalFaturado2026, "Saldo Contratual": totalSaldo, "Recebido Líquido": totalRecebido, "A Receber": totalAReceber, "Pago": totalPago, "A Pagar": totalAPagar, "Resultado de Caixa": totalResultado }], visible: projectReportRows.slice((tablePage - 1) * TABLE_PAGE_SIZE, tablePage * TABLE_PAGE_SIZE), all: projectReportRows }} detailMode="visible" detailOptions={["summary", "visible", "all"]} filters={reportFilters} presetTags={["project-executive"]} explanation="Posição executiva dos contratos, faturamento e caixa dos projetos filtrados." />
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
             Mostrando {paginatedProjetos.length} de {sortedProjetos.length} projetos
           </span>
@@ -1243,8 +1280,8 @@ export default function Projetos() {
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1rem' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse' }}>
+        <div className="projects-executive-table-wrap">
+          <table className="projects-executive-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-color)' }}>
               <tr style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
                 <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'left', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('nome')}>Projeto / Obra <SortIcon columnKey="nome" /></th>
@@ -1253,8 +1290,10 @@ export default function Projetos() {
                 <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('faturado')}>Faturado <SortIcon columnKey="faturado" /></th>
                 <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('percentFaturado')}>% Fat. <SortIcon columnKey="percentFaturado" /></th>
                 <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('saldoContratual')}>Saldo <SortIcon columnKey="saldoContratual" /></th>
-                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('recebido')}>Recebido <SortIcon columnKey="recebido" /></th>
+                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('recebido')}>Recebido Líquido <SortIcon columnKey="recebido" /></th>
                 <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('pago')}>Pago <SortIcon columnKey="pago" /></th>
+                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('aReceber')}>A Receber <SortIcon columnKey="aReceber" /></th>
+                <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('aPagar')}>A Pagar <SortIcon columnKey="aPagar" /></th>
                 <th style={{ padding: '1rem 1rem 0.5rem 1rem', textAlign: 'right', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('resultadoCaixa')}>Resultado <SortIcon columnKey="resultadoCaixa" /></th>
               </tr>
               <tr style={{ borderTop: 'none' }}>
@@ -1271,7 +1310,7 @@ export default function Projetos() {
                   <input type="number" placeholder="Min %" value={colFilterMinFaturadoPerc} onChange={e => { setColFilterMinFaturadoPerc(e.target.value); setTablePage(1); }}
                     style={{ width: '100%', height: '24px', fontSize: '11px', padding: '0 0.25rem', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px', textAlign: 'center' }} />
                 </th>
-                <th colSpan={4} style={{ padding: '0 1rem 0.75rem 1rem' }}></th>
+                <th colSpan={6} style={{ padding: '0 1rem 0.75rem 1rem' }}></th>
               </tr>
             </thead>
             <tbody style={{ fontSize: '13px' }}>
@@ -1288,11 +1327,13 @@ export default function Projetos() {
                   <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--text-main)' }}>{formatCurrency(p.saldoContratual)}</td>
                   <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--success)' }}>{formatCurrency(p.recebido)}</td>
                   <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--danger)' }}>{formatCurrency(p.pago)}</td>
+                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--text-main)' }}>{formatCurrency(p.aReceber)}</td>
+                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--text-main)' }}>{formatCurrency(p.aPagar)}</td>
                   <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: '600', color: p.resultadoCaixa >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(p.resultadoCaixa)}</td>
                 </tr>
               ))}
               {paginatedProjetos.length === 0 && (
-                <tr><td colSpan={9} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>Nenhum projeto encontrado com os filtros aplicados.</td></tr>
+                <tr><td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>Nenhum projeto encontrado com os filtros aplicados.</td></tr>
               )}
             </tbody>
           </table>
