@@ -1271,7 +1271,7 @@ export default function Projetos() {
             <div style={{ flex: '1 1 135px', minWidth: 0, overflow: 'visible' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Tributos</p>
               <p style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--primary)' }}>{formatCurrency(tributosProjetos)}</p>
-              {receitaLiquidaProjetos > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((tributosProjetos / receitaLiquidaProjetos) * 100).toFixed(1)}% da Receita</span>}
+              {totalFaturado2026 > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{taxPercentage.toFixed(1).replace('.', ',')}% do Faturamento</span>}
             </div>
           </div>
           {receitaLiquidaProjetos > 0 && (
