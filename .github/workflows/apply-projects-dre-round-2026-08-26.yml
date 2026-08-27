@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - scripts/apply-projects-dre-round-2026-08-26.js
+      - scripts/run-projects-dre-round-2026-08-26.js
       - .github/workflows/apply-projects-dre-round-2026-08-26.yml
   workflow_dispatch:
 
@@ -27,7 +28,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Aplicar ajustes
-        run: node scripts/apply-projects-dre-round-2026-08-26.js
+        run: node scripts/run-projects-dre-round-2026-08-26.js
       - name: Instalar dependencias
         run: npm ci
       - name: Gerar Prisma
