@@ -1196,7 +1196,7 @@ export default function Projetos() {
       </div>
 
       {/* 5. Composição Financeira + Resultado */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '1rem', marginBottom: '2rem', alignItems: 'stretch' }}>
+      <div className="projects-financial-summary-grid" style={{ display: 'grid', gap: '1rem', marginBottom: '2rem', alignItems: 'stretch' }}>
         <div className="card" style={{ padding: '1.5rem', borderTop: '2px solid var(--primary)', height: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -1210,7 +1210,7 @@ export default function Projetos() {
               <InfoTooltip title="Composição Financeira" content={`Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. O valor acompanha o período, os filtros e o botão de rateio administrativo.`} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <div className="projects-financial-metrics-grid">
             <div style={{ flex: '1 1 135px', minWidth: 0, overflow: 'visible' }}>
               <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
                 RECEITA
@@ -1254,7 +1254,7 @@ export default function Projetos() {
           )}
         </div>
 
-        <div className="card" style={{ padding: '1.5rem', borderTop: '2px solid var(--primary)', display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="card projects-managerial-result-card" style={{ padding: '1.5rem', borderTop: '2px solid var(--primary)', display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1267,8 +1267,8 @@ export default function Projetos() {
               <InfoTooltip title="Resultado e Margem" content="Resultado gerencial e margem dos projetos selecionados." />
             </div>
           </div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <p style={{ fontSize: 'clamp(20px, 2vw, 26px)', fontWeight: '700', color: resultadoGerencial >= 0 ? 'var(--success)' : 'var(--danger)', letterSpacing: '-0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums' }}>
+          <div className="projects-managerial-result-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <p className="projects-managerial-result-value" style={{ color: resultadoGerencial >= 0 ? 'var(--success)' : 'var(--danger)' }}>
               {formatCurrency(resultadoGerencial)}
             </p>
             <div style={{ marginTop: '1rem' }}>

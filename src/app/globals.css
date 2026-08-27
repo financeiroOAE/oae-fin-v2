@@ -1262,3 +1262,95 @@ tbody tr:hover {
     font-size: 9px !important;
   }
 }
+
+
+/* Projects financial composition layout - 2026-08-27 */
+.projects-financial-summary-grid {
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.8fr);
+}
+
+.projects-financial-metrics-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem !important;
+  align-items: start;
+  margin-bottom: 1.5rem !important;
+}
+
+.projects-financial-metrics-grid > div {
+  min-width: 0 !important;
+  flex: initial !important;
+  overflow: visible !important;
+}
+
+.projects-financial-metrics-grid > div > p:first-child {
+  min-height: 26px;
+  margin-bottom: 0.2rem !important;
+  font-size: 10px !important;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.projects-financial-metrics-grid > div > p:nth-child(2) {
+  font-size: clamp(13px, 1.15vw, 17px) !important;
+  line-height: 1.15;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.projects-financial-metrics-grid > div > span {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 10px !important;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.projects-managerial-result-card {
+  min-height: 0;
+}
+
+.projects-managerial-result-content {
+  min-height: 138px;
+  justify-content: space-between !important;
+  padding-top: 0.25rem;
+}
+
+.projects-managerial-result-value {
+  margin: 0;
+  min-width: 0;
+  font-size: clamp(24px, 2.2vw, 34px) !important;
+  font-weight: 800 !important;
+  line-height: 1.05;
+  letter-spacing: -0.04em !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1120px) {
+  .projects-financial-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .projects-managerial-result-content {
+    min-height: 115px;
+  }
+}
+
+@media (max-width: 760px) {
+  .projects-financial-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .projects-financial-metrics-grid > div > p:first-child,
+  .projects-financial-metrics-grid > div > p:nth-child(2),
+  .projects-financial-metrics-grid > div > span {
+    white-space: normal !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .projects-financial-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
