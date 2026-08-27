@@ -33,6 +33,14 @@ function combinedText(item) {
   ].filter(Boolean).join(' '));
 }
 
+// PRV e PCT representam documentos de previsao de recebimento. Mesmo que a
+// origem traga um status inconsistente, eles nao podem ser tratados como caixa recebido.
+export function isForecastOnlyReceivableDocument(item) {
+  const document = normalizeText(item?.documento);
+  if (!document) return false;
+  return /^(PRV|PCT)(?:$|[.\s_/-]|\d)/.test(document);
+}
+
 export function classifyFinancialEntry(item) {
   const code = normalizeAccountCode(item);
   const text = combinedText(item);
@@ -101,14 +109,19 @@ const REVENUE_TAX_CODES = new Set([
 
 export function isRevenueTax(item) {
   const code = normalizeAccountCode(item);
+  const text = accountText(item);
 
-  // Quando há código de conta, ele é a fonte de verdade. Isto impede que palavras
-  // presentes em cliente/documento/nome façam uma conta de equipe virar "tributo".
+  if (text.includes('RETENCOES FORNECEDORES')) return false;
+
+  // INSS da OAE e recolhido/retido sobre o faturamento e, por isso, pertence ao
+  // mesmo grupo gerencial dos tributos sobre receita. A identificacao textual e
+  // necessaria porque a conta pode variar na base sem usar os codigos 20301xx.
+  if (/\bINSS\b/.test(text)) return true;
+
+  // Para os demais tributos, o codigo financeiro segue como fonte primaria.
   if (code) return REVENUE_TAX_CODES.has(code);
 
-  // Fallback apenas para snapshots antigos sem contaCodigo, olhando SOMENTE a conta/DRE.
-  const text = accountText(item);
-  if (text.includes('RETENCOES FORNECEDORES')) return false;
+  // Fallback para snapshots antigos sem contaCodigo, olhando somente conta/DRE.
   return /(^|\s)(PIS|COFINS|ISS|IRPJ|CSLL)(\s|$)/.test(text) ||
     text.includes('IMPOSTOS RETIDOS NO FAT');
 }
@@ -123,6 +136,7 @@ export function getRevenueTaxLabel(item) {
   if (code === '2030107') return 'Impostos retidos / previsão';
 
   const text = accountText(item);
+  if (/\bINSS\b/.test(text)) return 'INSS';
   if (/\bPIS\b/.test(text)) return 'PIS';
   if (/\bCOFINS\b/.test(text)) return 'COFINS';
   if (/\bISS\b/.test(text)) return 'ISS';

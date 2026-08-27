@@ -15,7 +15,7 @@ import InfoTooltip from "@/components/InfoTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
-import { classifyFinancialEntry, isPartnerWithdrawal, isRevenueTax } from "@/lib/financialClassification";
+import { classifyFinancialEntry, isForecastOnlyReceivableDocument, isPartnerWithdrawal, isRevenueTax } from "@/lib/financialClassification";
 import { getActiveProjects, getActiveProjectNames, getProjectKey } from "@/lib/projectRules";
 
 const getYearToDateRange = () => {
@@ -77,8 +77,10 @@ export default function VisaoFinanceira() {
     return data.map(item => {
       let statusAmigavel = item.status;
       if (item.natureza === 'Entrada') {
-        if (item.status === 'Realizado') statusAmigavel = 'Recebido';
-        if (item.status === 'A realizar') statusAmigavel = 'A receber';
+        const forecastOnly = isForecastOnlyReceivableDocument(item);
+        if (forecastOnly) statusAmigavel = 'A receber';
+        else if (item.status === 'Realizado') statusAmigavel = 'Recebido';
+        else if (item.status === 'A realizar') statusAmigavel = 'A receber';
       } else if (item.natureza === 'Saída') {
         if (item.status === 'Realizado') statusAmigavel = 'Pago';
         if (item.status === 'A realizar') statusAmigavel = 'A pagar';
@@ -135,6 +137,7 @@ export default function VisaoFinanceira() {
     const end = Math.min(selectedEnd, todayEnd.getTime());
     return openFilteredData.filter((item) => {
       if (String(item.status || '').trim().toUpperCase() !== 'REALIZADO') return false;
+      if (item.natureza === 'Entrada' && isForecastOnlyReceivableDocument(item)) return false;
       return item.dataTimestamp >= start && item.dataTimestamp <= end;
     });
   }, [openFilteredData, filterDataInicial, filterDataFinal]);
@@ -143,7 +146,9 @@ export default function VisaoFinanceira() {
     const start = filterDataInicial ? new Date(filterDataInicial + 'T00:00:00').getTime() : 0;
     const end = filterDataFinal ? new Date(filterDataFinal + 'T23:59:59').getTime() : Infinity;
     return openFilteredData.filter((item) => {
-      if (String(item.status || '').trim().toUpperCase() !== 'A REALIZAR') return false;
+      const status = String(item.status || '').trim().toUpperCase();
+      const forecastOnly = item.natureza === 'Entrada' && isForecastOnlyReceivableDocument(item);
+      if (status !== 'A REALIZAR' && !forecastOnly) return false;
       return item.dataTimestamp >= start && item.dataTimestamp <= end;
     });
   }, [openFilteredData, filterDataInicial, filterDataFinal]);
@@ -380,13 +385,18 @@ export default function VisaoFinanceira() {
     const receitaObra = projectRevenueStatus.realizado.obra;
     const receitaAdm = projectRevenueStatus.realizado.adm;
     const receita = projectRevenueStatus.realizado.total;
-    const saidas = realizedFilteredData
+    const saidasProjeto = realizedFilteredData
       .filter((item) => item.natureza === 'Saída')
-      .filter((item) => filterProjetos.length > 0 || !String(item.projeto || '').toUpperCase().includes('ADMINISTRA'))
+      .filter((item) => filterProjetos.length > 0 || !String(item.projeto || '').toUpperCase().includes('ADMINISTRA'));
+    const tributos = saidasProjeto
+      .filter((item) => isRevenueTax(item))
       .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0);
-    const resultado = receita - saidas;
+    const saidas = saidasProjeto
+      .filter((item) => !isRevenueTax(item))
+      .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0);
+    const resultado = receita - saidas - tributos;
     const margem = receita > 0 ? (resultado / receita) * 100 : 0;
-    return { receita, receitaObra, receitaAdm, saidas, resultado, margem };
+    return { receita, receitaObra, receitaAdm, saidas, tributos, resultado, margem };
   }, [projectRevenueStatus, realizedFilteredData, filterProjetos]);
 
   const abcDonutData = useMemo(() => {
@@ -457,8 +467,9 @@ export default function VisaoFinanceira() {
         const mIdx = parseInt(parts[1], 10) - 1;
         if (map[mIdx]) {
           const status = String(item.status || '').trim().toUpperCase();
-          const isRealizado = status === 'REALIZADO';
-          const isPrevisto = status === 'A REALIZAR';
+          const forecastOnly = item.natureza === 'Entrada' && isForecastOnlyReceivableDocument(item);
+          const isRealizado = status === 'REALIZADO' && !forecastOnly;
+          const isPrevisto = status === 'A REALIZAR' || forecastOnly;
           if (!isRealizado && !isPrevisto) return;
           if (item.natureza === 'Entrada') {
             if (isPrevisto) map[mIdx]['Entradas Programadas'] += item.valor;
@@ -600,13 +611,13 @@ export default function VisaoFinanceira() {
           <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(somaProjetos)}</p>
         </div>
         <div className="card" style={{ padding: '1.5rem' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><CheckCircle size={16} color="var(--primary)"/> Resultado Realizado <InfoTooltip title="Resultado Realizado" content="Resultado das entradas realizadas menos as saídas realizadas no período selecionado." /></p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><CheckCircle size={16} color="var(--primary)"/> Resultado Realizado <InfoTooltip title="Resultado Realizado" content="Resultado do caixa efetivo: entradas líquidas realmente creditadas menos pagamentos realizados no período selecionado." /></p>
           <p style={{ fontSize: '24px', fontWeight: '700', color: resultadoRealizado >= 0 ? 'var(--success)' : 'var(--danger)' }}>
             {formatCurrency(resultadoRealizado)}
           </p>
         </div>
         <div className="card" style={{ padding: '1.5rem' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Target size={16} color="var(--primary)"/> Resultado Previsto <InfoTooltip title="Resultado Previsto" content="Resultado das entradas a receber menos as saídas a pagar no período selecionado." /></p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', fontWeight: '600' }}><Target size={16} color="var(--primary)"/> Resultado Previsto — Visão do Dia <InfoTooltip title="Resultado Previsto — Visão do Dia" content="Posição consultada hoje dos valores ainda em aberto: A Receber menos A Pagar dentro do período selecionado. PRV e PCT permanecem somente na previsão." /></p>
           <p style={{ fontSize: '24px', fontWeight: '700', color: resultadoPrevisto >= 0 ? 'var(--success)' : 'var(--danger)' }}>
             {formatCurrency(resultadoPrevisto)}
           </p>
@@ -616,19 +627,19 @@ export default function VisaoFinanceira() {
       {/* KPIs Secundários */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)"/> Entradas Realizadas</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDownCircle size={14} color="var(--success)"/> Entradas Realizadas <InfoTooltip title="Entradas Realizadas" content="Valor líquido efetivamente creditado nas contas. Para CR_GERAL, usa a coluna K (Valor). Documentos PRV e PCT não entram como recebidos." /></p>
           <p style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(entradasRealizadas)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(16, 185, 129, 0.4)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowUpCircle size={14} color="var(--success)"/> A Receber</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowUpCircle size={14} color="var(--success)"/> A Receber <InfoTooltip title="A Receber" content="Valores ainda previstos ou em aberto. Documentos PRV e PCT são tratados exclusivamente como previsão de recebimento." /></p>
           <p style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(entradasARealizar)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--danger)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowUp size={14} color="var(--danger)"/> Pago</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowUp size={14} color="var(--danger)"/> Pago <InfoTooltip title="Pago" content="Saídas efetivamente realizadas no período selecionado." /></p>
           <p style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(saidasRealizadas)}</p>
         </div>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid rgba(239, 68, 68, 0.4)' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDown size={14} color="var(--danger)"/> A Pagar</p>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}><ArrowDown size={14} color="var(--danger)"/> A Pagar <InfoTooltip title="A Pagar" content="Compromissos financeiros ainda em aberto ou previstos dentro do período selecionado." /></p>
           <p style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>{formatCurrency(saidasARealizar)}</p>
         </div>
       </div>
@@ -723,7 +734,7 @@ export default function VisaoFinanceira() {
               { name: 'Tributos Pagos', value: taxStatusBreakdown.realizado },
               { name: 'Tributos A Pagar', value: taxStatusBreakdown.pendente },
             ]} filters={reportFilters} captureId="report-visao-status" presetTags={["executive-financial"]} explanation="Receitas de projetos (1010101 + 1010107), pagamentos e tributos dentro do período selecionado." style={{ alignSelf: 'flex-end' }} />
-            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.35rem' }}>Status Financeiro Consolidado</h2>
+            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>Status Financeiro Consolidado <InfoTooltip title="Tributos consolidados" content="Tributos incluem PIS, COFINS, ISS, INSS incidente sobre o faturamento, IRPJ, CSLL e demais contas tributárias classificadas como tributo." /></h2>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Tributos, receitas de projetos e pagamentos no período selecionado.</p>
             <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.85rem', alignItems: 'stretch' }}>
               <PieStatusChart realizado={taxStatusBreakdown.realizado} pendente={taxStatusBreakdown.pendente} colorRealizado="var(--primary)" colorPendente="rgba(57, 198, 198, 0.25)" titulo="Tributos" labelRealizado="Pago" labelPendente="A pagar" />
@@ -762,16 +773,17 @@ export default function VisaoFinanceira() {
         {/* ROW 4: Visão Financeira dos Projetos e Despesas */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: '1rem' }}>
           <div id="report-visao-projetos-financeiro" data-report-section className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <ReportAdder sectionKey="visao:projetos-financeiro" title="Visão Financeira Geral dos Projetos" componentName="Resultado e Margem dos Projetos" page="Visão Financeira" type="CHART" data={[{ Recebido: projectFinancialOverview.receita, "Custos + Despesas": projectFinancialOverview.saidas, Resultado: projectFinancialOverview.resultado, Margem: projectFinancialOverview.margem }]} filters={reportFilters} captureId="report-visao-projetos-financeiro" presetTags={["executive-financial", "project-executive"]} style={{ alignSelf: 'flex-end' }} />
+            <ReportAdder sectionKey="visao:projetos-financeiro" title="Visão Financeira Geral dos Projetos" componentName="Resultado e Margem dos Projetos" page="Visão Financeira" type="CHART" data={[{ Recebido: projectFinancialOverview.receita, "Custos + Despesas": projectFinancialOverview.saidas, Tributos: projectFinancialOverview.tributos, Resultado: projectFinancialOverview.resultado, Margem: projectFinancialOverview.margem }]} filters={reportFilters} captureId="report-visao-projetos-financeiro" presetTags={["executive-financial", "project-executive"]} style={{ alignSelf: 'flex-end' }} />
             <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>Visão Financeira Geral dos Projetos</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Recebido de projetos (obra + administrativo vinculado) versus saídas realizadas das obras.</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Recebido líquido de projetos versus custos/despesas e tributos realizados, com INSS sobre faturamento separado na leitura.</p>
             <div className="finance-kpi-grid" style={{ marginBottom: '0.75rem' }}>
               <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Recebido</span><strong style={{display:'block',fontSize:'14px',color:'var(--success)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.receita)}</strong></div>
               <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Custos + Despesas</span><strong style={{display:'block',fontSize:'14px',color:'var(--danger)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.saidas)}</strong></div>
+              <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Tributos</span><strong style={{display:'block',fontSize:'14px',color:'var(--primary)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.tributos)}</strong></div>
               <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Resultado</span><strong style={{display:'block',fontSize:'14px',color:projectFinancialOverview.resultado >= 0 ? 'var(--success)' : 'var(--danger)',overflowWrap:'anywhere'}}>{formatCurrency(projectFinancialOverview.resultado)}</strong></div>
               <div><span style={{fontSize:'10px',color:'var(--text-secondary)',textTransform:'uppercase'}}>Margem</span><strong style={{display:'block',fontSize:'14px',color:projectFinancialOverview.margem >= 0 ? 'var(--success)' : 'var(--danger)'}}>{projectFinancialOverview.margem.toFixed(2).replace('.', ',')}%</strong></div>
             </div>
-            <div className="finance-chart-frame"><ProjectFinancialOverviewChart recebido={projectFinancialOverview.receita} saidas={projectFinancialOverview.saidas} resultado={projectFinancialOverview.resultado} /></div>
+            <div className="finance-chart-frame"><ProjectFinancialOverviewChart recebido={projectFinancialOverview.receita} saidas={projectFinancialOverview.saidas} tributos={projectFinancialOverview.tributos} resultado={projectFinancialOverview.resultado} /></div>
           </div>
           <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
             <AccountBarChart data={topContasSaidas} title="Despesas por Plano de Conta" infoContent="Saídas agrupadas por plano de conta no período selecionado, sem retiradas dos sócios." color="var(--danger)" />

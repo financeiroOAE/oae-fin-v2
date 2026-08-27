@@ -1,4 +1,4 @@
-import { isTeamExpense, normalizeAccountCode } from '@/lib/financialClassification';
+import { getRevenueTaxLabel, isRevenueTax, isTeamExpense, normalizeAccountCode } from '@/lib/financialClassification';
 
 /**
  * dreEngine.js — Motor da DRE Gerencial OAE_FIN V2
@@ -52,6 +52,14 @@ export function mapClasseToDreId(item) {
   // A classificacao da DRE nao pode eliminar receita por nome de obra, status do
   // catalogo de projetos ou eventual falha textual no DEPARA.
   if (item.natureza === 'Entrada' && (accountCode === '1010101' || accountCode === '1010107')) return 'RECEITA_BRUTA';
+
+  // Tributos incidentes sobre o faturamento reduzem a receita bruta. INSS da OAE
+  // segue aqui junto de PIS/COFINS/ISS. IRPJ e CSLL permanecem na deducao fiscal.
+  if (item.natureza === 'Saída' && isRevenueTax(item)) {
+    const taxLabel = getRevenueTaxLabel(item);
+    if (taxLabel === 'IRPJ' || taxLabel === 'CSLL') return 'DED_FISCAL';
+    return 'DED_RECEITA';
+  }
 
   // Equipe vinculada ao centro de custo administrativo é despesa administrativa,
   // nunca custo direto de projeto.

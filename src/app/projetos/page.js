@@ -29,6 +29,13 @@ const getYearToDateRange = () => {
   return { start: '2026-01-01', end: localDate(today) };
 };
 
+const parsePercentFilter = (value) => {
+  const normalized = String(value ?? '').replace('%', '').replace(',', '.').trim();
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const FINANCIAL_UNALLOCATED_PROJECT_KEY = '__RECEITA_PROJETO_NAO_ALOCADA__';
 const FINANCIAL_UNALLOCATED_PROJECT_NAME = 'Receita de Projeto não alocada';
 
@@ -386,7 +393,8 @@ export default function Projetos() {
       if (filterTipos.length > 0 && !p.tipos.some((tipo) => filterTipos.includes(tipo))) return false;
       if (colFilterProjeto && !p.nome.toLowerCase().includes(colFilterProjeto.toLowerCase())) return false;
       if (colFilterEmpresa && !p.empresa.toLowerCase().includes(colFilterEmpresa.toLowerCase())) return false;
-      if (colFilterMinFaturadoPerc && (p.percentFaturado * 100) < Number(colFilterMinFaturadoPerc)) return false;
+      const minFaturadoPerc = parsePercentFilter(colFilterMinFaturadoPerc);
+      if (minFaturadoPerc !== null && (p.percentFaturado * 100) < minFaturadoPerc) return false;
       return true;
     });
   }, [projetosCruzados, filterProjetos, filterEmpresas, filterTipos, colFilterProjeto, colFilterEmpresa, colFilterMinFaturadoPerc]);
@@ -1091,7 +1099,7 @@ export default function Projetos() {
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '120px' }}>
               <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                Receita Líquida Realizada de Projetos
+                RECEITA LÍQUIDA
                 <InfoTooltip
                   title="Receita Líquida Realizada"
                   content={`Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. É o valor efetivamente creditado, após descontos e retenções identificados na relação de recebimentos.`}
@@ -1307,7 +1315,7 @@ export default function Projetos() {
                 </th>
                 <th colSpan={2} style={{ padding: '0 1rem 0.75rem 1rem' }}></th>
                 <th style={{ padding: '0 1rem 0.75rem 1rem' }}>
-                  <input type="number" placeholder="Min %" value={colFilterMinFaturadoPerc} onChange={e => { setColFilterMinFaturadoPerc(e.target.value); setTablePage(1); }}
+                  <input type="text" inputMode="decimal" placeholder="Min % (ex.: 50)" value={colFilterMinFaturadoPerc} onChange={e => { setColFilterMinFaturadoPerc(e.target.value); setTablePage(1); }}
                     style={{ width: '100%', height: '24px', fontSize: '11px', padding: '0 0.25rem', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px', textAlign: 'center' }} />
                 </th>
                 <th colSpan={6} style={{ padding: '0 1rem 0.75rem 1rem' }}></th>
@@ -1392,8 +1400,56 @@ export default function Projetos() {
                 <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--primary)' }}>{selectedProject.nome}</h2>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <button onClick={exportSelectedProjectPdf} className="btn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
-                  <FileText size={14} /> Gerar PDF
+                <ReportAdder
+                  sectionKey={`projetos:executivo-selecionado:${selectedProject.projectKey}`}
+                  title={`Relatório Executivo — ${selectedProject.nome}`}
+                  componentName="Relatório Executivo do Projeto"
+                  page="Projetos"
+                  type="TABLE"
+                  data={[{
+                    Projeto: selectedProject.nome,
+                    Empresa: selectedProject.empresa || '',
+                    Tipo: selectedProject.tipo || '',
+                    Contratado: Number(selectedProject.contratado) || 0,
+                    Faturado: Number(selectedProject.faturado) || 0,
+                    'Recebido Líquido': Number(selectedProject.recebido) || 0,
+                    'A Receber': Number(selectedProject.aReceber) || 0,
+                    Pago: Number(selectedProject.pago) || 0,
+                    'A Pagar': Number(selectedProject.aPagar) || 0,
+                    Resultado: Number(selectedProject.resultadoCaixa) || 0,
+                  }]}
+                  dataSets={{
+                    summary: [{
+                      Projeto: selectedProject.nome,
+                      Empresa: selectedProject.empresa || '',
+                      Tipo: selectedProject.tipo || '',
+                      Contratado: Number(selectedProject.contratado) || 0,
+                      Faturado: Number(selectedProject.faturado) || 0,
+                      'Recebido Líquido': Number(selectedProject.recebido) || 0,
+                      'A Receber': Number(selectedProject.aReceber) || 0,
+                      Pago: Number(selectedProject.pago) || 0,
+                      'A Pagar': Number(selectedProject.aPagar) || 0,
+                      Resultado: Number(selectedProject.resultadoCaixa) || 0,
+                    }],
+                    all: selectedProjectReportMoves.map((item) => ({
+                      Data: item.data || '',
+                      Natureza: item.natureza || '',
+                      Situação: item.status || '',
+                      'Nome / Fornecedor': item.nome || '',
+                      Conta: item.contaNome || item.contaDescricao || item.contaCodigo || '',
+                      Documento: item.documento || '',
+                      Lançamento: item.lancamento || '',
+                      Valor: Number(item.valor) || 0,
+                    })),
+                  }}
+                  detailMode="summary"
+                  detailOptions={["summary", "all"]}
+                  filters={{ Projeto: selectedProject.nome, Empresa: selectedProject.empresa || 'Todas', Tipo: selectedProject.tipo || 'Todos', 'Data inicial': filterDataInicial || 'Todas', 'Data final': filterDataFinal || 'Todas' }}
+                  explanation="Relatório executivo do projeto selecionado com opção de resumo ou todos os lançamentos filtrados."
+                  style={{ display: 'none' }}
+                />
+                <button onClick={() => isReportMode ? exitReportMode() : openReportBuilder('Projetos')} className={`btn ${isReportMode ? 'btn-primary' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: isReportMode ? 'var(--primary)' : 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: isReportMode ? '#fff' : 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                  <FileText size={14} /> {isReportMode ? 'Sair do Modo Relatório' : 'Gerar Relatório'}
                 </button>
                 <button onClick={exportSelectedProjectExcel} className="btn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                   <FileSpreadsheet size={14} /> Exportar Excel

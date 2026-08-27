@@ -13,6 +13,7 @@ import IncomeExpenseChart from "@/components/charts/IncomeExpenseChart";
 import AnnualFlowChart from "@/components/charts/AnnualFlowChart";
 import CustomTooltip from "@/components/charts/CustomTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
+import { isForecastOnlyReceivableDocument } from "@/lib/financialClassification";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { getRolling30DayRange } from "@/lib/dateRange";
@@ -71,8 +72,10 @@ export default function FluxoDeCaixa() {
     return data.map(item => {
       let statusAmigavel = item.status;
       if (item.natureza === 'Entrada') {
-        if (item.status === 'Realizado') statusAmigavel = 'Recebido';
-        if (item.status === 'A realizar') statusAmigavel = 'A receber';
+        const forecastOnly = isForecastOnlyReceivableDocument(item);
+        if (forecastOnly) statusAmigavel = 'A receber';
+        else if (item.status === 'Realizado') statusAmigavel = 'Recebido';
+        else if (item.status === 'A realizar') statusAmigavel = 'A receber';
       } else if (item.natureza === 'Saída') {
         if (item.status === 'Realizado') statusAmigavel = 'Pago';
         if (item.status === 'A realizar') statusAmigavel = 'A pagar';
@@ -200,8 +203,9 @@ export default function FluxoDeCaixa() {
         const m = parseInt(parts[1], 10) - 1;
         if (map[m]) {
           const status = String(item.status || '').trim().toUpperCase();
-          const isRealizado = status === 'REALIZADO';
-          const isPrevisto = status === 'A REALIZAR';
+          const forecastOnly = item.natureza === 'Entrada' && isForecastOnlyReceivableDocument(item);
+          const isRealizado = status === 'REALIZADO' && !forecastOnly;
+          const isPrevisto = status === 'A REALIZAR' || forecastOnly;
           if (!isRealizado && !isPrevisto) return;
           if (item.natureza === 'Entrada') {
             if (isPrevisto) map[m]['A receber'] += item.valor;
@@ -331,7 +335,9 @@ export default function FluxoDeCaixa() {
 
     baseData.forEach(item => {
       const status = String(item.status || '').trim().toUpperCase();
-      if(status === 'A REALIZAR' && map[item.dataTimestamp]) {
+      const forecastOnly = item.natureza === 'Entrada' && isForecastOnlyReceivableDocument(item);
+      const isForecast = status === 'A REALIZAR' || forecastOnly;
+      if(isForecast && map[item.dataTimestamp]) {
         if (item.natureza === 'Entrada') {
           map[item.dataTimestamp].Entradas += item.valor;
           map[item.dataTimestamp].Resultado += item.valor;

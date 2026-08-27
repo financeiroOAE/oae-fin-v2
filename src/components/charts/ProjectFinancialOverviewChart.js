@@ -5,6 +5,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 const COLORS = {
   Recebido: 'var(--success)',
   'Custos + Despesas': 'var(--danger)',
+  Tributos: 'var(--warning)',
   Resultado: 'var(--primary)',
 };
 
@@ -15,10 +16,11 @@ const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', {
   maximumFractionDigits: 2,
 }).format(Number(value) || 0);
 
-export default function ProjectFinancialOverviewChart({ recebido = 0, saidas = 0, resultado = 0 }) {
+export default function ProjectFinancialOverviewChart({ recebido = 0, saidas = 0, tributos = 0, resultado = 0 }) {
   const data = [
     { name: 'Recebido', value: recebido },
     { name: 'Custos + Despesas', value: saidas },
+    { name: 'Tributos', value: tributos },
     { name: 'Resultado', value: resultado },
   ];
 
