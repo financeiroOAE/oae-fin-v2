@@ -20,23 +20,26 @@ const demonstrativeCardPattern = /(saldo|contrat|fatur|receb|entrada|receita|pag
 
 function cardExplanation(title) {
   const text = cleanText(title).toLowerCase();
-  if (text.includes('valor contratado') || text === 'contratado') return 'Valor total dos contratos dos projetos exibidos.';
-  if (text.includes('faturado')) return 'Valor já faturado dos projetos exibidos.';
-  if (text.includes('saldo contrat')) return 'Valor dos contratos que ainda resta faturar.';
-  if (text.includes('recebido')) return 'Receitas de projetos já realizadas na CR_GERAL.';
-  if (text.includes('a receber')) return 'Receitas de projetos ainda registradas como A realizar na CR_GERAL.';
-  if (text.includes('pago')) return 'Pagamentos já realizados no período selecionado.';
-  if (text.includes('a pagar')) return 'Pagamentos ainda registrados como A realizar.';
-  if (text.includes('saldo banc')) return 'Saldo das contas bancárias consideradas no painel.';
-  if (text.includes('curva abc')) return 'Distribuição dos projetos pelas classes A, B e C conforme o valor contratado.';
-  if (text.includes('progresso') && text.includes('contrat')) return 'Comparação entre valor contratado, faturado e saldo dos contratos.';
-  if (text.includes('imposto') || text.includes('tributo')) return 'Tributos relacionados às receitas e ao lucro dos projetos.';
-  if (text.includes('receita') || text.includes('fonte')) return 'Receitas registradas para os projetos no período selecionado.';
-  if (text.includes('despesa') || text.includes('custo') || text.includes('saída') || text.includes('saida')) return 'Saídas financeiras classificadas no período selecionado.';
-  if (text.includes('resultado') || text.includes('margem')) return 'Resultado financeiro ou gerencial calculado para o período selecionado.';
-  if (text.includes('status')) return 'Situação dos valores realizados e ainda em aberto no período selecionado.';
-  if (text.includes('fluxo') || text.includes('evolução') || text.includes('evolucao')) return 'Evolução das entradas e saídas ao longo do período exibido.';
-  return 'Indicador calculado a partir da base financeira oficial.';
+  if (text.includes('valor contratado') || text === 'contratado') return 'Representa o valor total dos contratos selecionados e o tamanho da carteira contratada.';
+  if (text.includes('faturado em 2026')) return 'Representa quanto dos contratos foi faturado especificamente durante o exercício de 2026.';
+  if (text.includes('% faturado')) return 'Indica quanto do valor total contratado já foi convertido em faturamento.';
+  if (text.includes('faturado')) return 'Representa a parcela dos contratos já transformada em faturamento ao cliente. Faturado não significa necessariamente recebido.';
+  if (text.includes('saldo contrat')) return 'Representa a parcela dos contratos ainda não faturada e o potencial restante da carteira.';
+  if (text.includes('a receber')) return 'Representa valores reconhecidos para recebimento que ainda não entraram no caixa.';
+  if (text.includes('recebido')) return 'Representa o valor que efetivamente entrou no caixa após descontos, retenções ou diferenças entre faturado e recebido.';
+  if (text.includes('a pagar')) return 'Representa compromissos financeiros previstos ou assumidos que ainda não foram pagos.';
+  if (text.includes('pago')) return 'Representa as saídas financeiras já efetivamente pagas.';
+  if (text.includes('saldo banc')) return 'Representa a posição disponível nas contas bancárias consideradas no painel.';
+  if (text.includes('curva abc')) return 'Mostra a concentração financeira dos projetos por classes, ajudando a identificar dependência dos maiores contratos.';
+  if (text.includes('progresso') && text.includes('contrat')) return 'Compara o contratado, o faturado e o saldo, permitindo acompanhar o avanço comercial dos contratos.';
+  if (text.includes('imposto') || text.includes('tributo')) return 'Representa impostos e encargos relacionados à operação e evidencia seu impacto financeiro.';
+  if (text.includes('margem')) return 'Indica proporcionalmente quanto da receita permanece como resultado após as saídas consideradas.';
+  if (text.includes('resultado')) return 'Representa a diferença entre entradas e saídas consideradas na análise, demonstrando o saldo gerado no período.';
+  if (text.includes('receita') || text.includes('fonte')) return 'Mostra a origem e a concentração das receitas no período selecionado.';
+  if (text.includes('despesa') || text.includes('custo') || text.includes('saída') || text.includes('saida')) return 'Representa os recursos consumidos na operação no período analisado.';
+  if (text.includes('status')) return 'Compara valores realizados e ainda em aberto para apoiar decisões de caixa.';
+  if (text.includes('fluxo') || text.includes('evolução') || text.includes('evolucao')) return 'Mostra a evolução das entradas e saídas ao longo do período, facilitando a leitura de tendências.';
+  return 'Resume o indicador selecionado e apoia sua interpretação gerencial.';
 }
 
 function getCardTitle(card) {

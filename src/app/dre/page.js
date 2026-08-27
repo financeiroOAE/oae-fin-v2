@@ -34,8 +34,17 @@ const DEFAULT_EXPANDED_GROUPS = Object.fromEntries(
 const fmt = (val) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val || 0);
 
-const fmtShort = (val) => {
-  return fmt(val);
+const fmtDreCell = (val) => new Intl.NumberFormat('pt-BR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+}).format(val || 0);
+
+const dreMonthLabel = (month) => {
+  if (month?.retroactive) return 'Retro. 2026';
+  if (Number.isInteger(month?.month)) {
+    return ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][month.month];
+  }
+  return String(month?.label || '').replace(/\.?\/\d{4}$/, '');
 };
 
 // ─── Helpers visuais ──────────────────────────────────────────────────────────
@@ -281,12 +290,12 @@ function DreResultRow({ groupDef, value, byMonth, meses, showMonths }) {
   const color = isPositive ? "var(--success)" : "var(--danger)";
   
   return (
-    <tr style={{ 
+    <tr className="dre-main-row dre-result-row" style={{
       background: isFinal ? "rgba(15, 23, 42, 0.95)" : "var(--bg-main)", 
       borderTop: isFinal ? "2px solid rgba(255,255,255,0.1)" : "1px solid rgba(255,255,255,0.05)",
       borderBottom: isFinal ? "2px solid rgba(255,255,255,0.1)" : "none"
     }}>
-      <td style={{
+      <td className="dre-description-cell" data-label="Descrição" style={{
         padding: isFinal ? "1.25rem 1rem" : "0.875rem 1rem", 
         fontWeight: isFinal ? "900" : "800", 
         fontSize: isFinal ? "14px" : "13px",
@@ -296,21 +305,21 @@ function DreResultRow({ groupDef, value, byMonth, meses, showMonths }) {
         {groupDef.label}
       </td>
       {showMonths && meses.map(m => (
-        <td key={m.key} style={{ 
+        <td key={m.key} className="dre-value-cell" data-label={dreMonthLabel(m)} style={{
           padding: "0.875rem 1rem", textAlign: "right", 
           fontWeight: isFinal ? "800" : "700", 
           color: resultColor(byMonth[m.key] || 0), 
           whiteSpace: "nowrap" 
         }} title={fmt(byMonth[m.key] || 0)}>
-          {fmt(byMonth[m.key] || 0)}
+          {fmtDreCell(byMonth[m.key] || 0)}
         </td>
       ))}
-      <td style={{ 
+      <td className="dre-value-cell dre-total-cell" data-label="Total" style={{
         padding: "0.875rem 1rem", textAlign: "right", 
         fontWeight: "900", fontSize: isFinal ? "16px" : "14px", 
         color, whiteSpace: "nowrap" 
       }}>
-        {fmt(value)}
+        {fmtDreCell(value)}
       </td>
     </tr>
   );
@@ -356,10 +365,10 @@ function DreSubgroupRow({ label, accounts, meses, showMonths }) {
   const total = accounts.reduce((sum, account) => sum + (account.total || 0), 0);
   const byMonth = Object.fromEntries(meses.map((month) => [month.key, accounts.reduce((sum, account) => sum + (account.byMonth?.[month.key] || 0), 0)]));
   return (
-    <tr style={{ background: 'rgba(57,198,198,0.055)', borderTop: '3px solid var(--bg-main)', borderBottom: '1px solid var(--border-color)' }}>
-      <td style={{ padding: '0.7rem 1rem 0.7rem 2.6rem', position: 'sticky', left: 0, zIndex: 1, background: 'rgba(10,38,65,0.99)', color: 'var(--primary)', fontSize: '11px', fontWeight: 800, letterSpacing: '0.045em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{label}</td>
-      {showMonths && meses.map((month) => <td key={month.key} style={{ padding: '0.7rem 1rem', textAlign: 'right', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>{byMonth[month.key] ? fmt(byMonth[month.key]) : '—'}</td>)}
-      <td style={{ padding: '0.7rem 1rem', textAlign: 'right', color: 'var(--text-main)', fontSize: '12px', fontWeight: 800, whiteSpace: 'nowrap', background: 'rgba(15,23,42,0.6)' }}>{fmt(total)}</td>
+    <tr className="dre-main-row dre-subgroup-row" style={{ background: 'rgba(57,198,198,0.055)', borderTop: '3px solid var(--bg-main)', borderBottom: '1px solid var(--border-color)' }}>
+      <td className="dre-description-cell" data-label="Descrição" style={{ padding: '0.7rem 1rem 0.7rem 2.6rem', position: 'sticky', left: 0, zIndex: 1, background: 'rgba(10,38,65,0.99)', color: 'var(--primary)', fontSize: '11px', fontWeight: 800, letterSpacing: '0.045em', textTransform: 'uppercase', whiteSpace: 'normal' }}>{label}</td>
+      {showMonths && meses.map((month) => <td key={month.key} className="dre-value-cell" data-label={dreMonthLabel(month)} style={{ padding: '0.7rem 1rem', textAlign: 'right', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }} title={fmt(byMonth[month.key] || 0)}>{byMonth[month.key] ? fmtDreCell(byMonth[month.key]) : '—'}</td>)}
+      <td className="dre-value-cell dre-total-cell" data-label="Total" style={{ padding: '0.7rem 1rem', textAlign: 'right', color: 'var(--text-main)', fontSize: '12px', fontWeight: 800, whiteSpace: 'nowrap', background: 'rgba(15,23,42,0.6)' }} title={fmt(total)}>{fmtDreCell(total)}</td>
     </tr>
   );
 }
@@ -396,6 +405,7 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
     <>
       {/* Linha de Grupo */}
       <tr
+        className="dre-main-row dre-group-row"
         onClick={onToggle}
         draggable={isDraggable}
         onDragStart={isDraggable ? (e) => onDragStart(e, groupDef.id) : undefined}
@@ -409,7 +419,7 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
         onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
         onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = "rgba(255,255,255,0.015)"; }}
       >
-        <td style={{
+        <td className="dre-description-cell" data-label="Descrição" style={{
           padding: "0.875rem 1rem", fontWeight: "700", fontSize: "13px",
           color: "var(--text-main)", position: "sticky", left: 0, zIndex: 1,
           background: expanded ? "rgba(6,27,60,0.98)" : "rgba(6,27,51,0.98)",
@@ -441,19 +451,19 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
           let mVal = groupData?.byMonth?.[m.key] || 0;
           if (groupDef.isCompound) mVal = dreData.computedByMonth[groupDef.id]?.[m.key] || 0;
           return (
-            <td key={m.key} style={{
+            <td key={m.key} className="dre-value-cell" data-label={dreMonthLabel(m)} style={{
               padding: "0.875rem 1rem", textAlign: "right",
               color: "var(--text-main)", fontWeight: "600", whiteSpace: "nowrap", fontSize: "12px",
             }} title={fmt(mVal)}>
-              {mVal !== 0 ? fmt(mVal) : "—"}
+              {mVal !== 0 ? fmtDreCell(mVal) : "—"}
             </td>
           );
         })}
-        <td style={{ 
+        <td className="dre-value-cell dre-total-cell" data-label="Total" style={{
           padding: "0.875rem 1rem", textAlign: "right", fontWeight: "800", color: "var(--text-main)", whiteSpace: "nowrap", fontSize: "14px",
           background: "rgba(15, 23, 42, 0.6)", borderLeft: "1px solid rgba(255,255,255,0.05)"
         }}>
-          {fmt(total)}
+          {fmtDreCell(total)}
         </td>
       </tr>
 
@@ -468,8 +478,8 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
 
             // Linha de cabeçalho do sub-grupo (mesmo grid que os demais)
             const headerRow = (
-              <tr key={`${subId}-header`} style={{ background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                <td style={{
+              <tr key={`${subId}-header`} className="dre-main-row dre-subgroup-row" style={{ background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <td className="dre-description-cell" data-label="Descrição" style={{
                   padding: "0.625rem 1rem 0.625rem 3rem", fontSize: "12px",
                   color: "var(--text-secondary)", fontWeight: "700", position: "sticky", left: 0, zIndex: 1,
                   background: "rgba(6,24,48,0.98)", whiteSpace: "nowrap",
@@ -477,18 +487,18 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
                   {subData.label}
                 </td>
                 {showMonths && meses.map(m => (
-                  <td key={m.key} style={{
+                  <td key={m.key} className="dre-value-cell" data-label={dreMonthLabel(m)} style={{
                     padding: "0.625rem 1rem", textAlign: "right",
                     color: "var(--text-main)", fontSize: "12px", whiteSpace: "nowrap",
                   }}>
-                    {(subData.byMonth[m.key] || 0) !== 0 ? fmt(subData.byMonth[m.key]) : "—"}
+                    {(subData.byMonth[m.key] || 0) !== 0 ? fmtDreCell(subData.byMonth[m.key]) : "—"}
                   </td>
                 ))}
-                <td style={{ 
+                <td className="dre-value-cell dre-total-cell" data-label="Total" style={{
                   padding: "0.625rem 1rem", textAlign: "right", color: "var(--text-main)", fontWeight: "700", fontSize: "13px", whiteSpace: "nowrap",
                   background: "rgba(15, 23, 42, 0.6)", borderLeft: "1px solid rgba(255,255,255,0.05)"
                 }}>
-                  {fmt(subData.total)}
+                  {fmtDreCell(subData.total)}
                 </td>
               </tr>
             );
@@ -510,12 +520,13 @@ function DreGroupRow({ groupDef, groupData, meses, showMonths, expanded, onToggl
 function DreAccountRow({ account, meses, showMonths, onAccountClick, paddingLeft = "3rem", showSeparator = false }) {
   return (
     <tr
+      className="dre-main-row dre-account-row"
       onClick={() => onAccountClick(account)}
       style={{ background: "rgba(255,255,255,0.01)", cursor: "pointer", transition: "background 0.1s", borderTop: showSeparator ? "2px solid var(--border-color)" : "none" }}
       onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
       onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.01)"}
     >
-      <td style={{
+      <td className="dre-description-cell" data-label="Descrição" style={{
         padding: `0.625rem 1rem 0.625rem ${paddingLeft}`, fontSize: "12px",
         color: "var(--text-secondary)", position: "sticky", left: 0, zIndex: 1,
         background: "rgba(6,24,48,0.98)", whiteSpace: "nowrap",
@@ -528,19 +539,19 @@ function DreAccountRow({ account, meses, showMonths, onAccountClick, paddingLeft
         <FileText size={10} color="rgba(168,181,198,0.4)" style={{ flexShrink: 0 }} />
       </td>
       {showMonths && meses.map(m => (
-        <td key={m.key} style={{
+        <td key={m.key} className="dre-value-cell" data-label={dreMonthLabel(m)} style={{
           padding: "0.625rem 1rem", textAlign: "right",
           color: (account.byMonth[m.key] || 0) !== 0 ? "var(--text-main)" : "rgba(255,255,255,0.2)",
           fontSize: "12px", whiteSpace: "nowrap",
         }} title={fmt(account.byMonth[m.key] || 0)}>
-          {(account.byMonth[m.key] || 0) !== 0 ? fmt(account.byMonth[m.key]) : "—"}
+          {(account.byMonth[m.key] || 0) !== 0 ? fmtDreCell(account.byMonth[m.key]) : "—"}
         </td>
       ))}
-      <td style={{ 
+      <td className="dre-value-cell dre-total-cell" data-label="Total" style={{
         padding: "0.625rem 1rem", textAlign: "right", color: "var(--text-main)", fontWeight: "600", whiteSpace: "nowrap", fontSize: "13px",
         background: "rgba(15, 23, 42, 0.6)", borderLeft: "1px solid rgba(255,255,255,0.05)"
       }}>
-        {fmt(account.total)}
+        {fmtDreCell(account.total)}
       </td>
     </tr>
   );
@@ -1022,14 +1033,19 @@ export default function Dre() {
           </div>
         </div>
 
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: showMonths ? `${300 + meses.length * 130}px` : "600px" }}>
+        <div className="dre-table-shell">
+          <table className={`dre-main-table ${includeRetroactive ? 'has-retroactive' : ''}`}>
+            <colgroup>
+              <col className="dre-description-col" />
+              {showMonths && meses.map((month) => <col key={month.key} className="dre-value-col" />)}
+              <col className="dre-total-col" />
+            </colgroup>
             <thead>
               <tr style={{ background: "var(--bg-elevated)", borderBottom: "2px solid var(--border-color)" }}>
-                <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "12px", fontWeight: "700", color: "var(--text-secondary)", textTransform: "uppercase", position: "sticky", left: 0, zIndex: 2, background: "var(--bg-elevated)", minWidth: "280px", whiteSpace: "nowrap" }}>Descrição</th>
-                {showMonths && meses.map(m => <th key={m.key} style={{ padding: "0.75rem 1rem", textAlign: "right", fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", whiteSpace: "nowrap", minWidth: "120px" }}>{m.label}</th>)}
-                <th style={{ 
-                  padding: "0.75rem 1rem", textAlign: "right", fontSize: "13px", fontWeight: "800", color: "var(--primary)", whiteSpace: "nowrap", minWidth: "140px",
+                <th className="dre-description-cell" style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "12px", fontWeight: "700", color: "var(--text-secondary)", textTransform: "uppercase", background: "var(--bg-elevated)", whiteSpace: "normal" }}>Descrição</th>
+                {showMonths && meses.map(m => <th key={m.key} className="dre-value-cell" style={{ padding: "0.75rem 1rem", textAlign: "right", fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", whiteSpace: "normal" }}>{dreMonthLabel(m)}</th>)}
+                <th className="dre-value-cell dre-total-cell" style={{
+                  padding: "0.75rem 1rem", textAlign: "right", fontSize: "13px", fontWeight: "800", color: "var(--primary)", whiteSpace: "nowrap",
                   background: "rgba(15, 23, 42, 0.8)", borderLeft: "1px solid rgba(255,255,255,0.05)"
                 }}>
                   {showMonths ? "TOTAL" : "VALOR"}

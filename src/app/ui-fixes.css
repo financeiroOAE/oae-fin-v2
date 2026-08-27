@@ -149,6 +149,220 @@
   overflow: visible;
 }
 
+.project-executive-filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(150px, 1fr) minmax(145px, 0.65fr);
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--bg-elevated) 72%, transparent);
+}
+
+.project-executive-filters input {
+  min-height: 34px !important;
+  height: 34px;
+  padding: 0 0.6rem;
+  font-size: 11px;
+}
+
+.project-executive-table-wrap {
+  width: 100%;
+  overflow: hidden;
+}
+
+.project-executive-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: clamp(8px, 0.68vw, 10.5px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.22px;
+}
+
+.project-executive-table .project-col-name { width: 22%; }
+.project-executive-table col:not(.project-col-name) { width: 8.666%; }
+.project-executive-table th,
+.project-executive-table td {
+  min-width: 0;
+  padding: 0.72rem clamp(0.18rem, 0.45vw, 0.55rem);
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+.project-executive-table th {
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: right;
+  white-space: normal;
+}
+.project-executive-table th:first-child { text-align: left; }
+.project-executive-table td:not(:first-child) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dre-table-shell {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  container: dre-shell / inline-size;
+}
+
+.dre-main-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.dre-main-table .dre-description-col { width: 20%; }
+.dre-main-table .dre-total-col { width: 8%; }
+.dre-main-table .dre-value-col { width: auto; }
+.dre-main-table .dre-description-cell {
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0.62rem clamp(0.3rem, 0.7vw, 0.75rem) !important;
+  overflow-wrap: anywhere;
+  white-space: normal !important;
+  line-height: 1.2;
+}
+.dre-main-table .dre-description-cell > div {
+  min-width: 0;
+  gap: 0.28rem !important;
+}
+.dre-main-table .dre-description-cell span {
+  min-width: 0;
+  max-width: 100% !important;
+  white-space: normal;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+.dre-main-table .dre-value-cell {
+  min-width: 0 !important;
+  padding: 0.62rem clamp(0.08rem, 0.22vw, 0.28rem) !important;
+  overflow: visible;
+  font-size: clamp(7.2px, 0.55vw, 9px) !important;
+  line-height: 1.15;
+  letter-spacing: -0.42px;
+  white-space: nowrap !important;
+}
+.dre-main-table .dre-total-cell {
+  font-size: clamp(7.6px, 0.6vw, 9.6px) !important;
+  letter-spacing: -0.48px;
+}
+.dre-main-table.has-retroactive .dre-value-cell {
+  font-size: clamp(6.9px, 0.51vw, 8.6px) !important;
+  letter-spacing: -0.52px;
+}
+
+@container dre-shell (max-width: 1180px) {
+  .dre-main-table colgroup,
+  .dre-main-table thead { display: none; }
+  .dre-main-table,
+  .dre-main-table tbody { display: block; }
+  .dre-main-table tbody { padding: 0.65rem; }
+  .dre-main-table .dre-main-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    margin-bottom: 0.65rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-card) !important;
+  }
+  .dre-main-table .dre-main-row > td {
+    position: static !important;
+    min-width: 0;
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.18rem;
+    padding: 0.55rem !important;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+    background: transparent !important;
+    font-size: 10px !important;
+    letter-spacing: -0.1px;
+    text-align: right;
+    white-space: normal !important;
+  }
+  .dre-main-table .dre-main-row > td::before {
+    content: attr(data-label);
+    color: var(--text-secondary);
+    font-size: 8.5px;
+    font-weight: 700;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+  .dre-main-table .dre-main-row > .dre-description-cell {
+    grid-column: 1 / -1;
+    align-items: flex-start;
+    padding: 0.7rem !important;
+    color: var(--text-main);
+    font-size: 11px !important;
+    text-align: left;
+  }
+  .dre-main-table .dre-main-row > .dre-description-cell::before { display: none; }
+  .dre-main-table .dre-main-row > .dre-total-cell {
+    background: color-mix(in srgb, var(--primary) 7%, transparent) !important;
+    color: var(--text-main);
+    font-weight: 800;
+  }
+}
+
+@media (max-width: 620px) {
+  .dre-main-table .dre-main-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .project-executive-filters { grid-template-columns: 1fr; }
+  .project-executive-table colgroup,
+  .project-executive-table thead { display: none; }
+  .project-executive-table,
+  .project-executive-table tbody { display: block; }
+  .project-executive-table tbody {
+    padding: 0.65rem;
+  }
+  .project-executive-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    margin-bottom: 0.65rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-card);
+  }
+  .project-executive-table tbody td {
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.55rem 0.65rem;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+    font-size: 10.5px;
+    text-align: right;
+    white-space: normal;
+  }
+  .project-executive-table tbody td:first-child {
+    grid-column: 1 / -1;
+    font-size: 12px;
+    text-align: left;
+  }
+  .project-executive-table tbody td::before {
+    content: attr(data-label);
+    max-width: 48%;
+    color: var(--text-secondary);
+    font-size: 9px;
+    font-weight: 700;
+    text-align: left;
+    text-transform: uppercase;
+  }
+  .project-executive-table tbody td:first-child::before { display: none; }
+}
+
 .account-group-separator td {
   padding: 0.4rem 0.75rem !important;
   border-top: 2px solid var(--border-color) !important;

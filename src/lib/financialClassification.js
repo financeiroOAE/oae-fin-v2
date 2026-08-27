@@ -130,3 +130,22 @@ export function getRevenueTaxLabel(item) {
   if (/\bCSLL\b/.test(text)) return 'CSLL';
   return item?.contaNome || item?.contaDescricao || 'Tributos';
 }
+
+export function isAllocatedInss(item) {
+  const text = accountText(item);
+  return /(^|\s)INSS(\s|$)/.test(text) || text.includes('PREVIDENCI');
+}
+
+/**
+ * Tributos exibidos na análise de projetos. O vínculo com obra/centro de custo
+ * deve ser validado pelo consumidor antes desta função ser chamada; assim um
+ * INSS administrativo genérico não é transformado em tributo de projeto.
+ */
+export function isProjectTax(item) {
+  return isRevenueTax(item) || isAllocatedInss(item);
+}
+
+export function getProjectTaxLabel(item) {
+  if (isAllocatedInss(item)) return 'INSS alocado aos projetos';
+  return getRevenueTaxLabel(item);
+}
