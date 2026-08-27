@@ -23,7 +23,7 @@ export default function ReportAdder({
   presetTags = [],
   style = {},
 }) {
-  const { isReportMode, activeReportPage, addReportItem, reportItems, registerSection } = useReport();
+  const { isReportMode, activeReportPage, addReportItem, reportItems, registerSection, unregisterSection } = useReport();
   const [isPreparing, setIsPreparing] = useState(false);
   const normalizedKey = sectionKey || `${page}:${title}`;
 
@@ -69,6 +69,13 @@ export default function ReportAdder({
   useEffect(() => {
     registerSection(section);
   }, [registerSection, section]);
+
+  // O registro de uma secao deve existir somente enquanto o bloco correspondente
+  // estiver montado. O cleanup usa apenas a chave, para nao apagar/recriar a secao
+  // a cada atualizacao de dados do mesmo bloco.
+  useEffect(() => {
+    return () => unregisterSection?.(normalizedKey);
+  }, [normalizedKey, unregisterSection]);
 
   if (!isReportMode || (activeReportPage && activeReportPage !== page)) {
     return <span data-report-section-key={normalizedKey} hidden aria-hidden="true" />;

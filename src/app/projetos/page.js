@@ -205,7 +205,7 @@ const isProjectTax = (item) => isRevenueTax(item) || isAllocatedProjectInss(item
 const getProjectTaxLabel = (item) => isAllocatedProjectInss(item) ? 'INSS' : getRevenueTaxLabel(item);
 
 export default function Projetos() {
-  const { isReportMode, openReportBuilder, exitReportMode } = useReport();
+  const { isReportMode, openReportBuilder, exitReportMode, reportItems, setReportItems } = useReport();
   const [isSyncing, setIsSyncing] = useState(false);
   const [data, setData] = useState([]);
   const [projetosBrutos, setProjetosBrutos] = useState([]);
@@ -729,6 +729,103 @@ export default function Projetos() {
     Resultado: project.resultadoCaixa,
   }));
 
+  const projectReportMovesByKey = useMemo(() => {
+    const allowedProjectKeys = new Set(filteredProjetos.map((project) => project.projectKey));
+    const map = new Map(filteredProjetos.map((project) => [project.projectKey, []]));
+    const start = filterDataInicial ? new Date(`${filterDataInicial}T00:00:00`).getTime() : 0;
+    const end = filterDataFinal ? new Date(`${filterDataFinal}T23:59:59`).getTime() : Infinity;
+
+    data.forEach((item) => {
+      const itemProjectKey = item.natureza === 'Entrada' && isProjectRelatedRevenueEntry(item)
+        ? getFinancialRevenueProjectIdentity(item).projectKey
+        : getProjectKey(item.projeto);
+      if (!allowedProjectKeys.has(itemProjectKey)) return;
+
+      const parts = String(item.data || '').split('/');
+      if (parts.length === 3) {
+        const timestamp = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T12:00:00`).getTime();
+        if (timestamp < start || timestamp > end) return;
+      }
+
+      map.get(itemProjectKey)?.push(item);
+    });
+
+    return map;
+  }, [data, filteredProjetos, filterDataInicial, filterDataFinal]);
+
+  const individualProjectReportSections = useMemo(() => filteredProjetos.map((project) => {
+    const summary = [{
+      Projeto: project.nome,
+      Empresa: project.empresa || '',
+      Tipo: project.tipo || '',
+      Contratado: Number(project.contratado) || 0,
+      Faturado: Number(project.faturado) || 0,
+      'Faturado em 2026': Number(project.faturado2026) || 0,
+      'Recebido Líquido': Number(project.recebido) || 0,
+      'A Receber': Number(project.aReceber) || 0,
+      Pago: Number(project.pago) || 0,
+      'A Pagar': Number(project.aPagar) || 0,
+      Resultado: Number(project.resultadoCaixa) || 0,
+    }];
+
+    const movements = (projectReportMovesByKey.get(project.projectKey) || []).map((item) => ({
+      Data: item.data || '',
+      Natureza: item.natureza || '',
+      Situação: item.status || '',
+      'Nome / Fornecedor': item.nome || '',
+      Conta: item.contaNome || item.contaDescricao || item.contaCodigo || '',
+      Documento: item.documento || '',
+      Lançamento: item.lancamento || '',
+      Valor: Number(item.valor) || 0,
+    }));
+
+    return {
+      sectionKey: `projetos:executivo-selecionado:${project.projectKey}`,
+      title: `Relatório Executivo — ${project.nome}`,
+      componentName: 'Relatório Executivo do Projeto',
+      page: 'Projetos',
+      type: 'TABLE',
+      data: summary,
+      dataSets: { summary, all: movements },
+      detailMode: 'summary',
+      detailOptions: ['summary', 'all'],
+      filters: {
+        Projeto: project.nome,
+        Empresa: project.empresa || 'Todas',
+        Tipo: project.tipo || 'Todos',
+        'Data inicial': filterDataInicial || 'Todas',
+        'Data final': filterDataFinal || 'Todas',
+      },
+      explanation: 'Relatório executivo do projeto filtrado, com opção de resumo ou todos os lançamentos do período.',
+    };
+  }), [filteredProjetos, projectReportMovesByKey, filterDataInicial, filterDataFinal]);
+
+  const activeIndividualReportKeys = useMemo(
+    () => new Set(individualProjectReportSections.map((section) => section.sectionKey)),
+    [individualProjectReportSections]
+  );
+
+  const activeIndividualReportSignature = useMemo(
+    () => [...activeIndividualReportKeys].sort().join('|'),
+    [activeIndividualReportKeys]
+  );
+
+  // Remove da ordem/exportacao relatorios individuais de projetos que sairam do filtro.
+  // A dependencia de reportItems tambem limpa selecoes antigas restauradas do localStorage.
+  useEffect(() => {
+    setReportItems((current) => {
+      let changed = false;
+      const next = current.filter((item) => {
+        const key = String(item?.sectionKey || '');
+        if (!key.startsWith('projetos:executivo-selecionado:')) return true;
+        const keep = activeIndividualReportKeys.has(key);
+        if (!keep) changed = true;
+        return keep;
+      });
+      return changed ? next : current;
+    });
+  }, [activeIndividualReportSignature, activeIndividualReportKeys, reportItems, setReportItems]);
+
   const selectedProjectMoves = useMemo(() => {
     if (!selectedProject) return [];
     return data.filter((item) => {
@@ -950,6 +1047,16 @@ export default function Projetos() {
           <AlertCircle size={18} /> <strong>Erro:</strong> {error}
         </div>
       )}
+
+      <div style={{ display: 'none' }} aria-hidden="true">
+        {individualProjectReportSections.map((section) => (
+          <ReportAdder
+            key={section.sectionKey}
+            {...section}
+            style={{ display: 'none' }}
+          />
+        ))}
+      </div>
 
       {/* 2. Filtros Globais com MultiSelect */}
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem', borderTop: '2px solid var(--purple)' }}>
@@ -1400,54 +1507,6 @@ export default function Projetos() {
                 <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--primary)' }}>{selectedProject.nome}</h2>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <ReportAdder
-                  sectionKey={`projetos:executivo-selecionado:${selectedProject.projectKey}`}
-                  title={`Relatório Executivo — ${selectedProject.nome}`}
-                  componentName="Relatório Executivo do Projeto"
-                  page="Projetos"
-                  type="TABLE"
-                  data={[{
-                    Projeto: selectedProject.nome,
-                    Empresa: selectedProject.empresa || '',
-                    Tipo: selectedProject.tipo || '',
-                    Contratado: Number(selectedProject.contratado) || 0,
-                    Faturado: Number(selectedProject.faturado) || 0,
-                    'Recebido Líquido': Number(selectedProject.recebido) || 0,
-                    'A Receber': Number(selectedProject.aReceber) || 0,
-                    Pago: Number(selectedProject.pago) || 0,
-                    'A Pagar': Number(selectedProject.aPagar) || 0,
-                    Resultado: Number(selectedProject.resultadoCaixa) || 0,
-                  }]}
-                  dataSets={{
-                    summary: [{
-                      Projeto: selectedProject.nome,
-                      Empresa: selectedProject.empresa || '',
-                      Tipo: selectedProject.tipo || '',
-                      Contratado: Number(selectedProject.contratado) || 0,
-                      Faturado: Number(selectedProject.faturado) || 0,
-                      'Recebido Líquido': Number(selectedProject.recebido) || 0,
-                      'A Receber': Number(selectedProject.aReceber) || 0,
-                      Pago: Number(selectedProject.pago) || 0,
-                      'A Pagar': Number(selectedProject.aPagar) || 0,
-                      Resultado: Number(selectedProject.resultadoCaixa) || 0,
-                    }],
-                    all: selectedProjectReportMoves.map((item) => ({
-                      Data: item.data || '',
-                      Natureza: item.natureza || '',
-                      Situação: item.status || '',
-                      'Nome / Fornecedor': item.nome || '',
-                      Conta: item.contaNome || item.contaDescricao || item.contaCodigo || '',
-                      Documento: item.documento || '',
-                      Lançamento: item.lancamento || '',
-                      Valor: Number(item.valor) || 0,
-                    })),
-                  }}
-                  detailMode="summary"
-                  detailOptions={["summary", "all"]}
-                  filters={{ Projeto: selectedProject.nome, Empresa: selectedProject.empresa || 'Todas', Tipo: selectedProject.tipo || 'Todos', 'Data inicial': filterDataInicial || 'Todas', 'Data final': filterDataFinal || 'Todas' }}
-                  explanation="Relatório executivo do projeto selecionado com opção de resumo ou todos os lançamentos filtrados."
-                  style={{ display: 'none' }}
-                />
                 <button onClick={() => isReportMode ? exitReportMode() : openReportBuilder('Projetos')} className={`btn ${isReportMode ? 'btn-primary' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: isReportMode ? 'var(--primary)' : 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: isReportMode ? '#fff' : 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                   <FileText size={14} /> {isReportMode ? 'Sair do Modo Relatório' : 'Gerar Relatório'}
                 </button>

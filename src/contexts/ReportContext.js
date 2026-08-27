@@ -267,6 +267,16 @@ export function ReportProvider({ children }) {
     });
   }, []);
 
+  const unregisterSection = useCallback((sectionKey) => {
+    if (!sectionKey) return;
+    setAvailableSections((current) => {
+      if (!current[sectionKey]) return current;
+      const next = { ...current };
+      delete next[sectionKey];
+      return next;
+    });
+  }, []);
+
   const addReportItem = useCallback((section) => {
     if (isExcludedExecutiveSection(section)) return;
     const normalized = snapshotSection(section);
@@ -477,6 +487,7 @@ export function ReportProvider({ children }) {
         loadTemplate,
         deleteTemplate,
         registerSection,
+        unregisterSection,
         availableSections,
         applyPreset,
         statusMessage,
