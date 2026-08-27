@@ -1,10 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { batchReadSheets } from '@/lib/googleSheets';
 import { processSiengeData, extractAccountCode, parseBRL } from '@/lib/businessRules';
-
-const globalForPrisma = globalThis;
-export const prisma = globalForPrisma.__oaePrisma || new PrismaClient();
-if (process.env.NODE_ENV !== 'production') globalForPrisma.__oaePrisma = prisma;
 
 const SNAPSHOT_ID = 'current';
 const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA'];
@@ -101,7 +97,6 @@ async function performFullSync(triggeredBy) {
   const cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap, projetos, planosMap);
   const crProcessed = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos, planosMap).map((row) => ({
     ...row,
-    // Regra oficial: CR_GERAL coluna K (Valor) é o líquido efetivamente recebido.
     valorCaixa: Number(row.valor) || 0,
     recebimentoLiquidoFonte: 'CR_GERAL_K_VALOR',
   }));
@@ -137,19 +132,6 @@ async function performFullSync(triggeredBy) {
     totalBilling: Math.round(somaCRFaturamento * 100) / 100,
     rule: 'J=FATURAMENTO;K=LIQUIDO_RECEBIDO',
   };
-
-  console.log('--- Resumo Financeiro da Sincronização ---');
-  console.log(`Disparado por: ${triggeredBy}`);
-  console.log(`Quantidade de registros processados (CP + CR): ${allData.length}`);
-  console.log(`Soma de CP_GERAL.Valor (Saídas): ${somaCP}`);
-  console.log(`Soma de CR_GERAL coluna J / Valor total título (Faturamento): ${somaCRFaturamento}`);
-  console.log(`Soma de CR_GERAL coluna K / Valor (Líquido): ${somaCRLiquido}`);
-  console.log(`Soma recebida realizada pela coluna K: ${somaCRRealizado}`);
-  console.log(`Soma de PROJETOS_2026.CONTRATO: ${somaProjetosContrato}`);
-  console.log(`Soma de PROJETOS_2026.NF FATURADAS: ${somaProjetosFaturado}`);
-  console.log(`Soma de PROJETOS_2026.SALDO_CONTRATUAL: ${somaProjetosSaldo}`);
-  console.log(`Tempo de processamento: ${Date.now() - startedAt}ms`);
-  console.log('------------------------------------------');
 
   const syncedAt = new Date().toISOString();
   const payload = {
