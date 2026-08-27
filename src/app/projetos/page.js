@@ -1205,7 +1205,7 @@ export default function Projetos() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 120px', minWidth: 0, overflow: 'hidden' }}>
+            <div style={{ flex: '1 1 135px', minWidth: 0, overflow: 'visible' }}>
               <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
                 FATURADO 2026
                 <InfoTooltip
@@ -1213,21 +1213,21 @@ export default function Projetos() {
                   content={`Faturado: ${formatCurrency(totalFaturado2026)}. Receita líquida realizada: ${formatCurrency(receitaLiquidaProjetos)}. A receita líquida é o valor efetivamente creditado após descontos e retenções.`}
                 />
               </p>
-              <p title={`Receita Líquida: ${formatCurrency(receitaLiquidaProjetos)}`} style={{ fontSize: 'clamp(14px, 1.25vw, 18px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', color: 'var(--success)', cursor: 'help' }}>{formatCurrency(totalFaturado2026)}</p>
+              <p title={`Faturado em 2026: ${formatCurrency(totalFaturado2026)}`} style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--success)', cursor: 'help' }}>{formatCurrency(totalFaturado2026)}</p>
             </div>
-            <div style={{ flex: '1 1 120px', minWidth: 0, overflow: 'hidden' }}>
+            <div style={{ flex: '1 1 135px', minWidth: 0, overflow: 'visible' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Custos Diretos</p>
-              <p style={{ fontSize: 'clamp(14px, 1.25vw, 18px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', color: 'var(--warning)' }}>{formatCurrency(dreStats.custo)}</p>
+              <p style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--warning)' }}>{formatCurrency(dreStats.custo)}</p>
               {totalFaturado2026 > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.custo / totalFaturado2026) * 100).toFixed(1)}% do Faturado</span>}
             </div>
-            <div style={{ flex: '1 1 120px', minWidth: 0, overflow: 'hidden' }}>
+            <div style={{ flex: '1 1 135px', minWidth: 0, overflow: 'visible' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Outras Despesas</p>
-              <p style={{ fontSize: 'clamp(14px, 1.25vw, 18px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', color: 'var(--danger)' }}>{formatCurrency(dreStats.despesa)}</p>
+              <p style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--danger)' }}>{formatCurrency(dreStats.despesa)}</p>
               {totalFaturado2026 > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.despesa / totalFaturado2026) * 100).toFixed(1)}% do Faturado</span>}
             </div>
-            <div style={{ flex: '1 1 120px', minWidth: 0, overflow: 'hidden' }}>
+            <div style={{ flex: '1 1 135px', minWidth: 0, overflow: 'visible' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Tributos</p>
-              <p style={{ fontSize: 'clamp(14px, 1.25vw, 18px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip', minWidth: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', color: 'var(--primary)' }}>{formatCurrency(dreStats.tributos)}</p>
+              <p style={{ fontSize: 'clamp(11px, 1vw, 15px)', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'visible', minWidth: 0, maxWidth: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.035em', color: 'var(--primary)' }}>{formatCurrency(dreStats.tributos)}</p>
               {totalFaturado2026 > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{((dreStats.tributos / totalFaturado2026) * 100).toFixed(1)}% do Faturado</span>}
             </div>
           </div>

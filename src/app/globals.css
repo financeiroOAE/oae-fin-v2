@@ -1170,3 +1170,95 @@ tbody tr:hover {
     font-size: 11px !important;
   }
 }
+
+
+/* === DRE SCROLLBAR VISIVEL 2026-08-26 === */
+/* Override final: a DRE precisa preservar colunas legiveis e oferecer rolagem horizontal clara. */
+.dre-responsive-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: scroll !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: auto;
+  scrollbar-color: var(--primary) var(--bg-main);
+  padding-bottom: 5px;
+}
+
+.dre-responsive-table {
+  width: max-content !important;
+  min-width: 100% !important;
+  max-width: none !important;
+  table-layout: auto !important;
+}
+
+.dre-responsive-table th:first-child,
+.dre-responsive-table td:first-child {
+  width: 340px !important;
+  min-width: 340px !important;
+  max-width: 340px !important;
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 3;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+}
+
+.dre-responsive-table th:not(:first-child),
+.dre-responsive-table td:not(:first-child) {
+  width: 110px !important;
+  min-width: 110px !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  font-size: 10px !important;
+  text-align: right;
+}
+
+.dre-responsive-table th:last-child,
+.dre-responsive-table td:last-child {
+  width: 135px !important;
+  min-width: 135px !important;
+}
+
+.dre-responsive-wrap::-webkit-scrollbar {
+  height: 18px !important;
+}
+
+.dre-responsive-wrap::-webkit-scrollbar-track {
+  background: var(--bg-main);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.dre-responsive-wrap::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border: 3px solid var(--bg-main);
+  border-radius: 10px;
+  min-width: 72px;
+}
+
+.dre-responsive-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-hover);
+}
+
+@media (max-width: 820px) {
+  .dre-responsive-table th:first-child,
+  .dre-responsive-table td:first-child {
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 280px !important;
+    font-size: 10px !important;
+  }
+
+  .dre-responsive-table th:not(:first-child),
+  .dre-responsive-table td:not(:first-child) {
+    width: 100px !important;
+    min-width: 100px !important;
+    font-size: 9px !important;
+  }
+}

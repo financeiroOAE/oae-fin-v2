@@ -15,7 +15,7 @@ export default function FinancialCompositionBar({ title, total = 0, items = [], 
     <div style={{ minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.65rem' }}>
         <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-main)', textTransform: 'uppercase' }}>{title}</span>
-        <strong style={{ fontSize: '14px', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{formatCurrency(total)}</strong>
+        <strong style={{ fontSize: 'clamp(11px, 0.9vw, 13px)', color: 'var(--text-main)', whiteSpace: 'nowrap', letterSpacing: '-0.025em', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(total)}</strong>
       </div>
 
       <div
@@ -55,7 +55,7 @@ export default function FinancialCompositionBar({ title, total = 0, items = [], 
         })}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: '0.55rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 175px), 1fr))', gap: '0.55rem' }}>
         {visibleItems.map((item) => (
           <button
             key={item.key}
@@ -87,7 +87,7 @@ export default function FinancialCompositionBar({ title, total = 0, items = [], 
           >
             <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
             <span style={{ fontSize: '10.5px', lineHeight: 1.25, color: 'var(--text-secondary)', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{item.label}</span>
-            <strong style={{ fontSize: '10.5px', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{formatCurrency(item.value)}</strong>
+            <strong style={{ fontSize: 'clamp(8.5px, 0.72vw, 10px)', color: 'var(--text-main)', whiteSpace: 'nowrap', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(item.value)}</strong>
           </button>
         ))}
       </div>

@@ -24,6 +24,42 @@ const getYearToDateRange = () => {
   return { start: `${today.getFullYear()}-01-01`, end: localDate(today) };
 };
 
+const normalizeTaxScopeText = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .trim()
+  .toUpperCase();
+
+const isInssTaxEntry = (item) => {
+  const text = normalizeTaxScopeText([
+    item?.contaNome,
+    item?.contaDescricao,
+    item?.planoFinanceiro,
+    item?.dreClasse,
+    item?.drePacote,
+    item?.dreLinha,
+    item?.dreDescricao,
+  ].filter(Boolean).join(' '));
+  return /\bINSS\b/.test(text);
+};
+
+// Visao Geral: tributos da empresa inteira. Mantem as regras tributarias existentes
+// e inclui INSS quando a propria conta/classificacao identifica o tributo.
+const isGeneralTax = (item) => isRevenueTax(item) || isInssTaxEntry(item);
+
+const hasAllocatedProject = (item) => {
+  const project = normalizeTaxScopeText(item?.projeto);
+  if (!project || project.includes('ADMINISTRA')) return false;
+  return ![
+    'GRUPO OAE',
+    'SEM PROJETO',
+    'PROJETOS',
+    'PROJETO',
+    'PROJETOS GERAL',
+    'PROJETOS GERAIS'
+  ].includes(project);
+};
+
 export default function VisaoFinanceira() {
   const { isReportMode, openReportBuilder, exitReportMode } = useReport();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -349,7 +385,7 @@ export default function VisaoFinanceira() {
       const dreText = [item.dreClasse, item.dreLinha, item.dreDescricao, item.contaDescricao]
         .filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 
-      if (isRevenueTax(item)) add('tributos', item, value);
+      if (isGeneralTax(item)) add('tributos', item, value);
       else if (/(INVEST|CAPEX|IMOBILIZ|ATIVO FIXO|ATIVO IMOB)/.test(dreText)) add('investimentos', item, value);
       else if (dreText.includes('CUSTO')) add('custos', item, value);
       else if (dreText.includes('DESPESA') || dreText.includes('ADMINISTRAT')) add('despesas', item, value);
@@ -374,10 +410,10 @@ export default function VisaoFinanceira() {
 
   const taxStatusBreakdown = useMemo(() => ({
     realizado: realizedFilteredData
-      .filter((item) => item.natureza === 'Saída' && isRevenueTax(item))
+      .filter((item) => item.natureza === 'Saída' && isGeneralTax(item))
       .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0),
     pendente: forecastFilteredData
-      .filter((item) => item.natureza === 'Saída' && isRevenueTax(item))
+      .filter((item) => item.natureza === 'Saída' && isGeneralTax(item))
       .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0),
   }), [realizedFilteredData, forecastFilteredData]);
 
@@ -387,12 +423,12 @@ export default function VisaoFinanceira() {
     const receita = projectRevenueStatus.realizado.total;
     const saidasProjeto = realizedFilteredData
       .filter((item) => item.natureza === 'Saída')
-      .filter((item) => filterProjetos.length > 0 || !String(item.projeto || '').toUpperCase().includes('ADMINISTRA'));
+      .filter((item) => hasAllocatedProject(item));
     const tributos = saidasProjeto
-      .filter((item) => isRevenueTax(item))
+      .filter((item) => isGeneralTax(item))
       .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0);
     const saidas = saidasProjeto
-      .filter((item) => !isRevenueTax(item))
+      .filter((item) => !isGeneralTax(item))
       .reduce((sum, item) => sum + Math.abs(Number(item.valor) || 0), 0);
     const resultado = receita - saidas - tributos;
     const margem = receita > 0 ? (resultado / receita) * 100 : 0;
