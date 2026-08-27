@@ -1077,3 +1077,96 @@ tbody tr:hover {
     padding-right: 0.04rem !important;
   }
 }
+
+
+/* === DRE valores completos sem sobreposicao - 2026-08-26 === */
+.dre-responsive-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dre-responsive-table {
+  width: 100% !important;
+  min-width: 1720px !important;
+  max-width: none !important;
+  table-layout: fixed !important;
+  border-collapse: collapse;
+}
+
+.dre-responsive-table th,
+.dre-responsive-table td {
+  resize: none !important;
+  box-sizing: border-box;
+  line-height: 1.25 !important;
+}
+
+.dre-responsive-table th:first-child,
+.dre-responsive-table td:first-child {
+  width: 340px !important;
+  min-width: 340px !important;
+  max-width: 340px !important;
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 3;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+.dre-responsive-table th:not(:first-child),
+.dre-responsive-table td:not(:first-child) {
+  width: 118px !important;
+  min-width: 118px !important;
+  max-width: 118px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  font-size: 12px !important;
+  letter-spacing: normal !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.dre-responsive-table th:last-child,
+.dre-responsive-table td:last-child {
+  width: 135px !important;
+  min-width: 135px !important;
+  max-width: 135px !important;
+  font-weight: 700;
+}
+
+.dre-responsive-table thead th:not(:first-child) {
+  font-size: 11px !important;
+}
+
+@media (max-width: 820px) {
+  .dre-responsive-table {
+    min-width: 1660px !important;
+  }
+
+  .dre-responsive-table th:first-child,
+  .dre-responsive-table td:first-child {
+    width: 300px !important;
+    min-width: 300px !important;
+    max-width: 300px !important;
+  }
+
+  .dre-responsive-table th:not(:first-child),
+  .dre-responsive-table td:not(:first-child) {
+    width: 115px !important;
+    min-width: 115px !important;
+    max-width: 115px !important;
+    font-size: 11px !important;
+  }
+}
