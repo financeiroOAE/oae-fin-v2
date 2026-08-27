@@ -1,9 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { getSession } from '@/lib/auth';
-
-const globalForPrisma = globalThis;
-const prisma = globalForPrisma.__oaePrisma || new PrismaClient();
-if (process.env.NODE_ENV !== 'production') globalForPrisma.__oaePrisma = prisma;
+import { prisma } from '@/lib/prisma';
 
 export const MENU_DEFINITIONS = [
   { key: 'inicio', label: 'Início', path: '/' },
