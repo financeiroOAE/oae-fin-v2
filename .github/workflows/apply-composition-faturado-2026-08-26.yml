@@ -1,0 +1,50 @@
+name: Aplicar composicao financeira com faturado 2026
+
+on:
+  push:
+    paths:
+      - 'scripts/apply-composition-faturado-2026-08-26.js'
+      - '.github/workflows/apply-composition-faturado-2026-08-26.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Aplicar patch
+        run: node scripts/apply-composition-faturado-2026-08-26.js
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Gerar Prisma
+        run: npx prisma generate
+
+      - name: Build
+        run: npm run build
+
+      - name: Commitar alteracao validada
+        run: |
+          if git diff --quiet -- src/app/projetos/page.js; then
+            echo "Nenhuma alteracao pendente."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/projetos/page.js
+          git commit -m "fix: usa faturado na composicao financeira"
+          git push origin main
