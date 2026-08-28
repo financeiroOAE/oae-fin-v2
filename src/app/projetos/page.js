@@ -466,12 +466,46 @@ export default function Projetos() {
   const totalAReceber = filteredProjetos.reduce((acc, p) => acc + p.aReceber, 0);
   const totalPago = filteredProjetos.reduce((acc, p) => acc + p.pago, 0);
   // Receita liquida dos projetos acompanha o botao de rateio administrativo.
-  // A base consolidada usa o valor efetivamente recebido da CR_GERAL (coluna K).
-  const receitaLiquidaProjetos = filteredProjetos.reduce((acc, p) => {
-    const direta = Number(p.receitaDireta) || 0;
-    const adm = incluirRateioAdm ? (Number(p.receitaAdm) || 0) : 0;
-    return acc + direta + adm;
-  }, 0);
+  // No consolidado geral, a fonte de verdade e a CR_GERAL (coluna K), somando
+  // diretamente as receitas 1010101 + 1010107 realizadas dentro do periodo.
+  // O vinculo por obra so passa a limitar o total quando ha filtro de projeto/empresa/tipo
+  // ou filtro inline da tabela. Isso evita perder receitas validas por falha de associacao
+  // com a carteira PROJETOS_2026.
+  const hasProjectScopeFilter = filterProjetos.length > 0
+    || filterEmpresas.length > 0
+    || filterTipos.length > 0
+    || Boolean(colFilterProjeto)
+    || Boolean(colFilterEmpresa)
+    || parsePercentFilter(colFilterMinFaturadoPerc) !== null;
+
+  const receitaLiquidaProjetos = useMemo(() => {
+    if (hasProjectScopeFilter) {
+      return filteredProjetos.reduce((acc, p) => {
+        const direta = Number(p.receitaDireta) || 0;
+        const adm = incluirRateioAdm ? (Number(p.receitaAdm) || 0) : 0;
+        return acc + direta + adm;
+      }, 0);
+    }
+
+    return baseData.reduce((acc, item) => {
+      if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return acc;
+
+      const status = String(item?.status || '').toUpperCase();
+      const isRealizado = status.includes('REALIZADO')
+        || status.includes('RECEBIDO')
+        || status.includes('EFETIVADO');
+      if (!isRealizado) return acc;
+
+      let ts = 0;
+      if (item.data) {
+        const parts = String(item.data).split('/');
+        if (parts.length === 3) ts = new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+      }
+      if (ts < realizadoIni || ts > realizadoFim) return acc;
+
+      return acc + (Number(item.valor) || 0);
+    }, 0);
+  }, [hasProjectScopeFilter, filteredProjetos, incluirRateioAdm, baseData, realizadoIni, realizadoFim]);
 
   const usarCarteiraCompleta = filterProjetos.length === 0 && filterEmpresas.length === 0 && filterTipos.length === 0;
 
