@@ -263,6 +263,9 @@ export async function exportReportToPdf(items, config) {
     if (item.includePending && Array.isArray(item.pendingData) && item.pendingData.length > 0) {
       drawTable({ ...item, columns: undefined }, item.pendingData, "Pendências incluídas");
     }
+
+    // Respiro visual entre um topico e o seguinte no PDF.
+    if (y < maxY) y += 8;
   }
 
   const totalPages = pdf.getNumberOfPages();

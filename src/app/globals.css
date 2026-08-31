@@ -741,7 +741,7 @@ tbody tr:hover {
 .report-preview-brand { color: #1e3a8a; font-size: 20px; }
 .report-preview-header span { color: #64748b; font-size: 10px; }
 .report-preview-header h1 { margin: 0 0 0.25rem; color: #334155; font-size: 18px; }
-.report-preview-sections { display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1.5rem; }
+.report-preview-sections { display: flex; flex-direction: column; gap: 2.25rem; margin-top: 1.5rem; }
 .report-preview-section { break-inside: avoid; }
 .report-preview-section-title { display: flex; align-items: center; gap: 0.55rem; padding-bottom: 0.4rem; border-bottom: 1px solid #e2e8f0; }
 .report-preview-section-title > span { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; color: #fff; background: #1e3a8a; font-size: 8px; font-weight: 800; }
