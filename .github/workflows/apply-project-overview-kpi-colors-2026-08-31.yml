@@ -1,0 +1,54 @@
+name: Apply Project Overview KPI Colors 2026-08-31
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/align-project-overview-kpi-colors-2026-08-31.js'
+      - '.github/workflows/apply-project-overview-kpi-colors-2026-08-31.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply KPI colors
+        run: node scripts/align-project-overview-kpi-colors-2026-08-31.js
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/oae_ci
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/oae_ci
+          JWT_SECRET: ci_only_secret_for_build_validation
+
+      - name: Commit applied changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/visao-financeira/page.js
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "style: alinhar cores da visao financeira de projetos"
+            git push
+          fi
