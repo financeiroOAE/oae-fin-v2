@@ -321,6 +321,34 @@ export default function FluxoDeCaixa() {
   const totalReceitasDia = receitasDoDia.reduce((acc, curr) => acc + curr.valor, 0);
   const totalCompromissosDia = compromissosDoDia.reduce((acc, curr) => acc + curr.valor, 0);
 
+  const reportResumoHojeSummary = useMemo(() => ([{
+    "A Receber Hoje": totalReceitasDia,
+    "Lançamentos a Receber": receitasDoDia.length,
+    "A Pagar Hoje": totalCompromissosDia,
+    "Lançamentos a Pagar": compromissosDoDia.length,
+  }]), [totalReceitasDia, receitasDoDia.length, totalCompromissosDia, compromissosDoDia.length]);
+
+  const reportResumoHojeRows = useMemo(() => ([
+    ...receitasDoDia.map((item) => ({
+      Situação: 'A Receber',
+      Data: item.data,
+      Documento: item.documento || item.lancamento || '-',
+      Nome: item.nome || '-',
+      Projeto: item.projeto || '-',
+      Conta: item.contaDescricao || '-',
+      Valor: Number(item.valor) || 0,
+    })),
+    ...compromissosDoDia.map((item) => ({
+      Situação: 'A Pagar',
+      Data: item.data,
+      Documento: item.documento || item.lancamento || '-',
+      Nome: item.nome || '-',
+      Projeto: item.projeto || '-',
+      Conta: item.contaDescricao || '-',
+      Valor: Number(item.valor) || 0,
+    })),
+  ]), [receitasDoDia, compromissosDoDia]);
+
   const formatDateBR = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
   const previsao7Dias = useMemo(() => {
@@ -663,7 +691,20 @@ export default function FluxoDeCaixa() {
         <div className="fluxo-highlight-content">
 
           <div data-report-section className="card fluxo-today-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-            <ReportAdder sectionKey="fluxo:resumo-hoje" title={`Resumo de Hoje — ${formatDateBR(hojeObj)}`} componentName="Resumo de Hoje" page="Fluxo de Caixa" type="SUMMARY" data={[{ "A Receber Hoje": totalReceitasDia, "Lançamentos a Receber": receitasDoDia.length, "A Pagar Hoje": totalCompromissosDia, "Lançamentos a Pagar": compromissosDoDia.length }]} filters={{ Data: formatDateBR(hojeObj) }} style={{ alignSelf: 'flex-end' }} />
+            <ReportAdder
+              sectionKey="fluxo:resumo-hoje"
+              title={`Resumo de Hoje — ${formatDateBR(hojeObj)}`}
+              componentName="Resumo de Hoje"
+              page="Fluxo de Caixa"
+              type="TABLE"
+              data={reportResumoHojeRows}
+              dataSets={{ summary: reportResumoHojeSummary, all: reportResumoHojeRows }}
+              detailMode="all"
+              detailOptions={["all", "summary"]}
+              filters={{ Data: formatDateBR(hojeObj) }}
+              explanation="Detalhamento dos lançamentos previstos para o dia, separando contas a receber e contas a pagar."
+              style={{ alignSelf: 'flex-end' }}
+            />
             <ChartHeader
               title={`Resumo de Hoje — ${formatDateBR(hojeObj)}`}
               infoTitle="Dia Atual"
