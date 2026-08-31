@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - scripts/fix-visao-financeira-match-projetos-2026-08-31.js
+      - scripts/fix-visao-financeira-match-projetos-2026-08-31-v2.js
       - .github/workflows/fix-visao-financeira-match-projetos-2026-08-31.yml
   workflow_dispatch:
 
@@ -27,7 +27,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Aplicar correcao
-        run: node scripts/fix-visao-financeira-match-projetos-2026-08-31.js
+        run: node scripts/fix-visao-financeira-match-projetos-2026-08-31-v2.js
       - name: Instalar dependencias
         run: npm ci
       - name: Gerar Prisma
