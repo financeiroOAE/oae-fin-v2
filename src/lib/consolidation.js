@@ -1,5 +1,23 @@
 import { classifyFinancialEntry } from '@/lib/financialClassification';
 
+export const PROJECT_ADMIN_RATE = 0.20;
+
+const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+/**
+ * Regra oficial de recebimento/faturamento dos projetos:
+ * - o plano financeiro NAO define mais a divisao Projeto x Administrativo;
+ * - 100% do titulo e primeiro vinculado ao projeto;
+ * - o sistema calcula o rateio: 80% Projeto + 20% Administrativo;
+ * - a soma das parcelas sempre preserva exatamente o total do titulo.
+ */
+export function splitProjectReceipt(totalValue) {
+  const total = roundMoney(totalValue);
+  const administrative = roundMoney(total * PROJECT_ADMIN_RATE);
+  const project = roundMoney(total - administrative);
+  return { total, project, administrative };
+}
+
 function parseDateToLocalMidnight(value, fallbackTimestamp) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0).getTime();
@@ -84,12 +102,23 @@ function isUsableAllocationProject(value) {
   ].includes(normalized);
 }
 
-function projectRevenueValue(item, incluirRateioAdm, valueOverride = null) {
+function isProjectRevenueClassification(classification) {
+  return classification?.type === 'receita_projeto' || classification?.type === 'receita_administrativa';
+}
+
+function enrichWithSystemAllocation(item, value) {
   const classification = classifyFinancialEntry(item);
-  const value = valueOverride === null ? (Number(item.valor) || 0) : valueOverride;
-  if (classification.type === 'receita_projeto') return value;
-  if (classification.type === 'receita_administrativa' && incluirRateioAdm) return value;
-  return 0;
+  if (!isProjectRevenueClassification(classification)) return null;
+
+  const allocation = splitProjectReceipt(value);
+  return {
+    ...item,
+    valorReceitaProjetoTotal: allocation.total,
+    valorDireto: allocation.project,
+    valorAdministrativo: allocation.administrative,
+    rateioAdministrativoPercentual: PROJECT_ADMIN_RATE * 100,
+    rateioAdministrativoFonte: 'SISTEMA_20_PERCENT',
+  };
 }
 
 export function consolidateFinancialData(baseData, options = {}) {
@@ -111,6 +140,7 @@ export function consolidateFinancialData(baseData, options = {}) {
     }
     return Number(item?.valor) || 0;
   };
+
   const isFiltroSomenteAdm = filterProjetos.length === 1 && filterProjetos[0].toUpperCase() === 'ADMINISTRAÇÃO';
   const isFiltroAdmPresente = filterProjetos.some(p => p.toUpperCase() === 'ADMINISTRAÇÃO');
 
@@ -119,13 +149,31 @@ export function consolidateFinancialData(baseData, options = {}) {
 
   normalizedBaseData.forEach(item => {
     if (item.natureza !== 'Entrada' || !item.lancamento) {
+      const value = effectiveValue(item);
+      const allocated = item.natureza === 'Entrada' ? enrichWithSystemAllocation(item, value) : null;
+
       if (isProjetosPage && item.natureza === 'Entrada') {
-        const value = projectRevenueValue(item, incluirRateioAdm, effectiveValue(item));
-        if (value === 0) return;
-        nonConsolidatable.push({ ...item, valor: value });
+        if (!allocated) return;
+        nonConsolidatable.push({
+          ...allocated,
+          valor: incluirRateioAdm ? allocated.valorReceitaProjetoTotal : allocated.valorDireto,
+          valorBruto: item.valorBruto ?? item.valor,
+        });
         return;
       }
-      nonConsolidatable.push(usarValorCaixa ? { ...item, valorBruto: item.valorBruto ?? item.valor, valor: effectiveValue(item) } : item);
+
+      if (allocated) {
+        nonConsolidatable.push({
+          ...allocated,
+          valor: value,
+          valorBruto: item.valorBruto ?? item.valor,
+        });
+        return;
+      }
+
+      nonConsolidatable.push(usarValorCaixa
+        ? { ...item, valorBruto: item.valorBruto ?? item.valor, valor: value }
+        : item);
       return;
     }
 
@@ -136,39 +184,39 @@ export function consolidateFinancialData(baseData, options = {}) {
     if (!consolidatedMap.has(key)) {
       consolidatedMap.set(key, {
         ...item,
+        valorReceitaProjetoTotal: 0,
         valorDireto: 0,
         valorAdministrativo: 0,
         valorOutrasEntradas: 0,
+        valorFaturamentoReceitaTotal: 0,
         valorFaturamentoDireto: 0,
         valorFaturamentoAdministrativo: 0,
         valorFaturamentoOutrasEntradas: 0,
         valorFaturamentoTitulo: 0,
         linhasOriginais: [],
-        centroCustoObra: null
+        centroCustoObra: null,
+        temReceitaProjeto: false,
       });
     }
 
     const consItem = consolidatedMap.get(key);
-    consItem.linhasOriginais.push(usarValorCaixa ? { ...item, valorBruto: item.valorBruto ?? item.valor, valor: effectiveValue(item) } : item);
+    const value = effectiveValue(item);
+    const rowForAudit = usarValorCaixa
+      ? { ...item, valorBruto: item.valorBruto ?? item.valor, valor: value }
+      : item;
+    consItem.linhasOriginais.push(rowForAudit);
 
     const classification = classifyFinancialEntry(item);
-    const value = effectiveValue(item);
     const faturamentoLinha = Number(item.valorFaturamento ?? item.valorTotalTitulo) || 0;
-    consItem.valorFaturamentoTitulo += faturamentoLinha;
 
-    if (classification.type === 'receita_administrativa') {
-      consItem.valorAdministrativo += value;
-      consItem.valorFaturamentoAdministrativo += faturamentoLinha;
-      // A linha ADM pode carregar o projeto real do titulo. Ela deve servir de
-      // vinculo quando a outra linha estiver em GRUPO OAE / SEM PROJETO.
-      if (!consItem.centroCustoObra && isUsableAllocationProject(item.projeto)) {
-        consItem.centroCustoObra = item.projeto;
-      }
-    } else if (classification.type === 'receita_projeto') {
-      consItem.valorDireto += value;
-      consItem.valorFaturamentoDireto += faturamentoLinha;
-      // Nunca deixe um centro generico bloquear um projeto valido encontrado
-      // em outra linha do mesmo titulo.
+    if (isProjectRevenueClassification(classification)) {
+      // REC. FATURAMENTO e REC. ADMINISTRATIVO apenas identificam que a linha
+      // pertence ao recebimento do projeto. A divisao financeira nao vem mais
+      // dessas contas: somamos o titulo e rateamos 20% pelo sistema depois.
+      consItem.temReceitaProjeto = true;
+      consItem.valorReceitaProjetoTotal += value;
+      consItem.valorFaturamentoReceitaTotal += faturamentoLinha;
+
       if (isUsableAllocationProject(item.projeto)) {
         consItem.centroCustoObra = item.projeto;
       }
@@ -179,47 +227,56 @@ export function consolidateFinancialData(baseData, options = {}) {
   });
 
   const processedConsolidated = Array.from(consolidatedMap.values()).map(cons => {
-    // J agora e uma parcela por linha. O valor bruto do titulo e a soma das linhas
-    // consolidadas, mantendo os subtotais Faturamento/Administrativo disponiveis.
+    const receiptAllocation = splitProjectReceipt(cons.valorReceitaProjetoTotal);
+    const billingAllocation = splitProjectReceipt(cons.valorFaturamentoReceitaTotal);
+
+    cons.valorReceitaProjetoTotal = receiptAllocation.total;
+    cons.valorDireto = receiptAllocation.project;
+    cons.valorAdministrativo = receiptAllocation.administrative;
+    cons.valorFaturamentoDireto = billingAllocation.project;
+    cons.valorFaturamentoAdministrativo = billingAllocation.administrative;
+    cons.valorFaturamentoTitulo = roundMoney(billingAllocation.total + cons.valorFaturamentoOutrasEntradas);
     cons.valorFaturamento = cons.valorFaturamentoTitulo;
     cons.valorTotalTitulo = cons.valorFaturamentoTitulo;
+    cons.rateioAdministrativoPercentual = PROJECT_ADMIN_RATE * 100;
+    cons.rateioAdministrativoFonte = cons.temReceitaProjeto ? 'SISTEMA_20_PERCENT' : null;
+
     const projectFromRows = cons.linhasOriginais.find((row) => isUsableAllocationProject(row.projeto))?.projeto;
     const ccFinal = cons.centroCustoObra || projectFromRows || cons.projeto || 'ADMINISTRAÇÃO';
 
     if (isProjetosPage) {
-      const projectValue = cons.valorDireto + (incluirRateioAdm ? cons.valorAdministrativo : 0);
-      if (projectValue === 0) return null;
+      if (!cons.temReceitaProjeto || receiptAllocation.total === 0) return null;
       return {
         ...cons,
-        valor: projectValue,
+        valor: incluirRateioAdm ? receiptAllocation.total : receiptAllocation.project,
         projeto: ccFinal,
-        isConsolidated: true
+        isConsolidated: true,
       };
     }
 
-    if (isFiltroSomenteAdm) {
+    if (isFiltroSomenteAdm && cons.temReceitaProjeto) {
       return {
         ...cons,
-        valor: cons.valorAdministrativo,
+        valor: receiptAllocation.administrative,
         projeto: 'ADMINISTRAÇÃO',
-        isConsolidated: true
+        isConsolidated: true,
       };
     }
 
-    if (isFiltroAdmPresente && !filterProjetos.includes(ccFinal)) {
+    if (isFiltroAdmPresente && cons.temReceitaProjeto && !filterProjetos.includes(ccFinal)) {
       return {
         ...cons,
-        valor: cons.valorAdministrativo,
+        valor: receiptAllocation.administrative,
         projeto: 'ADMINISTRAÇÃO',
-        isConsolidated: true
+        isConsolidated: true,
       };
     }
 
     return {
       ...cons,
-      valor: cons.valorDireto + cons.valorAdministrativo + cons.valorOutrasEntradas,
+      valor: roundMoney(receiptAllocation.total + cons.valorOutrasEntradas),
       projeto: ccFinal,
-      isConsolidated: true
+      isConsolidated: true,
     };
   }).filter(Boolean);
 
