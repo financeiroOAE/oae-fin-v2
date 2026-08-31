@@ -4,7 +4,7 @@ import { processSiengeData, extractAccountCode, parseBRL } from '@/lib/businessR
 
 const SNAPSHOT_ID = 'current';
 const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA'];
-const CASH_LOGIC_VERSION = 5;
+const CASH_LOGIC_VERSION = 6;
 
 function parseSortDate(value) {
   if (!value) return 0;
@@ -30,6 +30,88 @@ function isRealizedEntry(row) {
   if (String(row?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
   const status = String(row?.status || '').toUpperCase();
   return status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO');
+}
+
+function isForecastRevenueEntry(row) {
+  if (String(row?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
+  const code = String(row?.contaCodigo || '').replace(/\D/g, '');
+  if (code !== '1010101' && code !== '1010107') return false;
+  const status = String(row?.status || '').toUpperCase();
+  const isRealized = status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('EFETIVADO');
+  if (isRealized) return false;
+  return status.includes('A REALIZAR')
+    || status.includes('A RECEBER')
+    || status.includes('A PAGAR')
+    || status.includes('PREVISTO');
+}
+
+function forecastTitleKey(row, index) {
+  const lancamento = String(row?.lancamento || '').trim();
+  const status = String(row?.status || '').trim().toUpperCase();
+  const data = String(row?.data || '').trim();
+  if (lancamento) return [lancamento, status, data].join('|');
+  const documento = String(row?.documento || '').trim();
+  const nome = String(row?.nome || '').trim();
+  if (documento) return ['DOC:' + documento, nome, status, data].join('|');
+  return 'ROW:' + index;
+}
+
+function distributeAmount(rows, total) {
+  if (!rows.length) return [];
+  const weights = rows.map((row) => Math.abs(Number(row.valorFaturamentoOriginal ?? row.valorFaturamento) || 0));
+  const weightTotal = weights.reduce((sum, value) => sum + value, 0);
+  let allocated = 0;
+  return rows.map((row, index) => {
+    const value = index === rows.length - 1
+      ? Math.round((total - allocated) * 100) / 100
+      : Math.round((total * (weightTotal > 0 ? weights[index] / weightTotal : 1 / rows.length)) * 100) / 100;
+    allocated += value;
+    return { ...row, valorFaturamento: value, valorTotalTitulo: value, valorBruto: value };
+  });
+}
+
+function normalizeForecastRevenueBilling(rows) {
+  const result = [...rows];
+  const groups = new Map();
+
+  rows.forEach((row, index) => {
+    if (!isForecastRevenueEntry(row)) return;
+    const key = forecastTitleKey(row, index);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(index);
+  });
+
+  groups.forEach((indexes) => {
+    const groupRows = indexes.map((index) => ({ ...result[index], __index: index }));
+    const originals = groupRows.map((row) => Math.abs(Number(row.valorFaturamentoOriginal ?? row.valorFaturamento) || 0)).filter((value) => value > 0);
+    const titleValue = originals.length ? Math.max(...originals) : 0;
+    if (titleValue <= 0) return;
+
+    const direct = groupRows.filter((row) => String(row.contaCodigo || '').replace(/\D/g, '') === '1010101');
+    const admin = groupRows.filter((row) => String(row.contaCodigo || '').replace(/\D/g, '') === '1010107');
+
+    if (direct.length && admin.length) {
+      const directTotal = Math.round(titleValue * 0.8 * 100) / 100;
+      const adminTotal = Math.round((titleValue - directTotal) * 100) / 100;
+      distributeAmount(direct, directTotal).forEach((row) => {
+        result[row.__index] = { ...row, valorFaturamentoOriginal: Number(result[row.__index].valorFaturamentoOriginal ?? result[row.__index].valorFaturamento) || 0, previsaoFaturamentoFonte: 'TITULO_UNICO_80_20' };
+        delete result[row.__index].__index;
+      });
+      distributeAmount(admin, adminTotal).forEach((row) => {
+        result[row.__index] = { ...row, valorFaturamentoOriginal: Number(result[row.__index].valorFaturamentoOriginal ?? result[row.__index].valorFaturamento) || 0, previsaoFaturamentoFonte: 'TITULO_UNICO_80_20' };
+        delete result[row.__index].__index;
+      });
+      return;
+    }
+
+    const normalized = distributeAmount(groupRows, titleValue);
+    normalized.forEach((row) => {
+      result[row.__index] = { ...row, valorFaturamentoOriginal: Number(result[row.__index].valorFaturamentoOriginal ?? result[row.__index].valorFaturamento) || 0, previsaoFaturamentoFonte: 'TITULO_UNICO' };
+      delete result[row.__index].__index;
+    });
+  });
+
+  return result;
 }
 
 async function performFullSync(triggeredBy) {
@@ -95,11 +177,16 @@ async function performFullSync(triggeredBy) {
   });
 
   const cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap, projetos, planosMap);
-  const crProcessed = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos, planosMap).map((row) => ({
+  const crBase = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos, planosMap).map((row) => ({
     ...row,
     valorCaixa: Number(row.valor) || 0,
+    valorFaturamentoOriginal: Number(row.valorFaturamento) || 0,
     recebimentoLiquidoFonte: 'CR_GERAL_K_VALOR',
   }));
+  // Regra global da receita prevista: J do titulo entra uma unica vez.
+  // Quando existem 1010101 + 1010107, o titulo e distribuido 80/20.
+  // Realizados nao passam por esta normalizacao: J ja vem rateado na origem.
+  const crProcessed = normalizeForecastRevenueBilling(crBase);
 
   const stats = {
     EMPRESAS: empresas.length,
@@ -130,7 +217,7 @@ async function performFullSync(triggeredBy) {
     sourceNet: Math.round(somaCRRealizado * 100) / 100,
     totalLiquid: Math.round(somaCRLiquido * 100) / 100,
     totalBilling: Math.round(somaCRFaturamento * 100) / 100,
-    rule: 'J=SOMA_FATURAMENTO_POR_TITULO;K=SOMA_LIQUIDO_RECEBIDO_POR_TITULO',
+    rule: 'REALIZADO:J_SOMA_RATEIO;PREVISAO:J_TITULO_UNICO_80_20;K=LIQUIDO_RECEBIDO',
   };
 
   const syncedAt = new Date().toISOString();

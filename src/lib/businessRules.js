@@ -179,10 +179,10 @@ function resolveCanonicalSourceProject(rawNome, rawCodigo, exactIndex, projectIn
  * Sempre que a identificação da obra for inequívoca, o nome exibido vem da relação oficial PROJETOS_2026.
  *
  * Regra CR_GERAL (2026-08-31):
- * - coluna J / "Valor total título" = parcela faturada da linha; as linhas do mesmo título
- *   (ex.: 1010101 Faturamento + 1010107 Administrativo) devem ser SOMADAS para formar a nota/título;
- * - coluna K / "Valor" = parcela líquida efetivamente recebida/caixa da linha;
- * - J e K não devem ser deduplicados por MAX: a origem já separa Faturamento e Administrativo.
+ * - REALIZADO/RECEBIDO: coluna J já vem rateada por linha e deve ser somada;
+ * - A RECEBER/A REALIZAR/PREVISTO: o valor integral de J pode repetir nas contas
+ *   1010101/1010107; a sincronização normaliza o título uma única vez e distribui 80/20;
+ * - coluna K / "Valor" = valor líquido efetivamente recebido/caixa e não é alterada por essa regra.
  */
 export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [], financialPlanMap = {}) {
   const isCR = type === 'CR_GERAL';
