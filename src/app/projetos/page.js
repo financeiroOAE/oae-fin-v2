@@ -19,7 +19,7 @@ import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { exportReportToPdf } from "@/lib/reportExport";
 import { isRevenueTax, getRevenueTaxLabel, classifyFinancialEntry, isTeamExpense } from "@/lib/financialClassification";
-import { getProjectKey, isProjectOngoing, getActiveProjectNames, isGeneralProjectsBucket } from "@/lib/projectRules";
+import { getProjectKey, isGeneralProjectsBucket } from "@/lib/projectRules";
 
 const TABLE_PAGE_SIZE = 15;
 
@@ -218,6 +218,7 @@ export default function Projetos() {
   const [filterProjetos, setFilterProjetos] = useState([]);
   const [filterEmpresas, setFilterEmpresas] = useState([]);
   const [filterTipos, setFilterTipos] = useState([]);
+  const [filterStatusProjeto, setFilterStatusProjeto] = useState('TODOS');
   
   // Filtros Inline da Tabela
   const [colFilterProjeto, setColFilterProjeto] = useState('');
@@ -275,7 +276,7 @@ export default function Projetos() {
 
     projetosBrutos.forEach((p) => {
       const nomeObra = String(p.OBRA || '').trim();
-      if (!nomeObra || nomeObra.toUpperCase().includes('ADMINISTRATIVO') || !isProjectOngoing(p)) return;
+      if (!nomeObra || nomeObra.toUpperCase().includes('ADMINISTRATIVO')) return;
       const projectKey = getProjectKey(p.ID || nomeObra);
       if (!projectKey) return;
 
@@ -381,6 +382,7 @@ export default function Projetos() {
       empresa: p.empresas.join(' / ') || 'N/A',
       tipo: p.tipos.join(' / ') || 'N/A',
       percentFaturado: p.contratado > 0 ? p.faturado / p.contratado : 0,
+      statusProjeto: p.contratado > 0 && p.faturado >= p.contratado ? 'CONCLUIDO' : 'EM_ANDAMENTO',
       resultadoCaixa: p.recebido - p.pago,
       receitaConsideradaTooltip: p.receitaDireta + (incluirRateioAdm ? p.receitaAdm : 0)
     }));
@@ -388,6 +390,7 @@ export default function Projetos() {
 
   const filteredProjetos = useMemo(() => {
     return projetosCruzados.filter(p => {
+      if (filterStatusProjeto !== 'TODOS' && p.statusProjeto !== filterStatusProjeto) return false;
       if (filterProjetos.length > 0 && !filterProjetos.includes(p.nome)) return false;
       if (filterEmpresas.length > 0 && !p.empresas.some((empresa) => filterEmpresas.includes(empresa))) return false;
       if (filterTipos.length > 0 && !p.tipos.some((tipo) => filterTipos.includes(tipo))) return false;
@@ -397,12 +400,15 @@ export default function Projetos() {
       if (minFaturadoPerc !== null && (p.percentFaturado * 100) < minFaturadoPerc) return false;
       return true;
     });
-  }, [projetosCruzados, filterProjetos, filterEmpresas, filterTipos, colFilterProjeto, colFilterEmpresa, colFilterMinFaturadoPerc]);
+  }, [projetosCruzados, filterStatusProjeto, filterProjetos, filterEmpresas, filterTipos, colFilterProjeto, colFilterEmpresa, colFilterMinFaturadoPerc]);
 
-  // Regra oficial dos filtros de Projetos: exibir os nomes da relação PROJETOS_2026 / centro de custo, sem códigos financeiros P.xxx e sem duplicidade.
-  const listaProjetos = getActiveProjectNames(projetosBrutos, true);
-  const listaEmpresas = Array.from(new Set(projetosCruzados.flatMap(p => p.empresas))).sort();
-  const listaTipos = Array.from(new Set(projetosCruzados.flatMap(p => p.tipos))).sort();
+  // Opcoes dos filtros acompanham a situacao escolhida da carteira.
+  const projetosDisponiveisPorStatus = filterStatusProjeto === 'TODOS'
+    ? projetosCruzados
+    : projetosCruzados.filter((p) => p.statusProjeto === filterStatusProjeto);
+  const listaProjetos = Array.from(new Set(projetosDisponiveisPorStatus.map((p) => p.nome).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const listaEmpresas = Array.from(new Set(projetosDisponiveisPorStatus.flatMap(p => p.empresas))).sort();
+  const listaTipos = Array.from(new Set(projetosDisponiveisPorStatus.flatMap(p => p.tipos))).sort();
 
   const sortedProjetos = useMemo(() => {
     const sortable = [...filteredProjetos];
@@ -471,7 +477,8 @@ export default function Projetos() {
   // O vinculo por obra so passa a limitar o total quando ha filtro de projeto/empresa/tipo
   // ou filtro inline da tabela. Isso evita perder receitas validas por falha de associacao
   // com a carteira PROJETOS_2026.
-  const hasProjectScopeFilter = filterProjetos.length > 0
+  const hasProjectScopeFilter = filterStatusProjeto !== 'TODOS'
+    || filterProjetos.length > 0
     || filterEmpresas.length > 0
     || filterTipos.length > 0
     || Boolean(colFilterProjeto)
@@ -507,7 +514,7 @@ export default function Projetos() {
     }, 0);
   }, [hasProjectScopeFilter, filteredProjetos, incluirRateioAdm, baseData, realizadoIni, realizadoFim]);
 
-  const usarCarteiraCompleta = filterProjetos.length === 0 && filterEmpresas.length === 0 && filterTipos.length === 0;
+  const usarCarteiraCompleta = filterStatusProjeto === 'TODOS' && filterProjetos.length === 0 && filterEmpresas.length === 0 && filterTipos.length === 0;
 
   const previsaoProjetosGeral = useMemo(() => data
     .filter((item) => {
@@ -534,10 +541,11 @@ export default function Projetos() {
   // Escopo de impostos dos projetos: qualquer lancamento tributario efetivamente
   // alocado a uma obra/centro de custo real. Administracao e buckets genericos ficam fora.
   // Quando ha filtro global de projeto/empresa/tipo, o imposto acompanha esse recorte.
-  const hasGlobalProjectScopeFilter = filterProjetos.length > 0 || filterEmpresas.length > 0 || filterTipos.length > 0;
+  const hasGlobalProjectScopeFilter = filterStatusProjeto !== 'TODOS' || filterProjetos.length > 0 || filterEmpresas.length > 0 || filterTipos.length > 0;
   const globalProjectTaxKeys = useMemo(() => new Set(
     projetosCruzados
       .filter((p) => {
+        if (filterStatusProjeto !== 'TODOS' && p.statusProjeto !== filterStatusProjeto) return false;
         if (filterProjetos.length > 0 && !filterProjetos.includes(p.nome)) return false;
         if (filterEmpresas.length > 0 && !p.empresas.some((empresa) => filterEmpresas.includes(empresa))) return false;
         if (filterTipos.length > 0 && !p.tipos.some((tipo) => filterTipos.includes(tipo))) return false;
@@ -545,7 +553,7 @@ export default function Projetos() {
       })
       .map((p) => p.projectKey)
       .filter(Boolean)
-  ), [projetosCruzados, filterProjetos, filterEmpresas, filterTipos]);
+  ), [projetosCruzados, filterStatusProjeto, filterProjetos, filterEmpresas, filterTipos]);
 
   function isCDP(planoFinanceiro) {
     const raw = String(planoFinanceiro || '');
@@ -791,6 +799,7 @@ export default function Projetos() {
     Projetos: filterProjetos.length ? filterProjetos : "Todos",
     Empresas: filterEmpresas.length ? filterEmpresas : "Todas",
     Tipos: filterTipos.length ? filterTipos : "Todos",
+    "Status do projeto": filterStatusProjeto === "TODOS" ? "Todos" : (filterStatusProjeto === "CONCLUIDO" ? "Concluídos (100% faturados)" : "Em andamento"),
     "Rateio administrativo": incluirRateioAdm ? "Incluído" : "Não incluído",
   };
   const projectReportRows = sortedProjetos.map((project) => ({
@@ -1078,7 +1087,7 @@ export default function Projetos() {
   }, [selectedProject, selectedProjectReportMoves]);
 
   const clearAllFilters = () => {
-    setFilterProjetos([]); setFilterEmpresas([]); setFilterTipos([]);
+    setFilterProjetos([]); setFilterEmpresas([]); setFilterTipos([]); setFilterStatusProjeto('TODOS');
     const range = getYearToDateRange();
     setFilterDataInicial(range.start); setFilterDataFinal(range.end);
     setColFilterProjeto(''); setColFilterEmpresa(''); setColFilterMinFaturadoPerc('');
@@ -1161,6 +1170,22 @@ export default function Projetos() {
             <MultiSelect options={listaTipos} value={filterTipos} onChange={(v) => { setFilterTipos(v); setTablePage(1); }} placeholder="Todos os tipos" />
           </div>
 
+          <div style={{ flex: '1 1 170px', minWidth: 0 }}>
+            <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Target size={12} /> Situação do Projeto
+            </label>
+            <select
+              value={filterStatusProjeto}
+              onChange={(e) => { setFilterStatusProjeto(e.target.value); setFilterProjetos([]); setTablePage(1); }}
+              style={{ width: '100%', height: '34px', fontSize: '13px', color: 'var(--text-main)', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 0.5rem' }}
+              aria-label="Situação do Projeto"
+            >
+              <option value="TODOS">Todos</option>
+              <option value="EM_ANDAMENTO">Em andamento</option>
+              <option value="CONCLUIDO">Concluídos (100% faturados)</option>
+            </select>
+          </div>
+
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Data Inicial</label>
             <input type="date" value={filterDataInicial} onChange={(e) => setFilterDataInicial(e.target.value)}
@@ -1182,7 +1207,7 @@ export default function Projetos() {
         </div>
 
         {/* Badges dos filtros ativos */}
-        {(filterProjetos.length > 0 || filterEmpresas.length > 0 || filterTipos.length > 0) && (
+        {(filterStatusProjeto !== 'TODOS' || filterProjetos.length > 0 || filterEmpresas.length > 0 || filterTipos.length > 0) && (
           <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', fontSize: '11px', color: 'var(--text-secondary)' }}>
             <strong>{filteredProjetos.length}</strong> projeto{filteredProjetos.length !== 1 ? 's' : ''} exibido{filteredProjetos.length !== 1 ? 's' : ''} com os filtros aplicados.
           </div>
