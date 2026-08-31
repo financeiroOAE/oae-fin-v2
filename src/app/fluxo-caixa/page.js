@@ -310,6 +310,29 @@ export default function FluxoDeCaixa() {
   const totalFaturamentosNfes = faturamentosNfesFiltrados.reduce((acc, row) => acc + row.valor, 0);
   const totalValorRealNfes = faturamentosNfesFiltrados.reduce((acc, row) => acc + (Number(row.valorRealNota) || 0), 0);
 
+  const reportFaturamentosNfesRows = useMemo(() => [
+    ...faturamentosNfesFiltrados.map((row) => ({
+      Documento: row.documento,
+      Projeto: row.projeto,
+      Vencimento: row.data,
+      "Valor Bruto": Number(row.valorRealNota) || 0,
+      "Valor Líquido": Number(row.valor) || 0,
+    })),
+    ...(faturamentosNfesFiltrados.length > 0 ? [{
+      Documento: 'TOTAL DAS NOTAS',
+      Projeto: '-',
+      Vencimento: '-',
+      "Valor Bruto": totalValorRealNfes,
+      "Valor Líquido": totalFaturamentosNfes,
+    }] : []),
+  ], [faturamentosNfesFiltrados, totalValorRealNfes, totalFaturamentosNfes]);
+
+  const reportFaturamentosNfesSummary = useMemo(() => [{
+    "Quantidade de Notas": faturamentosNfesFiltrados.length,
+    "Total das Notas": totalValorRealNfes,
+    "Total Líquido": totalFaturamentosNfes,
+  }], [faturamentosNfesFiltrados.length, totalValorRealNfes, totalFaturamentosNfes]);
+
   const compromissosDoDia = useMemo(() => {
     return baseData.filter(item => item.natureza === 'Saída' && item.statusExibicao === 'A pagar' && item.dataTimestamp === hojeObj.getTime());
   }, [baseData, hojeObj]);
@@ -773,7 +796,20 @@ export default function FluxoDeCaixa() {
           </div>
 
           <div data-report-section className="card fluxo-billing-card" style={{ padding: '1.5rem' }}>
-            <ReportAdder sectionKey="fluxo:faturamento-nfes" title="Painel de Faturamento (NFES)" componentName="Tabela de Faturamentos" page="Fluxo de Caixa" type="TABLE" data={faturamentosNfesFiltrados.map(row => ({ Documento: row.documento, Projeto: row.projeto, Vencimento: row.data, "Valor Bruto": row.valorRealNota, "Valor Líquido": row.valor }))} filters={{ Tipo: "NFES", Situação: "A receber" }} style={{ float: 'right' }} />
+            <ReportAdder
+              sectionKey="fluxo:faturamento-nfes"
+              title="Painel de Faturamento (NFES)"
+              componentName="Tabela de Faturamentos"
+              page="Fluxo de Caixa"
+              type="TABLE"
+              data={reportFaturamentosNfesRows}
+              dataSets={{ all: reportFaturamentosNfesRows, summary: reportFaturamentosNfesSummary }}
+              detailMode="all"
+              detailOptions={["all", "summary"]}
+              filters={{ Tipo: "NFES", Situação: "A receber" }}
+              explanation="Relação de notas fiscais faturadas com soma total do valor bruto e do valor líquido."
+              style={{ float: 'right' }}
+            />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <ChartHeader
                 title="Painel de Faturamento (NFES)"
