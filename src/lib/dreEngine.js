@@ -117,10 +117,22 @@ export function buildDreStructure(items, meses) {
   items.forEach(item => {
     const dreId = mapClasseToDreId(item);
     const mesKey = item.mesKey;
-    // Receita Bruta da DRE = coluna J da CR_GERAL (Valor total titulo).
-    // Receita/Recebido operacional fora da DRE continua pela coluna K.
+    // Receita da DRE segue a mesma regra global do sistema:
+    // - REALIZADO/RECEBIDO: J representa o faturamento do realizado;
+    // - A RECEBER/A REALIZAR/PREVISTO: K e a fonte obrigatoria da previsao.
+    const statusUpper = String(item.status || '').toUpperCase();
+    const isRealizado = statusUpper.includes('REALIZADO')
+      || statusUpper.includes('RECEBIDO')
+      || statusUpper.includes('EFETIVADO');
+    const isPrevisto = !isRealizado && (
+      statusUpper.includes('A REALIZAR')
+      || statusUpper.includes('A RECEBER')
+      || statusUpper.includes('PREVISTO')
+    );
     const valorBase = dreId === 'RECEITA_BRUTA' && item.natureza === 'Entrada'
-      ? (item.valorFaturamento ?? item.valorTotalTitulo ?? item.valor)
+      ? (isPrevisto
+        ? (item.valorCaixa ?? item.valor)
+        : (item.valorFaturamentoOriginal ?? item.valorFaturamento ?? item.valorTotalTitulo ?? item.valor))
       : item.valor;
     const valorCru = Math.abs(Number(valorBase) || 0); // Sempre absoluto — o sinal vem de group.sign
 

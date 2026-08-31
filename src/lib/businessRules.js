@@ -179,10 +179,9 @@ function resolveCanonicalSourceProject(rawNome, rawCodigo, exactIndex, projectIn
  * Sempre que a identificação da obra for inequívoca, o nome exibido vem da relação oficial PROJETOS_2026.
  *
  * Regra CR_GERAL (2026-08-31):
- * - REALIZADO/RECEBIDO: coluna J já vem rateada por linha e deve ser somada;
- * - A RECEBER/A REALIZAR/PREVISTO: o valor integral de J pode repetir nas contas
- *   1010101/1010107; a sincronização normaliza o título uma única vez e distribui 80/20;
- * - coluna K / "Valor" = valor líquido efetivamente recebido/caixa e não é alterada por essa regra.
+ * - REALIZADO/RECEBIDO: J permanece como referência de faturamento e K como caixa líquido;
+ * - A RECEBER/A REALIZAR/PREVISTO: usar SEMPRE a coluna K / "Valor" em todo o sistema;
+ * - a coluna J da previsão fica preservada apenas para auditoria e nunca compõe o valor previsto.
  */
 export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [], financialPlanMap = {}) {
   const isCR = type === 'CR_GERAL';
