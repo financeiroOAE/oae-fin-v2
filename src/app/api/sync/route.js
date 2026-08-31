@@ -9,7 +9,7 @@ import {
 const TIME_ZONE = 'America/Sao_Paulo';
 const SCHEDULE_HOUR = 16;
 const SCHEDULE_MINUTE = 30;
-const CASH_LOGIC_VERSION = 4;
+const CASH_LOGIC_VERSION = 5;
 
 function getZonedParts(date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -100,7 +100,7 @@ export async function GET(request) {
     const scheduledDue = !force && !requiresRepair && isDailySyncDue(snapshot?.updatedAt);
 
     if (force || requiresRepair || scheduledDue) {
-      const triggeredBy = force ? username : requiresCashRepair ? 'AUTO_REPAIR_CASH_V4' : requiresProjectRepair ? 'AUTO_REPAIR_PROJECTS' : 'AUTO_16:30';
+      const triggeredBy = force ? username : requiresCashRepair ? 'AUTO_REPAIR_CASH_V5' : requiresProjectRepair ? 'AUTO_REPAIR_PROJECTS' : 'AUTO_16:30';
 
       try {
         const payload = await refreshFinancialSnapshot(triggeredBy);

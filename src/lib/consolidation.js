@@ -139,6 +139,10 @@ export function consolidateFinancialData(baseData, options = {}) {
         valorDireto: 0,
         valorAdministrativo: 0,
         valorOutrasEntradas: 0,
+        valorFaturamentoDireto: 0,
+        valorFaturamentoAdministrativo: 0,
+        valorFaturamentoOutrasEntradas: 0,
+        valorFaturamentoTitulo: 0,
         linhasOriginais: [],
         centroCustoObra: null
       });
@@ -149,9 +153,12 @@ export function consolidateFinancialData(baseData, options = {}) {
 
     const classification = classifyFinancialEntry(item);
     const value = effectiveValue(item);
+    const faturamentoLinha = Number(item.valorFaturamento ?? item.valorTotalTitulo) || 0;
+    consItem.valorFaturamentoTitulo += faturamentoLinha;
 
     if (classification.type === 'receita_administrativa') {
       consItem.valorAdministrativo += value;
+      consItem.valorFaturamentoAdministrativo += faturamentoLinha;
       // A linha ADM pode carregar o projeto real do titulo. Ela deve servir de
       // vinculo quando a outra linha estiver em GRUPO OAE / SEM PROJETO.
       if (!consItem.centroCustoObra && isUsableAllocationProject(item.projeto)) {
@@ -159,6 +166,7 @@ export function consolidateFinancialData(baseData, options = {}) {
       }
     } else if (classification.type === 'receita_projeto') {
       consItem.valorDireto += value;
+      consItem.valorFaturamentoDireto += faturamentoLinha;
       // Nunca deixe um centro generico bloquear um projeto valido encontrado
       // em outra linha do mesmo titulo.
       if (isUsableAllocationProject(item.projeto)) {
@@ -166,10 +174,15 @@ export function consolidateFinancialData(baseData, options = {}) {
       }
     } else {
       consItem.valorOutrasEntradas += value;
+      consItem.valorFaturamentoOutrasEntradas += faturamentoLinha;
     }
   });
 
   const processedConsolidated = Array.from(consolidatedMap.values()).map(cons => {
+    // J agora e uma parcela por linha. O valor bruto do titulo e a soma das linhas
+    // consolidadas, mantendo os subtotais Faturamento/Administrativo disponiveis.
+    cons.valorFaturamento = cons.valorFaturamentoTitulo;
+    cons.valorTotalTitulo = cons.valorFaturamentoTitulo;
     const projectFromRows = cons.linhasOriginais.find((row) => isUsableAllocationProject(row.projeto))?.projeto;
     const ccFinal = cons.centroCustoObra || projectFromRows || cons.projeto || 'ADMINISTRAÇÃO';
 

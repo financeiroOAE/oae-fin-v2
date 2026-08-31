@@ -4,7 +4,7 @@ import { processSiengeData, extractAccountCode, parseBRL } from '@/lib/businessR
 
 const SNAPSHOT_ID = 'current';
 const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA'];
-const CASH_LOGIC_VERSION = 4;
+const CASH_LOGIC_VERSION = 5;
 
 function parseSortDate(value) {
   if (!value) return 0;
@@ -130,7 +130,7 @@ async function performFullSync(triggeredBy) {
     sourceNet: Math.round(somaCRRealizado * 100) / 100,
     totalLiquid: Math.round(somaCRLiquido * 100) / 100,
     totalBilling: Math.round(somaCRFaturamento * 100) / 100,
-    rule: 'J=FATURAMENTO;K=LIQUIDO_RECEBIDO',
+    rule: 'J=SOMA_FATURAMENTO_POR_TITULO;K=SOMA_LIQUIDO_RECEBIDO_POR_TITULO',
   };
 
   const syncedAt = new Date().toISOString();

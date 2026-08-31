@@ -248,9 +248,9 @@ export default function FluxoDeCaixa() {
       item.documento.toUpperCase().includes('NFES')
     );
 
-    // A NF pode vir dividida entre faturamento operacional e administrativo.
-    // O Valor exibido continua seguindo a regra atual; o Valor Real da NF usa
-    // Valor total titulo apenas uma vez, sem somar a divisao ADM/operacional.
+    // A NF vem dividida entre Faturamento (1010101) e Administrativo (1010107).
+    // A coluna J ja traz a parcela de cada linha, portanto o valor faturado da
+    // nota/titulo e a SOMA das linhas, enquanto a coluna K continua sendo caixa.
     const map = {};
     rawList.forEach(item => {
       const key = String(item.lancamento || 'SEM-LANCAMENTO') + '|' + String(item.documento || item.nome || 'SEM-DOCUMENTO');
@@ -258,10 +258,14 @@ export default function FluxoDeCaixa() {
         ? item.linhasOriginais
         : [item];
 
-      const valoresReais = [
-        Number(item.valorTotalTitulo) || 0,
-        ...linhas.map(linha => Number(linha.valorTotalTitulo) || 0),
-      ].filter(valor => valor > 0);
+      const faturamentoConsolidado = Number(
+        item.valorFaturamentoTitulo
+        ?? item.valorFaturamento
+        ?? item.valorTotalTitulo
+      ) || 0;
+      const faturamentoPelasLinhas = linhas.reduce((sum, linha) =>
+        sum + (Number(linha.valorFaturamento ?? linha.valorTotalTitulo) || 0), 0
+      );
 
       const projetoObra = linhas
         .map(linha => String(linha.projeto || '').trim())
@@ -269,7 +273,7 @@ export default function FluxoDeCaixa() {
           const upper = projeto.toUpperCase();
           return projeto && !upper.includes('ADMINISTRA') && upper !== 'GRUPO OAE' && upper !== 'SEM PROJETO';
         }) || item.projeto;
-      const valorRealNota = valoresReais.length ? Math.max(...valoresReais) : 0;
+      const valorRealNota = faturamentoConsolidado || faturamentoPelasLinhas;
 
       if (!map[key]) {
         map[key] = {
@@ -279,7 +283,7 @@ export default function FluxoDeCaixa() {
         };
       } else {
         map[key].valor += Number(item.valor) || 0;
-        map[key].valorRealNota = Math.max(map[key].valorRealNota || 0, valorRealNota);
+        map[key].valorRealNota = (Number(map[key].valorRealNota) || 0) + (Number(valorRealNota) || 0);
         if ((!map[key].projeto || String(map[key].projeto).toUpperCase().includes('ADMINISTRA')) && projetoObra) {
           map[key].projeto = projetoObra;
         }
