@@ -1,0 +1,49 @@
+name: Fix System Admin Rate 2026-08-31
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/patch-system-admin-rate-visao-2026-08-31.js
+      - .github/workflows/fix-system-admin-rate-2026-08-31.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/oae_ci
+      JWT_SECRET: ci_only_secret_for_build_validation
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Restaurar pagina integra antes do patch
+        run: git checkout e3af44909cf451cdc9db7f7a4cf5833b8f17bc31 -- src/app/visao-financeira/page.js
+      - name: Aplicar regra visual 80 20
+        run: node scripts/patch-system-admin-rate-visao-2026-08-31.js
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Gerar Prisma
+        run: npx prisma generate
+      - name: Validar build
+        run: npm run build
+      - name: Commitar mudanca validada
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/visao-financeira/page.js
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: aplicar rateio sistemico de 20 por cento nas receitas"
+          git push origin main
