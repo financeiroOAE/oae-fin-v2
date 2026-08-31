@@ -1,0 +1,53 @@
+name: Fix DRE Forecast Title Dedup 2026-08-31
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-dre-forecast-title-dedup-2026-08-31.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/oae_ci
+      JWT_SECRET: ci_only_secret_for_build_validation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply DRE rule
+        run: node scripts/fix-dre-forecast-title-dedup-2026-08-31.js
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/dreEngine.js
+          git commit -m "fix: deduplicar previsao de receita por titulo na DRE"
+          git push
