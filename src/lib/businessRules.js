@@ -176,7 +176,8 @@ function resolveCanonicalSourceProject(rawNome, rawCodigo, exactIndex, projectIn
 /**
  * CR_GERAL = Entrada; CP_GERAL = Saída.
  * Linhas sem Data/Conta são ignoradas.
- * Sempre que a identificação da obra for inequívoca, o nome exibido vem da relação oficial PROJETOS_2026.
+ * O nome exibido prioriza o "Nome centro de custo" da movimentação.
+ * A relação PROJETOS_2026 valida o código e fornece dados contratuais, mas não substitui um nome de centro de custo já informado.
  *
  * Regra CR_GERAL (2026-08-31):
  * - REALIZADO/RECEBIDO: J permanece como referência de faturamento e K como caixa líquido;
@@ -221,9 +222,22 @@ export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [
 
       const canonicalSourceProject = resolveCanonicalSourceProject(projetoResolvido, rawCodigo, exactProjectNameIndex, projectIndex);
       if (canonicalSourceProject) {
-        projetoResolvido = canonicalSourceProject.label;
         projetoCodigoValidado = canonicalSourceProject.code || '';
         projetoResolvidoPor = canonicalSourceProject.source;
+
+        const nomeCentroCustoAtual = normalizeText(projetoResolvido);
+        const nomeCentroCustoUtil = projetoResolvido
+          && nomeCentroCustoAtual !== 'SEM PROJETO'
+          && nomeCentroCustoAtual !== 'GRUPO OAE'
+          && nomeCentroCustoAtual !== 'PROJETOS'
+          && nomeCentroCustoAtual !== 'PROJETOS GERAL'
+          && nomeCentroCustoAtual !== 'PROJETOS GERAIS';
+
+        // Fonte de verdade visual: Nome centro de custo.
+        // So usamos o rotulo do catalogo quando o lancamento nao possui nome util.
+        if (!nomeCentroCustoUtil) {
+          projetoResolvido = canonicalSourceProject.label;
+        }
       }
 
       const centroCustoGenerico = isCR
