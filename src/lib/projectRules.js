@@ -12,8 +12,21 @@ export function cleanOfficialProjectName(value) {
 
 export function getProjectKey(value) {
   const normalized = normalizeProjectText(value);
-  const code = normalized.match(/^(\d+(?:A\d+)?)/)?.[1];
-  return code || normalized.replace(/[^A-Z0-9]/g, '');
+
+  // Uma mesma obra pode aparecer no sistema como:
+  //   448-TS-VIR-JF-ENG
+  //   P.448
+  //   P 448
+  //   448
+  // Todos esses formatos precisam apontar para a mesma chave de centro de custo.
+  // Projetos do tipo 392A03 tambem possuem alias historico P.39203 no Sienge,
+  // por isso removemos o "A" apenas na chave de agrupamento.
+  const rawCode = normalized.match(/^(?:P\s*\.?\s*)?(\d+(?:A\d+)?)/)?.[1];
+  if (rawCode) {
+    return /^\d+A\d+$/.test(rawCode) ? rawCode.replace('A', '') : rawCode;
+  }
+
+  return normalized.replace(/[^A-Z0-9]/g, '');
 }
 
 export function isAdministrativeProject(value) {
