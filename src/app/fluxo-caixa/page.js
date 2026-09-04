@@ -365,6 +365,15 @@ export default function FluxoDeCaixa() {
       Conta: item.contaDescricao || '-',
       Valor: Number(item.valor) || 0,
     })),
+    ...(receitasDoDia.length > 0 ? [{
+      Situação: 'TOTAL A RECEBER',
+      Data: '-',
+      Documento: '-',
+      Nome: 'TOTAL DA RELAÇÃO DE RECEBIMENTOS',
+      Projeto: '-',
+      Conta: '-',
+      Valor: totalReceitasDia,
+    }] : []),
     ...compromissosDoDia.map((item) => ({
       Situação: 'A Pagar',
       Data: item.data,
@@ -374,7 +383,16 @@ export default function FluxoDeCaixa() {
       Conta: item.contaDescricao || '-',
       Valor: Number(item.valor) || 0,
     })),
-  ]), [receitasDoDia, compromissosDoDia]);
+    ...(compromissosDoDia.length > 0 ? [{
+      Situação: 'TOTAL A PAGAR',
+      Data: '-',
+      Documento: '-',
+      Nome: 'TOTAL DA RELAÇÃO DE PAGAMENTOS',
+      Projeto: '-',
+      Conta: '-',
+      Valor: totalCompromissosDia,
+    }] : []),
+  ]), [receitasDoDia, compromissosDoDia, totalReceitasDia, totalCompromissosDia]);
 
   const formatDateBR = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
@@ -734,7 +752,7 @@ export default function FluxoDeCaixa() {
               detailMode="all"
               detailOptions={["all", "summary"]}
               filters={{ Data: formatDateBR(hojeObj) }}
-              explanation="Detalhamento dos lançamentos previstos para o dia, separando contas a receber e contas a pagar."
+              explanation="Detalhamento dos lançamentos previstos para o dia, separando contas a receber e contas a pagar, com total da relação ao final de cada grupo."
               style={{ alignSelf: 'flex-end' }}
             />
             <ChartHeader
