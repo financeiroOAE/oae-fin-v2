@@ -1,0 +1,44 @@
+name: Add Flow Today Report Totals 2026-09-04
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/add-flow-today-report-totals-2026-09-04.js
+      - .github/workflows/add-flow-today-report-totals-2026-09-04.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Aplicar totalizadores
+        run: node scripts/add-flow-today-report-totals-2026-09-04.js
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+      - name: Validar build
+        run: npm run build
+      - name: Commitar mudanca validada
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/fluxo-caixa/page.js
+          git commit -m "feat: mostrar total no relatorio de pagamentos do dia"
+          git push origin main
