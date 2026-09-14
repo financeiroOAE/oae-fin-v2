@@ -64,6 +64,15 @@ export async function proxy(request) {
       return response;
     }
 
+    if (
+      pathname.startsWith('/previsao-faturamento') &&
+      String(payload.user?.username || '').trim().toLowerCase() !== 'admin'
+    ) {
+      const url = new URL('/acesso-negado', request.url);
+      url.searchParams.set('origem', pathname);
+      return NextResponse.redirect(url);
+    }
+
     if (payload.user?.role && payload.user.role !== 'ADMIN') {
       const permissions = Array.isArray(payload.user.permissions) ? payload.user.permissions : [];
       const route = permissionRoutes.find((item) => item.exact ? pathname === item.prefix : pathname.startsWith(item.prefix));
