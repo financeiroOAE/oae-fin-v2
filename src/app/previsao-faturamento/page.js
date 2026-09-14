@@ -620,31 +620,55 @@ export default function PrevisaoFaturamentoPage() {
             <h1 style={{ color: "var(--text-main)", fontSize: "clamp(1.35rem, 3vw, 2rem)", margin: 0 }}>Previsão de Faturamento</h1>
             <span style={{ background: "rgba(57,198,198,0.12)", color: "var(--primary)", border: "1px solid rgba(57,198,198,0.25)", borderRadius: 999, padding: "0.25rem 0.55rem", fontSize: 11, fontWeight: 800 }}>ACESSO CONTROLADO</span>
           </div>
-          <p style={{ color: "var(--text-secondary)", margin: "0.45rem 0 0" }}>Previsão da FAT_PROJEÇÃO 2026 comparada às notas realizadas por projeto e mês.</p>
+          <p style={{ color: "var(--text-secondary)", margin: "0.45rem 0 0" }}>Realizado anual e acompanhamento das metas de setembro a dezembro por projeto.</p>
         </div>
-        <button className="btn" onClick={() => loadData(true)} disabled={refreshing} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <RefreshCw size={16} className={refreshing ? "spin" : ""} />
-          {refreshing ? "Atualizando..." : "Atualizar dados"}
-        </button>
+        <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+          {canEdit && <button className="btn btn-primary" onClick={() => setEditor({ project: "", document: "", forecastDate: "2026-09-01", amount: "" })} style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}><Plus size={16} /> Nova previsão</button>}
+          <button className="btn" onClick={() => loadData(true)} disabled={refreshing} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <RefreshCw size={16} className={refreshing ? "spin" : ""} /> {refreshing ? "Atualizando..." : "Atualizar dados"}
+          </button>
+        </div>
       </div>
 
-      {error && (
-        <div className="card" style={{ padding: "0.9rem 1rem", marginBottom: "1rem", color: "var(--danger)", display: "flex", gap: "0.55rem", alignItems: "center" }}>
-          <AlertTriangle size={18} /> {error}
-        </div>
+      {error && <div className="card" style={{ padding: "0.9rem 1rem", marginBottom: "1rem", color: "var(--danger)", display: "flex", gap: "0.55rem", alignItems: "center" }}><AlertTriangle size={18} /> {error}</div>}
+
+      {canEdit && editor && (
+        <form className="card" onSubmit={saveForecast} style={{ padding: "1rem", marginBottom: "1rem", border: "1px solid rgba(57,198,198,0.35)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "center", marginBottom: "0.85rem" }}>
+            <div><h2 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>{editor.id ? "Editar previsão" : "Nova previsão"}</h2><p style={{ margin: "0.25rem 0 0", color: "var(--text-secondary)", fontSize: 12 }}>Informe a nota prevista diretamente no painel.</p></div>
+            <button type="button" onClick={() => setEditor(null)} aria-label="Fechar" style={{ border: 0, background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}><X size={18} /></button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.8rem" }}>
+            <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Projeto
+              <input list="forecast-projects" required value={editor.project} onChange={(event) => setEditor({ ...editor, project: event.target.value })} placeholder="Selecione ou informe o projeto" style={{ ...selectStyle, marginTop: 5 }} />
+              <datalist id="forecast-projects">{projectOptions.map((item) => <option key={item.key} value={item.name} />)}</datalist>
+            </label>
+            <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Documento / identificação
+              <input value={editor.document} onChange={(event) => setEditor({ ...editor, document: event.target.value })} placeholder="Ex.: PRV, PCT ou CTPA" style={{ ...selectStyle, marginTop: 5 }} />
+            </label>
+            <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Competência prevista
+              <input type="date" required min="2026-09-01" max="2026-12-31" value={editor.forecastDate} onChange={(event) => setEditor({ ...editor, forecastDate: event.target.value })} style={{ ...selectStyle, marginTop: 5 }} />
+            </label>
+            <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Valor previsto
+              <input type="number" required min="0.01" step="0.01" value={editor.amount} onChange={(event) => setEditor({ ...editor, amount: event.target.value })} placeholder="0,00" style={{ ...selectStyle, marginTop: 5 }} />
+            </label>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem", marginTop: "0.9rem" }}>
+            <button type="button" className="btn" onClick={() => setEditor(null)} disabled={saving}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}><Save size={15} /> {saving ? "Salvando..." : "Salvar previsão"}</button>
+          </div>
+        </form>
       )}
 
       <section className="card" style={{ padding: "1rem", marginBottom: "1rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: "0.8rem" }}>
           <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Período
-            <select value="2026" disabled style={{ ...selectStyle, marginTop: 5, opacity: 0.8 }}>
-              <option value="2026">Set a Dez/2026</option>
-            </select>
+            <select value="2026" disabled style={{ ...selectStyle, marginTop: 5, opacity: 0.8 }}><option value="2026">Ano de 2026</option></select>
           </label>
           <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Mês
             <select value={month} onChange={(event) => setMonth(event.target.value)} style={{ ...selectStyle, marginTop: 5 }}>
               <option value="all">Todos os meses</option>
-              {VISIBLE_MONTH_INDEXES.map((index) => <option key={MONTHS[index]} value={index}>{MONTHS[index]}/2026</option>)}
+              {MONTHS.map((name, index) => <option key={name} value={index}>{name}/2026</option>)}
             </select>
           </label>
           <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Projeto
@@ -661,24 +685,20 @@ export default function PrevisaoFaturamentoPage() {
             </select>
           </label>
         </div>
-        <label style={{ marginTop: "0.9rem", display: "flex", alignItems: "center", gap: "0.55rem", color: "var(--text-main)", fontSize: 13, cursor: "pointer" }}>
-          <input type="checkbox" checked={includeAdministrativeRate} onChange={(event) => setIncludeAdministrativeRate(event.target.checked)} style={{ accentColor: "var(--primary)", width: 15, height: 15 }} />
-          Incluir rateio administrativo da receita
-          <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>Ligado: nota total (80% projeto + 20% ADM). Desligado: somente 80% do projeto.</span>
-        </label>
       </section>
 
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "0.9rem", marginBottom: "1rem" }}>
-        <MetricCard icon={Target} label="Valor previsto" value={money(periodData.forecast)} detail="FAT_PROJEÇÃO 2026" color="var(--primary)" />
-        <MetricCard icon={CircleDollarSign} label="Valor realizado" value={money(periodData.realized)} detail="NFES, OS e CTPA.521" color="var(--success)" />
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.9rem", marginBottom: "1rem" }}>
+        <MetricCard icon={Target} label="Previsto set–dez" value={money(periodData.forecast)} detail="Meta cadastrada por projeto" color="var(--primary)" />
+        <MetricCard icon={CircleDollarSign} label="Realizado set–dez" value={money(periodData.realized)} detail="Comparado à previsão" color="var(--success)" />
+        <MetricCard icon={CircleDollarSign} label="Realizado jan–ago" value={money(periodData.previousRealized)} detail="Histórico anterior" color="var(--success)" />
         <MetricCard icon={Clock3} label="Saldo da previsão" value={money(periodData.balance)} detail="Valor ainda não realizado" color="var(--warning)" />
         <MetricCard icon={TrendingUp} label="% atingido" value={`${periodData.percent.toFixed(1)}%`} detail="Realizado ÷ previsto" color={periodData.percent >= 100 ? "var(--success)" : "var(--primary)"} />
-        <MetricCard icon={FileText} label="Notas previstas" value={periodData.forecastCount} detail="PRV, PCT, CTPA, CTPU e A REALIZAR" color="var(--danger)" />
+        <MetricCard icon={FileText} label="Notas previstas" value={periodData.forecastCount} detail="Setembro a dezembro" color="var(--danger)" />
       </section>
 
       <section className="card" style={{ padding: "1rem", marginBottom: "1rem" }}>
-        <h2 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>Visão mensal — setembro a dezembro de 2026</h2>
-        <p style={{ color: "var(--text-secondary)", fontSize: 12, margin: "0.25rem 0 0" }}>Valor previsto x valor realizado e percentual atingido.</p>
+        <h2 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>Visão mensal — 2026</h2>
+        <p style={{ color: "var(--text-secondary)", fontSize: 12, margin: "0.25rem 0 0" }}>Realizado de janeiro a agosto; previsto x realizado e percentual atingido de setembro a dezembro.</p>
         <div style={{ width: "100%", height: 360, marginTop: "0.7rem" }}>
           <ResponsiveContainer>
             <ComposedChart data={monthlyData} margin={{ top: 15, right: 16, bottom: 0, left: 4 }}>
@@ -686,38 +706,40 @@ export default function PrevisaoFaturamentoPage() {
               <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={12} />
               <YAxis yAxisId="money" stroke="var(--text-secondary)" fontSize={11} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
               <YAxis yAxisId="percent" orientation="right" stroke="var(--text-secondary)" fontSize={11} tickFormatter={(value) => `${value}%`} />
-              <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: 8 }} formatter={(value, name) => name === "% atingido" ? [`${Number(value).toFixed(1)}%`, name] : [money(value), name]} />
+              <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: 8 }} formatter={(value, name) => name === "% atingido" ? [value === null ? "—" : `${Number(value).toFixed(1)}%`, name] : [money(value), name]} />
               <Legend />
               <Bar yAxisId="money" dataKey="Valor previsto" fill="var(--primary)" radius={[5, 5, 0, 0]} />
               <Bar yAxisId="money" dataKey="Valor realizado" fill="var(--success)" radius={[5, 5, 0, 0]} />
-              <Line yAxisId="percent" type="monotone" dataKey="% atingido" stroke="var(--warning)" strokeWidth={3} dot={{ r: 3 }} />
+              <Line yAxisId="percent" type="monotone" dataKey="% atingido" stroke="var(--warning)" strokeWidth={3} connectNulls={false} dot={{ r: 3 }} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       </section>
 
       <section className="card" style={{ marginBottom: "1rem", overflow: "hidden" }}>
-        <div style={{ padding: "1rem 1rem 0.7rem" }}><h2 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>Previsto x realizado por projeto</h2></div>
+        <div style={{ padding: "1rem 1rem 0.7rem" }}><h2 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>Faturamento por projeto</h2><p style={{ margin: "0.25rem 0 0", color: "var(--text-secondary)", fontSize: 12 }}>Valores completos das notas, sem exibir rateio administrativo ou divisão por conta.</p></div>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
             <thead><tr>
               <th style={thStyle}>Projeto</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Valor previsto</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Valor realizado</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Saldo</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Previsto set–dez</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Realizado jan–ago</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Realizado set–dez</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Saldo set–dez</th>
               <th style={{ ...thStyle, textAlign: "center" }}>% atingido</th>
-              <th style={{ ...thStyle, textAlign: "center" }}>Notas previstas / realizadas</th>
+              <th style={{ ...thStyle, textAlign: "center" }}>Previstas / realizadas</th>
             </tr></thead>
             <tbody>
               {projectSummary.map((item) => <tr key={item.key}>
                 <td style={{ ...tdStyle, fontWeight: 700 }}>{item.name}</td>
                 <td style={{ ...tdStyle, textAlign: "right" }}>{money(item.forecast)}</td>
+                <td style={{ ...tdStyle, textAlign: "right" }}>{money(item.previousRealized)}</td>
                 <td style={{ ...tdStyle, textAlign: "right", color: "var(--success)", fontWeight: 700 }}>{money(item.realized)}</td>
                 <td style={{ ...tdStyle, textAlign: "right" }}>{money(item.balance)}</td>
-                <td style={{ ...tdStyle, textAlign: "center", color: item.percent >= 100 ? "var(--success)" : "var(--primary)", fontWeight: 800 }}>{item.percent.toFixed(1)}%</td>
+                <td style={{ ...tdStyle, textAlign: "center", color: item.percent >= 100 ? "var(--success)" : "var(--primary)", fontWeight: 800 }}>{item.forecast > 0 ? `${item.percent.toFixed(1)}%` : "—"}</td>
                 <td style={{ ...tdStyle, textAlign: "center" }}>{item.forecastCount} / {item.realizedCount}</td>
               </tr>)}
-              {!projectSummary.length && <tr><td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "var(--text-secondary)", padding: "2rem" }}>Nenhum projeto encontrado no período.</td></tr>}
+              {!projectSummary.length && <tr><td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "var(--text-secondary)", padding: "2rem" }}>Nenhum projeto encontrado no período.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -725,36 +747,25 @@ export default function PrevisaoFaturamentoPage() {
 
       <section className="card" style={{ overflow: "hidden" }}>
         <div style={{ padding: "1rem 1rem 0.7rem", display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "center" }}>
-          <div>
-            <h2 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>Controle por nota</h2>
-            <p style={{ color: "var(--text-secondary)", fontSize: 12, margin: "0.25rem 0 0" }}>Notas consolidadas por projeto, sem divisão ou duplicidade por conta.</p>
-          </div>
+          <div><h2 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>Controle por nota</h2><p style={{ color: "var(--text-secondary)", fontSize: 12, margin: "0.25rem 0 0" }}>Notas consolidadas por projeto, sem divisão ou duplicidade por conta.</p></div>
           <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>{filteredNotes.length} nota(s)</span>
         </div>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 980 }}>
             <thead><tr>
-              <th style={thStyle}>Projeto</th>
-              <th style={thStyle}>NF / Documento</th>
-              <th style={thStyle}>Competência</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Valor previsto</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Valor realizado</th>
-              <th style={{ ...thStyle, textAlign: "center" }}>Classificação</th>
+              <th style={thStyle}>Projeto</th><th style={thStyle}>NF / Documento</th><th style={thStyle}>Competência</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Valor previsto</th><th style={{ ...thStyle, textAlign: "right" }}>Valor realizado</th>
+              <th style={{ ...thStyle, textAlign: "center" }}>Classificação</th>{canEdit && <th style={{ ...thStyle, textAlign: "center" }}>Ações</th>}
             </tr></thead>
             <tbody>
               {filteredNotes.slice().sort((a, b) => b.date - a.date).map((note) => <tr key={note.id}>
-                <td style={{ ...tdStyle, fontWeight: 700 }}>{note.project}</td>
-                <td style={tdStyle}>{note.document}</td>
-                <td style={tdStyle}>{dateLabel(note.date)}</td>
+                <td style={{ ...tdStyle, fontWeight: 700 }}>{note.project}</td><td style={tdStyle}>{note.document}</td><td style={tdStyle}>{dateLabel(note.date)}</td>
                 <td style={{ ...tdStyle, textAlign: "right", fontWeight: note.kind === "forecast" ? 700 : 400 }}>{note.kind === "forecast" ? money(note.displayedValue) : "—"}</td>
                 <td style={{ ...tdStyle, textAlign: "right", color: note.kind === "realized" ? "var(--success)" : "var(--text-secondary)", fontWeight: note.kind === "realized" ? 700 : 400 }}>{note.kind === "realized" ? money(note.displayedValue) : "—"}</td>
-                <td style={{ ...tdStyle, textAlign: "center" }}>
-                  <span style={{ display: "inline-flex", padding: "0.3rem 0.55rem", borderRadius: 999, fontSize: 11, fontWeight: 800, color: note.kind === "realized" ? "var(--success)" : "var(--warning)", background: note.kind === "realized" ? "rgba(34,197,94,0.12)" : "rgba(245,158,11,0.12)" }}>
-                    {note.kind === "realized" ? "Realizada" : "Prevista"}
-                  </span>
-                </td>
+                <td style={{ ...tdStyle, textAlign: "center" }}><span style={{ display: "inline-flex", padding: "0.3rem 0.55rem", borderRadius: 999, fontSize: 11, fontWeight: 800, color: note.kind === "realized" ? "var(--success)" : "var(--warning)", background: note.kind === "realized" ? "rgba(34,197,94,0.12)" : "rgba(245,158,11,0.12)" }}>{note.kind === "realized" ? "Realizada" : "Prevista"}</span></td>
+                {canEdit && <td style={{ ...tdStyle, textAlign: "center" }}>{note.kind === "forecast" ? <div style={{ display: "flex", justifyContent: "center", gap: "0.4rem" }}><button type="button" onClick={() => editForecast(note)} title="Editar previsão" style={{ border: "1px solid var(--border-color)", background: "var(--bg-elevated)", color: "var(--primary)", borderRadius: 6, padding: "0.35rem", cursor: "pointer", display: "grid" }}><Pencil size={14} /></button><button type="button" onClick={() => deleteForecast(note)} disabled={saving} title="Excluir previsão" style={{ border: "1px solid rgba(239,68,68,.35)", background: "rgba(239,68,68,.06)", color: "var(--danger)", borderRadius: 6, padding: "0.35rem", cursor: "pointer", display: "grid" }}><Trash2 size={14} /></button></div> : "—"}</td>}
               </tr>)}
-              {!filteredNotes.length && <tr><td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "var(--text-secondary)", padding: "2rem" }}>Nenhuma nota encontrada com os filtros selecionados.</td></tr>}
+              {!filteredNotes.length && <tr><td colSpan={canEdit ? 7 : 6} style={{ ...tdStyle, textAlign: "center", color: "var(--text-secondary)", padding: "2rem" }}>Nenhuma nota encontrada com os filtros selecionados.</td></tr>}
             </tbody>
           </table>
         </div>
