@@ -292,7 +292,6 @@ export default function PrevisaoFaturamentoPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [authorized, setAuthorized] = useState(false);
-  const [year, setYear] = useState("2026");
   const [month, setMonth] = useState("all");
   const [project, setProject] = useState("all");
   const [status, setStatus] = useState("all");
@@ -352,12 +351,6 @@ export default function PrevisaoFaturamentoPage() {
   );
   const notes = useMemo(() => [...forecastNotes, ...realizedNotes], [forecastNotes, realizedNotes]);
 
-  const years = useMemo(() => {
-    const values = new Set([2026]);
-    notes.forEach((note) => note.date && values.add(note.date.getFullYear()));
-    return [...values].sort((a, b) => b - a);
-  }, [notes]);
-
   const projectOptions = useMemo(() => {
     const map = new Map();
     notes.forEach((note) => {
@@ -369,7 +362,7 @@ export default function PrevisaoFaturamentoPage() {
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [notes]);
 
-  const selectedYear = Number(year);
+  const selectedYear = 2026;
   const displayedNotes = useMemo(() => notes.map((note) => ({
     ...note,
     displayedValue: rateValue(note.value, includeAdministrativeRate),
