@@ -29,6 +29,7 @@ const MONTHS = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
   "Jul", "Ago", "Set", "Out", "Nov", "Dez",
 ];
+const VISIBLE_MONTH_INDEXES = [8, 9, 10, 11];
 
 const MONTH_ALIASES = [
   ["JAN", "JANEIRO"],
@@ -382,7 +383,8 @@ export default function PrevisaoFaturamentoPage() {
     return true;
   }), [displayedNotes, selectedYear, month, project, status]);
 
-  const monthlyData = useMemo(() => MONTHS.map((name, monthIndex) => {
+  const monthlyData = useMemo(() => VISIBLE_MONTH_INDEXES.map((monthIndex) => {
+    const name = MONTHS[monthIndex];
     const scoped = displayedNotes.filter((note) =>
       note.date?.getFullYear() === selectedYear
       && note.date.getMonth() === monthIndex
@@ -392,6 +394,7 @@ export default function PrevisaoFaturamentoPage() {
     const realized = scoped.filter((note) => note.kind === "realized").reduce((sum, note) => sum + note.displayedValue, 0);
     return {
       name,
+      monthIndex,
       "Valor previsto": forecast,
       "Valor realizado": realized,
       "% atingido": forecast > 0 ? Number(((realized / forecast) * 100).toFixed(1)) : (realized > 0 ? 100 : 0),
@@ -399,9 +402,11 @@ export default function PrevisaoFaturamentoPage() {
   }), [displayedNotes, selectedYear, project]);
 
   const periodData = useMemo(() => {
-    const indexes = month === "all" ? monthlyData.map((_, index) => index) : [Number(month)];
-    const forecast = indexes.reduce((sum, index) => sum + monthlyData[index]["Valor previsto"], 0);
-    const realized = indexes.reduce((sum, index) => sum + monthlyData[index]["Valor realizado"], 0);
+    const selectedMonths = month === "all"
+      ? monthlyData
+      : monthlyData.filter((item) => item.monthIndex === Number(month));
+    const forecast = selectedMonths.reduce((sum, item) => sum + item["Valor previsto"], 0);
+    const realized = selectedMonths.reduce((sum, item) => sum + item["Valor realizado"], 0);
     return {
       forecast,
       realized,
@@ -493,15 +498,15 @@ export default function PrevisaoFaturamentoPage() {
 
       <section className="card" style={{ padding: "1rem", marginBottom: "1rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: "0.8rem" }}>
-          <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Ano
-            <select value={year} onChange={(event) => setYear(event.target.value)} style={{ ...selectStyle, marginTop: 5 }}>
-              {years.map((item) => <option key={item} value={item}>{item}</option>)}
+          <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Período
+            <select value="2026" disabled style={{ ...selectStyle, marginTop: 5, opacity: 0.8 }}>
+              <option value="2026">Set a Dez/2026</option>
             </select>
           </label>
           <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Mês
             <select value={month} onChange={(event) => setMonth(event.target.value)} style={{ ...selectStyle, marginTop: 5 }}>
               <option value="all">Todos os meses</option>
-              {MONTHS.map((name, index) => <option key={name} value={index}>{name}</option>)}
+              {VISIBLE_MONTH_INDEXES.map((index) => <option key={MONTHS[index]} value={index}>{MONTHS[index]}/2026</option>)}
             </select>
           </label>
           <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>Projeto
@@ -534,7 +539,7 @@ export default function PrevisaoFaturamentoPage() {
       </section>
 
       <section className="card" style={{ padding: "1rem", marginBottom: "1rem" }}>
-        <h2 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>Visão mensal — {year}</h2>
+        <h2 style={{ margin: 0, color: "var(--text-main)", fontSize: "1rem" }}>Visão mensal — setembro a dezembro de 2026</h2>
         <p style={{ color: "var(--text-secondary)", fontSize: 12, margin: "0.25rem 0 0" }}>Valor previsto x valor realizado e percentual atingido.</p>
         <div style={{ width: "100%", height: 360, marginTop: "0.7rem" }}>
           <ResponsiveContainer>
