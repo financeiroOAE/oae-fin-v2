@@ -340,27 +340,108 @@ export default function PrevisaoFaturamentoPage() {
   const [month, setMonth] = useState("all");
   const [project, setProject] = useState("all");
   const [status, setStatus] = useState("all");
-  const [includeAdministrativeRate, setIncludeAdministrativeRate] = useState(true);
+  const [savedForecasts, setSavedForecasts] = useState([]);
+  const [canEdit, setCanEdit] = useState(false);
+  const [editor, setEditor] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   async function loadData(force = false) {
     try {
       if (force) setRefreshing(true);
       setError("");
-      const response = await fetch(force ? "/api/sync?force=1" : "/api/sync", { cache: "no-store" });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Não foi possível carregar os dados financeiros.");
-      if (!Array.isArray(result.projecaoFaturamento)) {
+      const [syncResponse, forecastResponse] = await Promise.all([
+        fetch(force ? "/api/sync?force=1" : "/api/sync", { cache: "no-store" }),
+        fetch("/api/previsao-faturamento", { cache: "no-store" }),
+      ]);
+      const [syncResult, forecastResult] = await Promise.all([
+        syncResponse.json(),
+        forecastResponse.json(),
+      ]);
+      if (!syncResponse.ok) throw new Error(syncResult.error || "Não foi possível carregar os dados financeiros.");
+      if (!forecastResponse.ok) throw new Error(forecastResult.error || "Não foi possível carregar as previsões editáveis.");
+      if (!Array.isArray(syncResult.projecaoFaturamento)) {
         throw new Error("A aba FAT_PROJEÇÃO 2026 ainda não foi carregada. Atualize os dados novamente.");
       }
-      setFinancialRows(Array.isArray(result.data) ? result.data : []);
-      setProjectionRows(result.projecaoFaturamento);
-      setProjectCatalog(Array.isArray(result.projetos) ? result.projetos : []);
+      setFinancialRows(Array.isArray(syncResult.data) ? syncResult.data : []);
+      setProjectionRows(syncResult.projecaoFaturamento);
+      setProjectCatalog(Array.isArray(syncResult.projetos) ? syncResult.projetos : []);
+      setSavedForecasts(Array.isArray(forecastResult.forecasts) ? forecastResult.forecasts : []);
+      setCanEdit(Boolean(forecastResult.canEdit));
     } catch (loadError) {
       setError(loadError.message || "Erro ao carregar os dados.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
+  }
+
+  async function saveForecast(event) {
+    event.preventDefault();
+    if (!editor) return;
+    try {
+      setSaving(true);
+      setError("");
+      const response = await fetch("/api/previsao-faturamento", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editor.savedId || undefined,
+          sourceKey: editor.sourceKey || undefined,
+          project: editor.project,
+          document: editor.document,
+          forecastDate: editor.forecastDate,
+          amount: toNumber(editor.amount),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Não foi possível salvar a previsão.");
+      setEditor(null);
+      await loadData(false);
+    } catch (saveError) {
+      setError(saveError.message || "Não foi possível salvar a previsão.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteForecast(note) {
+    if (!window.confirm(`Excluir a previsão de ${note.project}?`)) return;
+    try {
+      setSaving(true);
+      setError("");
+      const response = await fetch("/api/previsao-faturamento", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: note.savedId || undefined,
+          sourceKey: note.sourceKey || undefined,
+          project: note.project,
+          document: note.document,
+          forecastDate: note.date?.toISOString(),
+          amount: note.value,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Não foi possível excluir a previsão.");
+      if (editor?.id === note.id) setEditor(null);
+      await loadData(false);
+    } catch (deleteError) {
+      setError(deleteError.message || "Não foi possível excluir a previsão.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function editForecast(note) {
+    setEditor({
+      id: note.id,
+      savedId: note.savedId || null,
+      sourceKey: note.sourceKey || null,
+      project: note.project,
+      document: note.document || "",
+      forecastDate: note.date ? note.date.toISOString().slice(0, 10) : "2026-09-01",
+      amount: String(note.value || ""),
+    });
   }
 
   useEffect(() => {
@@ -386,9 +467,13 @@ export default function PrevisaoFaturamentoPage() {
     return () => { active = false; };
   }, [router]);
 
-  const forecastNotes = useMemo(
+  const sheetForecastNotes = useMemo(
     () => buildForecastNotes(projectionRows, projectCatalog),
     [projectionRows, projectCatalog]
+  );
+  const forecastNotes = useMemo(
+    () => mergeForecastNotes(sheetForecastNotes, savedForecasts, projectCatalog),
+    [sheetForecastNotes, savedForecasts, projectCatalog]
   );
   const realizedNotes = useMemo(
     () => buildRealizedNotes(financialRows, projectCatalog),
@@ -398,6 +483,11 @@ export default function PrevisaoFaturamentoPage() {
 
   const projectOptions = useMemo(() => {
     const map = new Map();
+    projectCatalog.forEach((item) => {
+      const name = getOfficialProjectName(item.OBRA || item.ID, projectCatalog);
+      const key = getProjectKey(name);
+      if (key && name) map.set(key, name);
+    });
     notes.forEach((note) => {
       if (!note.projectKey) return;
       if (!map.has(note.projectKey) || note.kind === "realized") map.set(note.projectKey, note.project);
@@ -405,13 +495,14 @@ export default function PrevisaoFaturamentoPage() {
     return [...map.entries()]
       .map(([key, name]) => ({ key, name }))
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [notes]);
+  }, [notes, projectCatalog]);
 
   const selectedYear = 2026;
-  const displayedNotes = useMemo(() => notes.map((note) => ({
-    ...note,
-    displayedValue: rateValue(note.value, includeAdministrativeRate),
-  })), [notes, includeAdministrativeRate]);
+  const displayedNotes = useMemo(() => notes
+    .filter((note) => note.kind === "realized" || (
+      note.date?.getFullYear() === 2026 && TARGET_MONTH_INDEXES.includes(note.date.getMonth())
+    ))
+    .map((note) => ({ ...note, displayedValue: note.value })), [notes]);
 
   const filteredNotes = useMemo(() => displayedNotes.filter((note) => {
     if (note.date?.getFullYear() !== selectedYear) return false;
@@ -421,21 +512,22 @@ export default function PrevisaoFaturamentoPage() {
     return true;
   }), [displayedNotes, selectedYear, month, project, status]);
 
-  const monthlyData = useMemo(() => VISIBLE_MONTH_INDEXES.map((monthIndex) => {
-    const name = MONTHS[monthIndex];
+  const monthlyData = useMemo(() => MONTHS.map((name, monthIndex) => {
     const scoped = displayedNotes.filter((note) =>
       note.date?.getFullYear() === selectedYear
       && note.date.getMonth() === monthIndex
       && (project === "all" || note.projectKey === project)
     );
-    const forecast = scoped.filter((note) => note.kind === "forecast").reduce((sum, note) => sum + note.displayedValue, 0);
+    const forecast = TARGET_MONTH_INDEXES.includes(monthIndex)
+      ? scoped.filter((note) => note.kind === "forecast").reduce((sum, note) => sum + note.displayedValue, 0)
+      : 0;
     const realized = scoped.filter((note) => note.kind === "realized").reduce((sum, note) => sum + note.displayedValue, 0);
     return {
       name,
       monthIndex,
       "Valor previsto": forecast,
       "Valor realizado": realized,
-      "% atingido": forecast > 0 ? Number(((realized / forecast) * 100).toFixed(1)) : (realized > 0 ? 100 : 0),
+      "% atingido": forecast > 0 ? Number(((realized / forecast) * 100).toFixed(1)) : null,
     };
   }), [displayedNotes, selectedYear, project]);
 
@@ -444,12 +536,18 @@ export default function PrevisaoFaturamentoPage() {
       ? monthlyData
       : monthlyData.filter((item) => item.monthIndex === Number(month));
     const forecast = selectedMonths.reduce((sum, item) => sum + item["Valor previsto"], 0);
-    const realized = selectedMonths.reduce((sum, item) => sum + item["Valor realizado"], 0);
+    const realized = selectedMonths
+      .filter((item) => TARGET_MONTH_INDEXES.includes(item.monthIndex))
+      .reduce((sum, item) => sum + item["Valor realizado"], 0);
+    const previousRealized = selectedMonths
+      .filter((item) => !TARGET_MONTH_INDEXES.includes(item.monthIndex))
+      .reduce((sum, item) => sum + item["Valor realizado"], 0);
     return {
       forecast,
       realized,
+      previousRealized,
       balance: Math.max(forecast - realized, 0),
-      percent: forecast > 0 ? (realized / forecast) * 100 : (realized > 0 ? 100 : 0),
+      percent: forecast > 0 ? (realized / forecast) * 100 : 0,
       forecastCount: filteredNotes.filter((note) => note.kind === "forecast").length,
     };
   }, [monthlyData, month, filteredNotes]);
