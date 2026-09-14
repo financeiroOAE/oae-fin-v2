@@ -7,9 +7,14 @@ import {
   CircleDollarSign,
   Clock3,
   FileText,
+  Pencil,
+  Plus,
   RefreshCw,
+  Save,
   Target,
+  Trash2,
   TrendingUp,
+  X,
 } from "lucide-react";
 import {
   Bar,
@@ -22,14 +27,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { consolidateFinancialData, splitProjectReceipt } from "@/lib/consolidation";
+import { consolidateFinancialData } from "@/lib/consolidation";
 import { getOfficialProjectName, getProjectKey } from "@/lib/projectRules";
 
 const MONTHS = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
   "Jul", "Ago", "Set", "Out", "Nov", "Dez",
 ];
-const VISIBLE_MONTH_INDEXES = [8, 9, 10, 11];
+const TARGET_MONTH_INDEXES = [8, 9, 10, 11];
 
 const MONTH_ALIASES = [
   ["JAN", "JANEIRO"],
@@ -197,7 +202,8 @@ function buildForecastNotes(rows, projectCatalog) {
 
     if (date && value && (rowTypeKnown || document === "Previsão")) {
       notes.push({
-        id: `forecast-${rowIndex}`,
+        id: `sheet:${rowIndex}`,
+        sourceKey: `sheet:${rowIndex}`,
         kind: "forecast",
         project,
         projectKey: getProjectKey(project),
@@ -215,7 +221,8 @@ function buildForecastNotes(rows, projectCatalog) {
       if (monthIndex < 0 || !monthValue) return;
       const headerYear = Number(String(header).match(/20\d{2}/)?.[0]) || yearValue;
       notes.push({
-        id: `forecast-${rowIndex}-${columnIndex}`,
+        id: `sheet:${rowIndex}:${columnIndex}`,
+        sourceKey: `sheet:${rowIndex}:${columnIndex}`,
         kind: "forecast",
         project,
         projectKey: getProjectKey(project),
@@ -263,9 +270,47 @@ function buildRealizedNotes(rows, projectCatalog) {
     .filter((item) => item.date && item.value);
 }
 
-function rateValue(value, includeAdministrativeRate) {
-  const allocation = splitProjectReceipt(value);
-  return includeAdministrativeRate ? allocation.total : allocation.project;
+function mergeForecastNotes(sheetNotes, savedForecasts, projectCatalog) {
+  const bySource = new Map(
+    (savedForecasts || []).filter((item) => item.sourceKey).map((item) => [item.sourceKey, item])
+  );
+
+  const mergedSheet = sheetNotes.flatMap((note) => {
+    const override = bySource.get(note.sourceKey);
+    if (!override) return [note];
+    if (!override.isActive) return [];
+    const project = getOfficialProjectName(override.project, projectCatalog) || override.project;
+    return [{
+      ...note,
+      id: override.id,
+      savedId: override.id,
+      project,
+      projectKey: getProjectKey(project),
+      document: override.document || "Previsão",
+      date: parseDate(override.forecastDate),
+      value: toNumber(override.amount),
+    }];
+  });
+
+  const manual = (savedForecasts || [])
+    .filter((item) => !item.sourceKey && item.isActive)
+    .map((item) => {
+      const project = getOfficialProjectName(item.project, projectCatalog) || item.project;
+      return {
+        id: item.id,
+        savedId: item.id,
+        sourceKey: null,
+        kind: "forecast",
+        project,
+        projectKey: getProjectKey(project),
+        document: item.document || "Previsão",
+        date: parseDate(item.forecastDate),
+        value: toNumber(item.amount),
+        source: "Cadastro no painel",
+      };
+    });
+
+  return [...mergedSheet, ...manual].filter((item) => item.date && item.value);
 }
 
 function MetricCard({ icon: Icon, label, value, detail, color }) {
