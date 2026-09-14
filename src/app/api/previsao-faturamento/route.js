@@ -49,18 +49,26 @@ function parseInput(body) {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: 'Sessão inválida ou expirada.' }, { status: 401 });
-  if (!canViewForecast(user)) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 403 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: 'Sessão inválida ou expirada.' }, { status: 401 });
+    if (!canViewForecast(user)) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 403 });
 
-  const forecasts = await prisma.billingForecast.findMany({
-    orderBy: [{ forecastDate: 'asc' }, { project: 'asc' }],
-  });
+    const forecasts = await prisma.billingForecast.findMany({
+      orderBy: [{ forecastDate: 'asc' }, { project: 'asc' }],
+    });
 
-  return NextResponse.json({
-    forecasts: forecasts.map(safeForecast),
-    canEdit: canEditForecast(user),
-  });
+    return NextResponse.json({
+      forecasts: forecasts.map(safeForecast),
+      canEdit: canEditForecast(user),
+    });
+  } catch (error) {
+    console.error('Erro ao carregar previsões de faturamento:', error);
+    return NextResponse.json(
+      { error: 'Não foi possível acessar o cadastro de previsões. Tente novamente em instantes.' },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request) {
