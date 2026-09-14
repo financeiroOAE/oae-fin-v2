@@ -7,6 +7,7 @@ export const MENU_DEFINITIONS = [
   { key: 'fluxo_caixa', label: 'Fluxo de Caixa', path: '/fluxo-caixa' },
   { key: 'projetos', label: 'Projetos', path: '/projetos' },
   { key: 'dre', label: 'DRE Gerencial', path: '/dre' },
+  { key: 'previsao_faturamento', label: 'Previsão de Faturamento', path: '/previsao-faturamento' },
   { key: 'configuracoes', label: 'Configurações', path: '/configuracoes' },
   { key: 'atualizacao_dados', label: 'Atualização de Dados', path: '/atualizacao-dados' },
   { key: 'historico', label: 'Histórico', path: '/historico' },

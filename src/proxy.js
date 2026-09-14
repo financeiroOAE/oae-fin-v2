@@ -19,6 +19,7 @@ const permissionRoutes = [
   { prefix: '/fluxo-caixa', permission: 'fluxo_caixa' },
   { prefix: '/projetos', permission: 'projetos' },
   { prefix: '/dre', permission: 'dre' },
+  { prefix: '/previsao-faturamento', permission: 'previsao_faturamento' },
   { prefix: '/atualizacao-dados', permission: 'atualizacao_dados' },
   { prefix: '/historico', permission: 'historico' },
   { prefix: '/configuracoes', permission: 'configuracoes' },
@@ -31,6 +32,7 @@ const permissionDestinations = [
   ['fluxo_caixa', '/fluxo-caixa'],
   ['projetos', '/projetos'],
   ['dre', '/dre'],
+  ['previsao_faturamento', '/previsao-faturamento'],
   ['configuracoes', '/configuracoes'],
   ['atualizacao_dados', '/atualizacao-dados'],
   ['historico', '/historico'],
@@ -64,13 +66,15 @@ export async function proxy(request) {
       return response;
     }
 
-    if (
-      pathname.startsWith('/previsao-faturamento') &&
-      String(payload.user?.username || '').trim().toLowerCase() !== 'admin'
-    ) {
-      const url = new URL('/acesso-negado', request.url);
-      url.searchParams.set('origem', pathname);
-      return NextResponse.redirect(url);
+    if (pathname.startsWith('/previsao-faturamento')) {
+      const projectionPermissions = Array.isArray(payload.user?.permissions) ? payload.user.permissions : [];
+      const canViewProjection = String(payload.user?.username || '').trim().toLowerCase() === 'admin'
+        || projectionPermissions.includes('previsao_faturamento');
+      if (!canViewProjection) {
+        const url = new URL('/acesso-negado', request.url);
+        url.searchParams.set('origem', pathname);
+        return NextResponse.redirect(url);
+      }
     }
 
     if (payload.user?.role && payload.user.role !== 'ADMIN') {

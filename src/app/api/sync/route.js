@@ -54,6 +54,7 @@ function isDailySyncDue(snapshotUpdatedAt) {
 }
 
 function snapshotNeedsProjectRepair(payload) {
+  if (!Array.isArray(payload?.projecaoFaturamento)) return true;
   if (!Array.isArray(payload?.projetos)) return true;
   if (payload.projetos.some((project) => project?.FATURADO_2026 === undefined || project?.FATURADO_2026 === null)) return true;
   if (!Array.isArray(payload?.data)) return false;
@@ -87,6 +88,13 @@ export async function GET(request) {
   }
 
   const username = session.user.username;
+  const canViewProjection = String(username).trim().toLowerCase() === 'admin'
+    || (Array.isArray(session.user.permissions) && session.user.permissions.includes('previsao_faturamento'));
+  const visiblePayload = (payload) => {
+    if (canViewProjection) return payload;
+    const { projecaoFaturamento: _restrictedProjection, ...safePayload } = payload || {};
+    return safePayload;
+  };
   let snapshot = null;
 
   try {
@@ -105,7 +113,7 @@ export async function GET(request) {
       try {
         const payload = await refreshFinancialSnapshot(triggeredBy);
         return NextResponse.json({
-          ...payload,
+          ...visiblePayload(payload),
           fromSnapshot: false,
           refreshReason: force ? 'MANUAL' : requiresRepair ? 'SNAPSHOT_REPAIR' : 'AUTO_16:30',
         });
@@ -114,7 +122,7 @@ export async function GET(request) {
 
         if (snapshot?.payload) {
           return NextResponse.json({
-            ...snapshot.payload,
+            ...visiblePayload(snapshot.payload),
             fromSnapshot: true,
             snapshotAt: snapshot.updatedAt,
             snapshotUpdatedBy: snapshot.updatedBy,
@@ -130,14 +138,14 @@ export async function GET(request) {
     if (!snapshot) {
       const payload = await refreshFinancialSnapshot('INITIAL_BOOTSTRAP');
       return NextResponse.json({
-        ...payload,
+        ...visiblePayload(payload),
         fromSnapshot: false,
         refreshReason: 'INITIAL_BOOTSTRAP',
       });
     }
 
     return NextResponse.json({
-      ...snapshot.payload,
+      ...visiblePayload(snapshot.payload),
       fromSnapshot: true,
       snapshotAt: snapshot.updatedAt,
       snapshotUpdatedBy: snapshot.updatedBy,

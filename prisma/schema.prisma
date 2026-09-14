@@ -37,3 +37,21 @@ model FinancialSnapshot {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+
+model BillingForecast {
+  id           String   @id @default(cuid())
+  sourceKey    String?  @unique
+  project      String
+  document     String?
+  forecastDate DateTime
+  amount       Float
+  isActive     Boolean  @default(true)
+  createdBy    String
+  updatedBy    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([forecastDate])
+  @@index([project])
+}
