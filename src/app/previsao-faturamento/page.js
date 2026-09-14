@@ -563,6 +563,7 @@ export default function PrevisaoFaturamentoPage() {
         name: note.project,
         forecast: 0,
         realized: 0,
+        previousRealized: 0,
         forecastCount: 0,
         realizedCount: 0,
       };
@@ -570,7 +571,8 @@ export default function PrevisaoFaturamentoPage() {
         current.forecast += note.displayedValue;
         current.forecastCount += 1;
       } else {
-        current.realized += note.displayedValue;
+        if (TARGET_MONTH_INDEXES.includes(note.date.getMonth())) current.realized += note.displayedValue;
+        else current.previousRealized += note.displayedValue;
         current.realizedCount += 1;
         current.name = note.project;
       }
@@ -579,7 +581,7 @@ export default function PrevisaoFaturamentoPage() {
     return [...grouped.values()].map((item) => ({
       ...item,
       balance: Math.max(item.forecast - item.realized, 0),
-      percent: item.forecast > 0 ? (item.realized / item.forecast) * 100 : (item.realized > 0 ? 100 : 0),
+      percent: item.forecast > 0 ? (item.realized / item.forecast) * 100 : 0,
     })).sort((a, b) => b.forecast - a.forecast);
   }, [displayedNotes, selectedYear, month, project]);
 
