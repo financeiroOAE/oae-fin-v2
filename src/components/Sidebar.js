@@ -8,7 +8,8 @@ import {
   BarChart3,
   Activity, 
   FolderKanban, 
-  ChartColumn, 
+  ChartColumn,
+  ReceiptText,
   RefreshCw, 
   History, 
   Settings, 
@@ -71,6 +72,7 @@ export default function Sidebar() {
   if (pathname === '/login') return null;
 
   const canAccess = (permission) => !sessionUser || sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission);
+  const isPrivateAdmin = String(sessionUser?.username || '').trim().toLowerCase() === 'admin';
   const isSettingsPath = ['/configuracoes', '/atualizacao-dados', '/historico'].some((path) => pathname.startsWith(path));
   const showSettingsChildren = settingsOpen || isSettingsPath;
   const menuItems = [
@@ -79,6 +81,7 @@ export default function Sidebar() {
     { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: Activity, permission: 'fluxo_caixa' },
     { name: 'Projetos', path: '/projetos', icon: FolderKanban, permission: 'projetos' },
     { name: 'DRE Gerencial', path: '/dre', icon: ChartColumn, permission: 'dre' },
+    { name: 'Previsão de Faturamento', path: '/previsao-faturamento', icon: ReceiptText, privateAdmin: true },
     {
       name: 'Configurações', path: '/configuracoes', icon: Settings, permission: 'configuracoes',
       children: [
@@ -86,7 +89,10 @@ export default function Sidebar() {
         { name: 'Histórico', path: '/historico', icon: History, permission: 'historico' },
       ],
     },
-  ].filter((item) => canAccess(item.permission) || item.children?.some((child) => canAccess(child.permission)));
+  ].filter((item) => {
+    if (item.privateAdmin) return isPrivateAdmin;
+    return canAccess(item.permission) || item.children?.some((child) => canAccess(child.permission));
+  });
 
   return (
     <>
