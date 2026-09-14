@@ -31,6 +31,7 @@ export async function batchReadSheets() {
   const ranges = [
     'EMPRESAS!A:J',
     'PROJETOS_2026!A:L',
+    "'FAT_PROJEÇÃO 2026'!A:AZ",
     'CENTROS_CUSTO!A:E',
     'PLANOS_FINANCEIROS!A:E',
     'CP_GERAL!A:L',
@@ -41,6 +42,7 @@ export async function batchReadSheets() {
   const resultData = {
     EMPRESAS: [],
     PROJETOS_2026: [],
+    FAT_PROJECAO_2026: [],
     CENTROS_CUSTO: [],
     PLANOS_FINANCEIROS: [],
     CP_GERAL: [],
@@ -87,8 +89,9 @@ export async function batchReadSheets() {
           return rowData;
         });
 
-        if (resultData[sheetName] !== undefined) {
-          resultData[sheetName] = data;
+        const resultKey = sheetName === 'FAT_PROJEÇÃO 2026' ? 'FAT_PROJECAO_2026' : sheetName;
+        if (resultData[resultKey] !== undefined) {
+          resultData[resultKey] = data;
         } else {
           const baseName = Object.keys(resultData).find((key) => sheetName.includes(key));
           if (baseName) resultData[baseName] = data;
