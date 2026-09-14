@@ -27,7 +27,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { consolidateFinancialData } from "@/lib/consolidation";
 import { getOfficialProjectName, getProjectKey } from "@/lib/projectRules";
 
 const MONTHS = [
@@ -238,36 +237,36 @@ function buildForecastNotes(rows, projectCatalog) {
 }
 
 function buildRealizedNotes(rows, projectCatalog) {
-  const consolidated = consolidateFinancialData(rows || [], {
-    isProjetosPage: true,
-    incluirRateioAdm: true,
-    usarValorCaixa: false,
+  const groups = new Map();
+
+  (rows || []).forEach((item, index) => {
+    if (normalizeText(item?.natureza) !== "ENTRADA" || !isRealizedDocument(item)) return;
+
+    const date = parseDate(item.dataEmissao || item.data);
+    if (!date) return;
+
+    const project = getOfficialProjectName(item.projeto, projectCatalog) || item.projeto || "Sem projeto";
+    const projectKey = getProjectKey(project);
+    const reference = String(item.lancamento || item.documento || `linha-${index}`).trim();
+    const key = [reference, projectKey, item.dataEmissao || item.data || ""].join("|");
+    const current = groups.get(key) || {
+      id: `realized-${key}`,
+      kind: "realized",
+      project,
+      projectKey,
+      document: item.documento || item.lancamento || "Sem número",
+      date,
+      value: 0,
+      source: "CR_GERAL — coluna K",
+    };
+
+    // Regra oficial: o valor da CR_GERAL vem da coluna K e as linhas
+    // da mesma nota são somadas antes da apresentação por projeto.
+    current.value += toNumber(item.valorCaixa ?? item.valor);
+    groups.set(key, current);
   });
 
-  return consolidated
-    .filter((item) => item?.natureza === "Entrada" && isRealizedDocument(item))
-    .map((item, index) => {
-      const date = parseDate(item.dataEmissao || item.data);
-      const project = getOfficialProjectName(item.projeto, projectCatalog) || item.projeto || "Sem projeto";
-      const value = toNumber(
-        item.valorFaturamentoReceitaTotal
-        ?? item.valorFaturamentoTitulo
-        ?? item.valorFaturamento
-        ?? item.valorTotalTitulo
-        ?? item.valorBruto
-      );
-      return {
-        id: `realized-${item.lancamento || item.documento || index}-${item.data || ""}`,
-        kind: "realized",
-        project,
-        projectKey: getProjectKey(project),
-        document: item.documento || item.lancamento || "Sem número",
-        date,
-        value,
-        source: item.origemSienge || "CR_GERAL",
-      };
-    })
-    .filter((item) => item.date && item.value);
+  return [...groups.values()].filter((item) => item.date && item.value);
 }
 
 function mergeForecastNotes(sheetNotes, savedForecasts, projectCatalog) {
