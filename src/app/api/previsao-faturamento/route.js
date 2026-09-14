@@ -35,8 +35,13 @@ function parseInput(body) {
   if (!project || project.length > 180) throw new Error('Informe um projeto válido.');
   if (document.length > 120) throw new Error('O documento deve ter no máximo 120 caracteres.');
   if (sourceKey && sourceKey.length > 200) throw new Error('Identificador da previsão inválido.');
-  if (Number.isNaN(forecastDate.getTime()) || forecastDate.getFullYear() !== 2026) {
-    throw new Error('A competência deve pertencer ao ano de 2026.');
+  if (
+    Number.isNaN(forecastDate.getTime())
+    || forecastDate.getFullYear() !== 2026
+    || forecastDate.getMonth() < 8
+    || forecastDate.getMonth() > 11
+  ) {
+    throw new Error('A competência prevista deve estar entre setembro e dezembro de 2026.');
   }
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('Informe um valor previsto maior que zero.');
 
