@@ -13,7 +13,7 @@ import IncomeExpenseChart from "@/components/charts/IncomeExpenseChart";
 import AnnualFlowChart from "@/components/charts/AnnualFlowChart";
 import CustomTooltip from "@/components/charts/CustomTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
-import { isForecastOnlyReceivableDocument } from "@/lib/financialClassification";
+import { getFinancialDisplayStatus, isForecastOnlyReceivableDocument } from "@/lib/financialClassification";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { getRolling30DayRange } from "@/lib/dateRange";
@@ -70,16 +70,7 @@ export default function FluxoDeCaixa() {
 
   const rawBaseData = useMemo(() => {
     return data.map(item => {
-      let statusAmigavel = item.status;
-      if (item.natureza === 'Entrada') {
-        const forecastOnly = isForecastOnlyReceivableDocument(item);
-        if (forecastOnly) statusAmigavel = 'A receber';
-        else if (item.status === 'Realizado') statusAmigavel = 'Recebido';
-        else if (item.status === 'A realizar') statusAmigavel = 'A receber';
-      } else if (item.natureza === 'Saída') {
-        if (item.status === 'Realizado') statusAmigavel = 'Pago';
-        if (item.status === 'A realizar') statusAmigavel = 'A pagar';
-      }
+      const statusAmigavel = getFinancialDisplayStatus(item);
 
       let dataTimestamp = 0;
       if (item.data) {
