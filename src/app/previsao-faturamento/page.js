@@ -129,6 +129,16 @@ function dateLabel(date) {
   return date ? date.toLocaleDateString("pt-BR") : "—";
 }
 
+async function readJsonResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`O servidor retornou uma resposta inválida (HTTP ${response.status}).`);
+  }
+}
+
 function documentText(item) {
   return normalizeText([
     item?.documento,
@@ -353,8 +363,8 @@ export default function PrevisaoFaturamentoPage() {
         fetch("/api/previsao-faturamento", { cache: "no-store" }),
       ]);
       const [syncResult, forecastResult] = await Promise.all([
-        syncResponse.json(),
-        forecastResponse.json(),
+        readJsonResponse(syncResponse),
+        readJsonResponse(forecastResponse),
       ]);
       if (!syncResponse.ok) throw new Error(syncResult.error || "Não foi possível carregar os dados financeiros.");
       if (!forecastResponse.ok) throw new Error(forecastResult.error || "Não foi possível carregar as previsões editáveis.");
@@ -392,7 +402,7 @@ export default function PrevisaoFaturamentoPage() {
           amount: toNumber(editor.amount),
         }),
       });
-      const result = await response.json();
+      const result = await readJsonResponse(response);
       if (!response.ok) throw new Error(result.error || "Não foi possível salvar a previsão.");
       setEditor(null);
       await loadData(false);
@@ -420,7 +430,7 @@ export default function PrevisaoFaturamentoPage() {
           amount: note.value,
         }),
       });
-      const result = await response.json();
+      const result = await readJsonResponse(response);
       if (!response.ok) throw new Error(result.error || "Não foi possível excluir a previsão.");
       if (editor?.id === note.id) setEditor(null);
       await loadData(false);
@@ -448,7 +458,7 @@ export default function PrevisaoFaturamentoPage() {
     async function initialize() {
       try {
         const response = await fetch("/api/session", { cache: "no-store" });
-        const session = await response.json();
+        const session = await readJsonResponse(response);
         const permissions = Array.isArray(session.user?.permissions) ? session.user.permissions : [];
         const isAllowed = normalizeText(session.user?.username) === "ADMIN" || permissions.includes("previsao_faturamento");
         if (!isAllowed) {
