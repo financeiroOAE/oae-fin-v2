@@ -33,12 +33,45 @@ function combinedText(item) {
   ].filter(Boolean).join(' '));
 }
 
-// PRV e PCT representam documentos de previsao de recebimento. Mesmo que a
-// origem traga um status inconsistente, eles nao podem ser tratados como caixa recebido.
+export function isRealizedFinancialStatus(itemOrStatus) {
+  const rawStatus = typeof itemOrStatus === 'object' ? itemOrStatus?.status : itemOrStatus;
+  const status = normalizeText(rawStatus);
+  return status.includes('REALIZADO')
+    || status.includes('RECEBIDO')
+    || status.includes('PAGO')
+    || status.includes('EFETIVADO');
+}
+
+export function isForecastFinancialStatus(itemOrStatus) {
+  const rawStatus = typeof itemOrStatus === 'object' ? itemOrStatus?.status : itemOrStatus;
+  const status = normalizeText(rawStatus);
+  return status.includes('A REALIZAR')
+    || status.includes('A RECEBER')
+    || status.includes('A PAGAR')
+    || status.includes('PREVISTO');
+}
+
+// PRV e PCT sao previsoes enquanto estiverem pendentes. Quando a propria
+// planilha marca o lancamento como realizado/recebido, o status confirmado
+// prevalece em todas as telas.
 export function isForecastOnlyReceivableDocument(item) {
+  if (isRealizedFinancialStatus(item)) return false;
   const document = normalizeText(item?.documento);
   if (!document) return false;
   return /^(PRV|PCT)(?:$|[.\s_/-]|\d)/.test(document);
+}
+
+export function getFinancialDisplayStatus(item) {
+  const nature = normalizeText(item?.natureza);
+  if (nature === 'ENTRADA') {
+    if (isRealizedFinancialStatus(item)) return 'Recebido';
+    if (isForecastOnlyReceivableDocument(item) || isForecastFinancialStatus(item)) return 'A receber';
+  }
+  if (nature === 'SAIDA') {
+    if (isRealizedFinancialStatus(item)) return 'Pago';
+    if (isForecastFinancialStatus(item)) return 'A pagar';
+  }
+  return String(item?.status || '').trim();
 }
 
 export function classifyFinancialEntry(item) {
