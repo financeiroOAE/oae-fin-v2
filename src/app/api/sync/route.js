@@ -9,7 +9,7 @@ import {
 const TIME_ZONE = 'America/Sao_Paulo';
 const SCHEDULE_HOUR = 16;
 const SCHEDULE_MINUTE = 30;
-const CASH_LOGIC_VERSION = 7;
+const CASH_LOGIC_VERSION = 8;
 
 function getZonedParts(date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -123,12 +123,13 @@ export async function GET(request) {
         if (snapshot?.payload) {
           return NextResponse.json({
             ...visiblePayload(snapshot.payload),
+            error: 'A atualização não foi concluída; os números anteriores foram preservados.',
             fromSnapshot: true,
             snapshotAt: snapshot.updatedAt,
             snapshotUpdatedBy: snapshot.updatedBy,
             refreshFailed: true,
             refreshError: refreshError?.message || 'Falha ao atualizar dados',
-          });
+          }, { status: 502 });
         }
 
         throw refreshError;
