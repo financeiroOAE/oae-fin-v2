@@ -3,8 +3,8 @@ import { batchReadSheets } from '@/lib/googleSheets';
 import { processSiengeData, extractAccountCode, parseBRL } from '@/lib/businessRules';
 
 const SNAPSHOT_ID = 'current';
-const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'FAT_PROJECAO_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA'];
-const CASH_LOGIC_VERSION = 7;
+const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA'];
+const CASH_LOGIC_VERSION = 8;
 
 function parseSortDate(value) {
   if (!value) return 0;
