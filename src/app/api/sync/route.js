@@ -10,6 +10,24 @@ const TIME_ZONE = 'America/Sao_Paulo';
 const SCHEDULE_HOUR = 16;
 const SCHEDULE_MINUTE = 30;
 const CASH_LOGIC_VERSION = 8;
+const SYNC_TIMEOUT_MS = 30000;
+
+async function withTimeout(promise, timeoutMs = SYNC_TIMEOUT_MS) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error('O Google Sheets não respondeu dentro de 30 segundos. Tente novamente.');
+      error.code = 'SYNC_TIMEOUT';
+      reject(error);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function getZonedParts(date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -111,7 +129,7 @@ export async function GET(request) {
       const triggeredBy = force ? username : requiresCashRepair ? 'AUTO_REPAIR_CASH_V7' : requiresProjectRepair ? 'AUTO_REPAIR_PROJECTS' : 'AUTO_16:30';
 
       try {
-        const payload = await refreshFinancialSnapshot(triggeredBy);
+        const payload = await withTimeout(refreshFinancialSnapshot(triggeredBy));
         return NextResponse.json({
           ...visiblePayload(payload),
           fromSnapshot: false,
@@ -141,7 +159,7 @@ export async function GET(request) {
     }
 
     if (!snapshot) {
-      const payload = await refreshFinancialSnapshot('INITIAL_BOOTSTRAP');
+      const payload = await withTimeout(refreshFinancialSnapshot('INITIAL_BOOTSTRAP'));
       return NextResponse.json({
         ...visiblePayload(payload),
         fromSnapshot: false,
