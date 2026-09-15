@@ -14,7 +14,7 @@ import InfoTooltip from "@/components/InfoTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
-import { classifyFinancialEntry, isForecastOnlyReceivableDocument, isPartnerWithdrawal, isRevenueTax } from "@/lib/financialClassification";
+import { classifyFinancialEntry, getFinancialDisplayStatus, isForecastOnlyReceivableDocument, isPartnerWithdrawal, isRevenueTax } from "@/lib/financialClassification";
 import { getActiveProjects, getActiveProjectNames, getProjectKey } from "@/lib/projectRules";
 
 const getYearToDateRange = () => {
@@ -110,16 +110,7 @@ export default function VisaoFinanceira() {
 
   const rawBaseData = useMemo(() => {
     return data.map(item => {
-      let statusAmigavel = item.status;
-      if (item.natureza === 'Entrada') {
-        const forecastOnly = isForecastOnlyReceivableDocument(item);
-        if (forecastOnly) statusAmigavel = 'A receber';
-        else if (item.status === 'Realizado') statusAmigavel = 'Recebido';
-        else if (item.status === 'A realizar') statusAmigavel = 'A receber';
-      } else if (item.natureza === 'Saída') {
-        if (item.status === 'Realizado') statusAmigavel = 'Pago';
-        if (item.status === 'A realizar') statusAmigavel = 'A pagar';
-      }
+      const statusAmigavel = getFinancialDisplayStatus(item);
 
       let dataTimestamp = 0;
       if (item.data) {
