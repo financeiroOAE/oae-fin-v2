@@ -56,7 +56,7 @@ export async function batchReadSheets() {
       valueRenderOption: 'UNFORMATTED_VALUE',
       dateTimeRenderOption: 'FORMATTED_STRING',
       majorDimension: 'ROWS'
-    });
+    }, { timeout: 25000 });
 
     // A projeção é complementar. Uma ausência, renomeação ou falha nessa aba
     // nunca pode bloquear CP_GERAL, CR_GERAL e as demais telas financeiras.
@@ -68,7 +68,7 @@ export async function batchReadSheets() {
         valueRenderOption: 'UNFORMATTED_VALUE',
         dateTimeRenderOption: 'FORMATTED_STRING',
         majorDimension: 'ROWS'
-      });
+      }, { timeout: 12000 });
       valueRanges.push(projectionResponse.data);
     } catch (projectionError) {
       console.warn(
