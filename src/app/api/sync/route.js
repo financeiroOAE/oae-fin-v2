@@ -121,7 +121,7 @@ export async function GET(request) {
         await registerSyncError(triggeredBy, refreshError);
 
         if (snapshot?.payload) {
-          return NextResponse.json({
+          const fallbackPayload = {
             ...visiblePayload(snapshot.payload),
             error: 'A atualização não foi concluída; os números anteriores foram preservados.',
             fromSnapshot: true,
@@ -129,7 +129,11 @@ export async function GET(request) {
             snapshotUpdatedBy: snapshot.updatedBy,
             refreshFailed: true,
             refreshError: refreshError?.message || 'Falha ao atualizar dados',
-          }, { status: 502 });
+          };
+
+          // A abertura normal das telas preserva o último snapshot disponível.
+          // O clique manual continua retornando erro para nunca exibir falso sucesso.
+          return NextResponse.json(fallbackPayload, { status: force ? 502 : 200 });
         }
 
         throw refreshError;
