@@ -104,6 +104,8 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Sessão não autenticada' }, { status: 401 });
   }
 
+  const username = session.user.username;
+
   const visiblePayload = (payload) => payload;
   let snapshot = null;
 
