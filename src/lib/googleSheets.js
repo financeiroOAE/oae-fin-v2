@@ -41,7 +41,6 @@ export async function batchReadSheets() {
   const resultData = {
     EMPRESAS: [],
     PROJETOS_2026: [],
-    FAT_PROJECAO_2026: [],
     CENTROS_CUSTO: [],
     PLANOS_FINANCEIROS: [],
     CP_GERAL: [],
@@ -58,25 +57,7 @@ export async function batchReadSheets() {
       majorDimension: 'ROWS'
     }, { timeout: 25000 });
 
-    // A projeção é complementar. Uma ausência, renomeação ou falha nessa aba
-    // nunca pode bloquear CP_GERAL, CR_GERAL e as demais telas financeiras.
     const valueRanges = [...(response.data.valueRanges || [])];
-    try {
-      const projectionResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: "'FAT_PROJEÇÃO 2026'!A:AZ",
-        valueRenderOption: 'UNFORMATTED_VALUE',
-        dateTimeRenderOption: 'FORMATTED_STRING',
-        majorDimension: 'ROWS'
-      }, { timeout: 12000 });
-      valueRanges.push(projectionResponse.data);
-    } catch (projectionError) {
-      console.warn(
-        '[Google Sheets] FAT_PROJEÇÃO 2026 indisponível; sincronização financeira continuará:',
-        projectionError?.message || projectionError
-      );
-    }
-
     valueRanges.forEach((rangeData) => {
       const sheetNameMatch = rangeData.range.match(/^'?([^!']+)'?!/);
       const sheetName = sheetNameMatch ? sheetNameMatch[1] : rangeData.range.split('!')[0];
@@ -107,7 +88,7 @@ export async function batchReadSheets() {
           return rowData;
         });
 
-        const resultKey = sheetName === 'FAT_PROJEÇÃO 2026' ? 'FAT_PROJECAO_2026' : sheetName;
+        const resultKey = sheetName;
         if (resultData[resultKey] !== undefined) {
           resultData[resultKey] = data;
         } else {
