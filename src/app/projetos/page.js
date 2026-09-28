@@ -251,7 +251,7 @@ export default function Projetos() {
     }
   };
 
-  useEffect(() => { fetchDados(); }, []);
+  useEffect(() => { fetchDados(true); }, []);
 
   const formatCurrency = (val) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
