@@ -45,7 +45,7 @@ export default function AtualizacaoDados() {
   };
 
   useEffect(() => {
-    // Esta tela não sincroniza automaticamente. O painel já fixa um snapshot na primeira abertura da sessão.
+    fetchDados();
   }, []);
 
   return (
@@ -56,7 +56,7 @@ export default function AtualizacaoDados() {
             Atualização de Dados
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-            Os números permanecem fixos durante a sessão e só mudam ao clicar em Atualizar Dados.
+            Os dados são atualizados ao abrir esta tela e sempre que você clicar em Atualizar Dados.
           </p>
         </div>
         <button onClick={fetchDados} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '14px', padding: '0.75rem 1.5rem' }}>
@@ -76,7 +76,7 @@ export default function AtualizacaoDados() {
                 {errorMsg ? 'Google Sheets Desconectado/Erro' : 'Google Sheets Conectado'}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Clock size={14} /> Última atualização manual: {lastSync || 'Ainda não realizada nesta tela'}
+                <Clock size={14} /> Última atualização: {lastSync || 'Em andamento'}
               </div>
               {duration && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

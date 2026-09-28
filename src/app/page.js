@@ -34,7 +34,7 @@ export default function Home() {
         setUserName(sessionData.user.username);
         setIsSyncing(true);
 
-        const syncRes = await fetch('/api/sync', { method: 'GET', cache: 'no-store' });
+        const syncRes = await fetch('/api/sync?force=1', { method: 'GET', cache: 'no-store' });
         const syncData = await syncRes.json();
         if (!syncRes.ok) {
           throw new Error(syncData.error || syncData.details?.message || 'Falha ao carregar os dados financeiros.');
