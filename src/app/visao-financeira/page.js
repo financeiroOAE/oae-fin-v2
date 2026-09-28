@@ -102,8 +102,8 @@ export default function VisaoFinanceira() {
   };
 
   useEffect(() => {
-    // Seta 30 dias padrão se vazio
-    fetchDados();
+    // Toda abertura ou recarga deve consultar novamente a planilha.
+    fetchDados(true);
   }, []);
 
   const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
