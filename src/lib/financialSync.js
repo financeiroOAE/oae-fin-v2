@@ -133,7 +133,6 @@ async function performFullSync(triggeredBy) {
       'SALDO CONTRATUAL': parseBRL(proj['SALDO CONTRATUAL']),
     }));
 
-  const projecaoFaturamento = sheetsData.FAT_PROJECAO_2026 || [];
   const centrosCusto = sheetsData.CENTROS_CUSTO || [];
   const planos = sheetsData.PLANOS_FINANCEIROS || [];
   const cpGeralRaw = sheetsData.CP_GERAL || [];
@@ -166,7 +165,6 @@ async function performFullSync(triggeredBy) {
   const stats = {
     EMPRESAS: empresas.length,
     PROJETOS_2026: projetos.length,
-    FAT_PROJECAO_2026: projecaoFaturamento.length,
     CENTROS_CUSTO: centrosCusto.length,
     PLANOS_FINANCEIROS: planos.length,
     CP_GERAL: cpProcessed.length,
@@ -202,7 +200,6 @@ async function performFullSync(triggeredBy) {
     data: allData,
     stats,
     projetos,
-    projecaoFaturamento,
     saldosBancarios: empresas,
     somaProjetosContrato,
     somaProjetosFaturado,

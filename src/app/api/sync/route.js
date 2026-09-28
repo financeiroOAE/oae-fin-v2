@@ -72,7 +72,6 @@ function isDailySyncDue(snapshotUpdatedAt) {
 }
 
 function snapshotNeedsProjectRepair(payload) {
-  if (!Array.isArray(payload?.projecaoFaturamento)) return true;
   if (!Array.isArray(payload?.projetos)) return true;
   if (payload.projetos.some((project) => project?.FATURADO_2026 === undefined || project?.FATURADO_2026 === null)) return true;
   if (!Array.isArray(payload?.data)) return false;
@@ -105,14 +104,7 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Sessão não autenticada' }, { status: 401 });
   }
 
-  const username = session.user.username;
-  const canViewProjection = String(username).trim().toLowerCase() === 'admin'
-    || (Array.isArray(session.user.permissions) && session.user.permissions.includes('previsao_faturamento'));
-  const visiblePayload = (payload) => {
-    if (canViewProjection) return payload;
-    const { projecaoFaturamento: _restrictedProjection, ...safePayload } = payload || {};
-    return safePayload;
-  };
+  const visiblePayload = (payload) => payload;
   let snapshot = null;
 
   try {
