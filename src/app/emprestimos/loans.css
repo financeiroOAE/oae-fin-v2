@@ -56,7 +56,7 @@
 .loans-alert.success { background: rgba(16,185,129,.12); color: var(--success); }
 .loans-status { border-radius: 6px; padding: .35rem .5rem; font-size: .72rem; font-weight: 700; background: var(--bg-elevated); }
 .loans-status.PAGO { color: var(--success); }
-.loans-status.VENCIDO, .loans-status.CONFERIR { color: var(--warning); }
+.loans-status.VENCIDO, .loans-status.CONFERIR, .loans-status.VALOR_DIVERGENTE { color: var(--warning); }
 .loans-full-label { margin: 1.4rem 0; }
 .loans-simulation > div { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--border-color); padding: .85rem 0; }
 .loans-simulation .highlight { border: 0; background: var(--bg-elevated); border-radius: 8px; margin-top: 1rem; padding: 1rem; }
