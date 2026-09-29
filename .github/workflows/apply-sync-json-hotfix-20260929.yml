@@ -1,0 +1,37 @@
+name: Apply Sync JSON Hotfix 2026-09-29
+
+on:
+  push:
+    branches:
+      - fix-sync-json-20260929
+    paths:
+      - '.github/workflows/apply-sync-json-hotfix-20260929.yml'
+      - '.github/workflows/sync-json-hotfix.patch.gz.b64'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix-sync-json-20260929
+          fetch-depth: 0
+
+      - name: Apply validated patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          base64 --decode .github/workflows/sync-json-hotfix.patch.gz.b64 | gzip -d > /tmp/sync-json-hotfix.patch
+          git am /tmp/sync-json-hotfix.patch
+
+      - name: Remove temporary automation files
+        run: |
+          git rm .github/workflows/apply-sync-json-hotfix-20260929.yml
+          git rm .github/workflows/sync-json-hotfix.patch.gz.b64
+          git commit -m "chore: remover arquivos temporarios do hotfix"
+          git push origin HEAD:fix-sync-json-20260929
