@@ -121,6 +121,99 @@ function enrichWithSystemAllocation(item, value) {
   };
 }
 
+/**
+ * Prepara a receita da DRE sem usar a nomenclatura das contas para definir o rateio.
+ *
+ * Regra:
+ * - agrupa todas as linhas de receita do projeto pelo numero do Lancamento;
+ * - soma a coluna K (valorCaixa) para obter o valor total do titulo;
+ * - gera 80% para o projeto e 20% para Administracao;
+ * - preserva exatamente 100% do titulo na DRE consolidada.
+ */
+export function buildDreRevenueItems(baseData) {
+  const groups = new Map();
+  const otherEntries = [];
+
+  (baseData || []).map(normalizeDateTimestamp).forEach((item, index) => {
+    const classification = classifyFinancialEntry(item);
+    if (!isProjectRevenueClassification(classification)) {
+      otherEntries.push(item);
+      return;
+    }
+
+    const lancamento = String(item.lancamento || '').trim();
+    const empresa = String(item.empresa || '').trim();
+    const key = lancamento ? `${empresa}|${lancamento}` : `SEM_LANCAMENTO|${index}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        template: item,
+        totalColunaK: 0,
+        linhasOriginais: [],
+        projeto: null,
+      });
+    }
+
+    const group = groups.get(key);
+    const valorColunaK = Number(item.valorCaixa ?? item.valor) || 0;
+    group.totalColunaK += valorColunaK;
+    group.linhasOriginais.push(item);
+
+    if (isUsableAllocationProject(item.projeto)) {
+      group.projeto = item.projeto;
+    }
+  });
+
+  const allocatedEntries = Array.from(groups.values()).flatMap((group) => {
+    const allocation = splitProjectReceipt(group.totalColunaK);
+    const projeto = group.projeto
+      || group.linhasOriginais.find((row) => isUsableAllocationProject(row.projeto))?.projeto
+      || 'SEM PROJETO';
+
+    const common = {
+      ...group.template,
+      linhasOriginais: group.linhasOriginais,
+      valorReceitaProjetoTotal: allocation.total,
+      valorDireto: allocation.project,
+      valorAdministrativo: allocation.administrative,
+      rateioAdministrativoPercentual: PROJECT_ADMIN_RATE * 100,
+      rateioAdministrativoFonte: 'SISTEMA_20_PERCENT_COLUNA_K',
+      isDreRevenueAllocation: true,
+    };
+
+    return [
+      {
+        ...common,
+        valor: allocation.project,
+        valorCaixa: allocation.project,
+        valorFaturamento: allocation.project,
+        valorFaturamentoOriginal: allocation.project,
+        valorTotalTitulo: allocation.project,
+        contaCodigo: '1010101',
+        contaNome: 'REC. FATURAMENTO (80%)',
+        contaDescricao: 'REC. FATURAMENTO (80%)',
+        projeto,
+        parcelaRateio: 'PROJETO_80',
+      },
+      {
+        ...common,
+        valor: allocation.administrative,
+        valorCaixa: allocation.administrative,
+        valorFaturamento: allocation.administrative,
+        valorFaturamentoOriginal: allocation.administrative,
+        valorTotalTitulo: allocation.administrative,
+        contaCodigo: '1010107',
+        contaNome: 'REC. ADMINISTRATIVO (20%)',
+        contaDescricao: 'REC. ADMINISTRATIVO (20%)',
+        projeto: 'ADMINISTRAÇÃO',
+        parcelaRateio: 'ADMINISTRACAO_20',
+      },
+    ];
+  });
+
+  return [...otherEntries, ...allocatedEntries].map(normalizeDateTimestamp);
+}
+
 export function consolidateFinancialData(baseData, options = {}) {
   const {
     filterProjetos = [],
