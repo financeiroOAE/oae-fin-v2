@@ -36,12 +36,6 @@ export default function Home() {
         }
       } catch {
         // O nome e opcional; uma falha nessa consulta nao deve bloquear o painel.
-      }
-
-      try {
-        await refreshFinancialData();
-      } catch {
-        // Na abertura, o painel preserva o ultimo snapshot sem exibir erro tecnico.
       } finally {
         if (active) setIsSyncing(false);
       }
@@ -101,7 +95,7 @@ export default function Home() {
             Bem-vindo{userName ? `, ${userName}` : ''}
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            {isSyncing ? 'Carregando a base financeira da sessão...' : 'O que você deseja consultar hoje?'}
+            {isSyncing ? 'Carregando o painel...' : 'O que você deseja consultar hoje?'}
           </p>
         </div>
 
