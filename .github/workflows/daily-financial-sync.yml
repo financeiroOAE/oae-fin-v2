@@ -1,6 +1,9 @@
-name: Sincronizacao Financeira 16h30
+name: Sincronizacao Financeira 07h00
 
 on:
+  schedule:
+    # 10h UTC corresponde a 07h no horario de Brasilia (UTC-3).
+    - cron: '0 10 * * *'
   workflow_dispatch:
 
 permissions:
