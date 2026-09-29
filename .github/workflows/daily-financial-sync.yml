@@ -1,9 +1,6 @@
 name: Sincronizacao Financeira 16h30
 
 on:
-  schedule:
-    - cron: '30 16 * * *'
-      timezone: 'America/Sao_Paulo'
   workflow_dispatch:
 
 permissions:
