@@ -59,7 +59,7 @@ model BillingForecast {
 model LoanContract {
   id              String   @id @default(cuid())
   cpDocument      String?  @unique
-  sourceKey       String?  @unique
+  sourceKey       String?
   holder          String?
   kind            String   @default("EMPRESTIMO")
   sourceNote      String?  @db.Text
