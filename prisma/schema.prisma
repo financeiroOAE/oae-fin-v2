@@ -55,3 +55,44 @@ model BillingForecast {
   @@index([forecastDate])
   @@index([project])
 }
+
+model LoanContract {
+  id              String   @id @default(cuid())
+  cpDocument      String   @unique
+  bank            String
+  contractNumber  String?
+  modality        String?
+  amount          Decimal  @db.Decimal(14, 2)
+  startDate       DateTime?
+  installmentCount Int
+  status          String   @default("ATIVO")
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  installments    LoanInstallment[]
+  documents       LoanDocument[]
+}
+
+model LoanInstallment {
+  id          String   @id @default(cuid())
+  contractId  String
+  number      Int
+  dueDate     DateTime
+  principal   Decimal  @db.Decimal(14, 2)
+  interest    Decimal  @db.Decimal(14, 2)
+  other       Decimal  @db.Decimal(14, 2)
+  total       Decimal  @db.Decimal(14, 2)
+  contract    LoanContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  @@unique([contractId, number])
+  @@index([dueDate])
+}
+
+model LoanDocument {
+  id          String   @id @default(cuid())
+  contractId  String
+  filename    String
+  mimeType    String
+  content     Bytes
+  createdAt   DateTime @default(now())
+  contract    LoanContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+}
