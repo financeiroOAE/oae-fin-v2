@@ -11,7 +11,7 @@ import MultiSelect from "@/components/MultiSelect";
 import InfoTooltip from "@/components/InfoTooltip";
 import { classifyFinancialEntry, normalizeAccountCode } from "@/lib/financialClassification";
 import { getActiveProjectNames } from "@/lib/projectRules";
-import { consolidateFinancialData } from "@/lib/consolidation";
+import { buildDreRevenueItems } from "@/lib/consolidation";
 import { loadFinancialData } from "@/lib/clientSync";
 import {
   DRE_ORDER, buildMeses, buildDreStructure, tagItemsWithMesKey
@@ -633,19 +633,13 @@ export default function Dre() {
       visao
     });
 
-    if (filterProjetos.length > 0) {
-      const entradas = items.filter(i => i.natureza === "Entrada");
-      const saidas = items.filter(i => i.natureza === "Saída");
-      const consolidated = consolidateFinancialData(entradas, {
-        filterProjetos,
-        isProjetosPage: false,
-        incluirRateioAdm: true,
-      });
+    const entradas = items.filter(i => i.natureza === "Entrada");
+    const saidas = items.filter(i => i.natureza === "Saída");
+    const entradasRateadas = buildDreRevenueItems(entradas);
 
-      const somenteAdm = filterProjetos.length === 1 && filterProjetos[0].toUpperCase().includes('ADMINISTRA');
-      const entradasFiltradas = consolidated.filter(item => {
+    if (filterProjetos.length > 0) {
+      const entradasFiltradas = entradasRateadas.filter(item => {
         const proj = String(item.projeto || '');
-        if (somenteAdm) return proj.toUpperCase().includes('ADMINISTRA') && Math.abs(Number(item.valor) || 0) > 0;
         return filterProjetos.some(p => proj === p || proj.toUpperCase().includes(p.toUpperCase()));
       });
 
@@ -655,6 +649,8 @@ export default function Dre() {
       });
 
       items = [...entradasFiltradas, ...saidasFiltradas];
+    } else {
+      items = [...entradasRateadas, ...saidas];
     }
 
     return items;
@@ -673,15 +669,9 @@ export default function Dre() {
 
     const entradas = items.filter((item) => item.natureza === 'Entrada');
     const saidas = items.filter((item) => item.natureza === 'Saída');
-    const consolidated = consolidateFinancialData(entradas, {
-      filterProjetos,
-      isProjetosPage: false,
-      incluirRateioAdm: true,
-    });
-    const somenteAdm = filterProjetos.length === 1 && filterProjetos[0].toUpperCase().includes('ADMINISTRA');
-    const entradasFiltradas = consolidated.filter((item) => {
+    const entradasRateadas = buildDreRevenueItems(entradas);
+    const entradasFiltradas = entradasRateadas.filter((item) => {
       const proj = String(item.projeto || '');
-      if (somenteAdm) return proj.toUpperCase().includes('ADMINISTRA') && Math.abs(Number(item.valor) || 0) > 0;
       return filterProjetos.some((project) => proj === project || proj.toUpperCase().includes(project.toUpperCase()));
     });
     const saidasFiltradas = saidas.filter((item) => {
