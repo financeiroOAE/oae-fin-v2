@@ -591,7 +591,7 @@ export default function Dre() {
   };
 
   useEffect(() => {
-    fetchDados(true);
+    fetchDados();
   }, []);
 
   const handleVisaoChange = (nextVisao) => {

@@ -6,10 +6,6 @@ import {
   registerSyncError,
 } from '@/lib/financialSync';
 
-const TIME_ZONE = 'America/Sao_Paulo';
-const SCHEDULE_HOUR = 16;
-const SCHEDULE_MINUTE = 30;
-const CASH_LOGIC_VERSION = 8;
 const SYNC_TIMEOUT_MS = 30000;
 
 async function withTimeout(promise, timeoutMs = SYNC_TIMEOUT_MS) {
@@ -27,75 +23,6 @@ async function withTimeout(promise, timeoutMs = SYNC_TIMEOUT_MS) {
   } finally {
     clearTimeout(timeoutId);
   }
-}
-
-function getZonedParts(date) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date);
-
-  return Object.fromEntries(
-    parts
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, Number(part.value)])
-  );
-}
-
-function isDailySyncDue(snapshotUpdatedAt) {
-  if (!snapshotUpdatedAt) return true;
-
-  const now = getZonedParts(new Date());
-  const reachedSchedule =
-    now.hour > SCHEDULE_HOUR ||
-    (now.hour === SCHEDULE_HOUR && now.minute >= SCHEDULE_MINUTE);
-
-  if (!reachedSchedule) return false;
-
-  const snapshot = getZonedParts(new Date(snapshotUpdatedAt));
-  const sameLocalDay =
-    snapshot.year === now.year &&
-    snapshot.month === now.month &&
-    snapshot.day === now.day;
-
-  if (!sameLocalDay) return true;
-
-  return (
-    snapshot.hour < SCHEDULE_HOUR ||
-    (snapshot.hour === SCHEDULE_HOUR && snapshot.minute < SCHEDULE_MINUTE)
-  );
-}
-
-function snapshotNeedsProjectRepair(payload) {
-  if (!Array.isArray(payload?.projetos)) return true;
-  if (payload.projetos.some((project) => project?.FATURADO_2026 === undefined || project?.FATURADO_2026 === null)) return true;
-  if (!Array.isArray(payload?.data)) return false;
-  return payload.data.some((item) => {
-    if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
-    const project = String(item?.projeto || '').trim().toUpperCase();
-    return project === 'GRUPO OAE';
-  });
-}
-
-function snapshotNeedsCashRepair(payload) {
-  if (!Array.isArray(payload?.data)) return false;
-  if (payload.cashLogicVersion !== CASH_LOGIC_VERSION) return true;
-  if (payload.recebimentosLiquidosStats?.source !== 'CR_GERAL_K_VALOR') return true;
-
-  return payload.data.some((item) => {
-    if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return false;
-    return item?.valorCaixa === undefined
-      || item?.valorCaixa === null
-      || !Number.isFinite(Number(item.valorCaixa))
-      || item?.valorFaturamento === undefined
-      || item?.valorFaturamento === null
-      || item?.recebimentoLiquidoFonte !== 'CR_GERAL_K_VALOR';
-  });
 }
 
 export async function GET(request) {
@@ -133,34 +60,28 @@ export async function GET(request) {
       });
     }
 
-    const requiresProjectRepair = snapshotNeedsProjectRepair(snapshot?.payload);
-    const requiresCashRepair = snapshotNeedsCashRepair(snapshot?.payload);
-    const requiresRepair = requiresProjectRepair || requiresCashRepair;
     const requestedRefresh = force || refreshOnly;
-    const scheduledDue = !requestedRefresh && !requiresRepair && isDailySyncDue(snapshot?.updatedAt);
 
-    if (requestedRefresh || requiresRepair || scheduledDue) {
-      const triggeredBy = requestedRefresh ? username : requiresCashRepair ? 'AUTO_REPAIR_CASH_V7' : requiresProjectRepair ? 'AUTO_REPAIR_PROJECTS' : 'AUTO_16:30';
-
+    if (requestedRefresh) {
       try {
-        const payload = await withTimeout(refreshFinancialSnapshot(triggeredBy));
+        const payload = await withTimeout(refreshFinancialSnapshot(username));
 
         if (refreshOnly) {
           return NextResponse.json({
             ok: true,
             syncedAt: payload.syncedAt,
             recordsCount: payload.recordsCount,
-            refreshReason: 'PAGE_LOAD',
+            refreshReason: 'MANUAL',
           });
         }
 
         return NextResponse.json({
           ...visiblePayload(payload),
           fromSnapshot: false,
-          refreshReason: force ? 'MANUAL' : requiresRepair ? 'SNAPSHOT_REPAIR' : 'AUTO_16:30',
+          refreshReason: 'MANUAL',
         });
       } catch (refreshError) {
-        await registerSyncError(triggeredBy, refreshError);
+        await registerSyncError(username, refreshError);
 
         if (snapshot?.payload) {
           if (refreshOnly) {
@@ -176,32 +97,29 @@ export async function GET(request) {
             );
           }
 
-          const fallbackPayload = {
-            ...visiblePayload(snapshot.payload),
-            error: 'A atualização não foi concluída; os números anteriores foram preservados.',
-            fromSnapshot: true,
-            snapshotAt: snapshot.updatedAt,
-            snapshotUpdatedBy: snapshot.updatedBy,
-            refreshFailed: true,
-            refreshError: refreshError?.message || 'Falha ao atualizar dados',
-          };
-
-          // A abertura normal das telas preserva o último snapshot disponível.
-          // O clique manual continua retornando erro para nunca exibir falso sucesso.
-          return NextResponse.json(fallbackPayload, { status: force ? 502 : 200 });
+          return NextResponse.json(
+            {
+              ...visiblePayload(snapshot.payload),
+              error: 'A atualização não foi concluída; os números anteriores foram preservados.',
+              fromSnapshot: true,
+              snapshotAt: snapshot.updatedAt,
+              snapshotUpdatedBy: snapshot.updatedBy,
+              refreshFailed: true,
+              refreshError: refreshError?.message || 'Falha ao atualizar dados',
+            },
+            { status: 502 }
+          );
         }
 
         throw refreshError;
       }
     }
 
-    if (!snapshot) {
-      const payload = await withTimeout(refreshFinancialSnapshot('INITIAL_BOOTSTRAP'));
-      return NextResponse.json({
-        ...visiblePayload(payload),
-        fromSnapshot: false,
-        refreshReason: 'INITIAL_BOOTSTRAP',
-      });
+    if (!snapshot?.payload) {
+      return NextResponse.json(
+        { error: 'Ainda não existe uma base financeira sincronizada. Clique em Sincronizar Dados.' },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({

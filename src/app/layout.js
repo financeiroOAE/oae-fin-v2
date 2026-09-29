@@ -2,7 +2,6 @@ import "./globals.css";
 import "./ui-fixes.css";
 import Sidebar from "@/components/Sidebar";
 import UiEnhancements from "@/components/UiEnhancements";
-import DailySyncScheduler from "@/components/DailySyncScheduler";
 import { ReportProvider } from "@/contexts/ReportContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ReportDrawer from "@/components/report/ReportDrawer";
@@ -24,7 +23,6 @@ export default function RootLayout({ children }) {
         <ThemeProvider>
           <ReportProvider>
             <UiEnhancements />
-            <DailySyncScheduler />
             <div className="app-layout">
               <Sidebar />
               <main className="main-content">{children}</main>

@@ -14,16 +14,16 @@ export default function AtualizacaoDados() {
   const [errorDetails, setErrorDetails] = useState(null);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
 
-  const fetchDados = async (showRefreshError = true) => {
+  const fetchDados = async (refresh = false, showRefreshError = true) => {
     setIsSyncing(true);
-    setStatusMsg("Conectando ao Google Sheets e processando dados...");
+    setStatusMsg(refresh ? "Conectando ao Google Sheets e processando dados..." : "Carregando o último snapshot salvo...");
     setErrorMsg(null);
     setErrorDetails(null);
     setShowErrorDetails(false);
     const startTime = performance.now();
 
     try {
-      const result = await loadFinancialData({ refresh: true });
+      const result = await loadFinancialData({ refresh });
 
       const endTime = performance.now();
       setDuration(((endTime - startTime) / 1000).toFixed(2));
@@ -38,8 +38,10 @@ export default function AtualizacaoDados() {
           setErrorMsg('A atualização não foi concluída.');
           setErrorDetails(result.refreshError || 'Tente novamente em alguns segundos.');
         }
-      } else {
+      } else if (refresh) {
         setStatusMsg(`Sincronização concluída com sucesso! Total de ${result.recordsCount || (result.stats ? Object.values(result.stats).reduce((a,b)=>a+b,0) : 0)} registros processados.`);
+      } else {
+        setStatusMsg('Últimos dados sincronizados carregados.');
       }
     } catch (err) {
       setErrorMsg("Ocorreu um erro durante a atualização dos dados.");
@@ -51,7 +53,7 @@ export default function AtualizacaoDados() {
   };
 
   useEffect(() => {
-    fetchDados(false);
+    fetchDados(false, false);
   }, []);
 
   return (
@@ -62,10 +64,10 @@ export default function AtualizacaoDados() {
             Atualização de Dados
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-            Os dados são atualizados ao abrir esta tela e sempre que você clicar em Atualizar Dados.
+            Ao abrir, o painel carrega o último snapshot salvo. Uma nova leitura da planilha ocorre somente ao clicar em Atualizar Dados.
           </p>
         </div>
-        <button onClick={() => fetchDados(true)} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '14px', padding: '0.75rem 1.5rem' }}>
+        <button onClick={() => fetchDados(true, true)} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '14px', padding: '0.75rem 1.5rem' }}>
           <RefreshCw size={16} className={isSyncing ? "spin" : ""} /> {isSyncing ? 'Atualizando Dados...' : 'Atualizar Dados'}
         </button>
       </header>

@@ -32,7 +32,7 @@ export async function refreshFinancialData() {
   return requestJson('/api/sync?refresh=1');
 }
 
-export async function loadFinancialData({ refresh = true } = {}) {
+export async function loadFinancialData({ refresh = false } = {}) {
   let refreshError = null;
 
   if (refresh) {
