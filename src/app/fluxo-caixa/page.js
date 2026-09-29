@@ -18,6 +18,7 @@ import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { getRolling30DayRange } from "@/lib/dateRange";
 import { getActiveProjectNames } from "@/lib/projectRules";
+import { loadFinancialData } from "@/lib/clientSync";
 import {
   BarChart, Bar, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine, Cell
 } from "recharts";
@@ -42,19 +43,20 @@ export default function FluxoDeCaixa() {
   const [modalResumo, setModalResumo] = useState(null);
   const [expandedEmpresa, setExpandedEmpresa] = useState(null);
 
-  const fetchDados = async (force = false) => {
+  const fetchDados = async (force = false, showRefreshError = false) => {
     setIsSyncing(true);
     setError(null);
     try {
-      const response = await fetch(force ? '/api/sync?force=1' : '/api/sync', { method: 'GET', cache: 'no-store' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || result.details?.message || 'Erro desconhecido');
+      const result = await loadFinancialData({ refresh: force });
 
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
       setSaldosBancarios(result.saldosBancarios || []);
       const syncDate = result.syncedAt || result.snapshotAt;
       setLastSync(syncDate ? new Date(syncDate).toLocaleString('pt-BR') : null);
+      if (showRefreshError && result.refreshFailed) {
+        setError(result.refreshError || 'A atualização não foi concluída; os dados anteriores foram preservados.');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -454,7 +456,7 @@ export default function FluxoDeCaixa() {
         <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '2rem' }}>
           <AlertCircle size={48} style={{ margin: '0 auto', marginBottom: '1rem', color: 'var(--text-secondary)' }} />
           <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.5rem' }}>Dados não sincronizados</h2>
-          <button onClick={() => fetchDados(true)} className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
+          <button onClick={() => fetchDados(true, true)} className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
             <RefreshCw size={16} style={{ marginRight: '0.5rem' }} /> Sincronizar Dados
           </button>
         </div>
@@ -478,7 +480,7 @@ export default function FluxoDeCaixa() {
             <FileText size={14} /> {isReportMode ? 'Sair do Modo Relatório' : 'Gerar Relatório'}
           </button>
           {isSyncing && <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Atualizando...</span>}
-          <button onClick={() => fetchDados(true)} disabled={isSyncing} className="btn" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
+          <button onClick={() => fetchDados(true, true)} disabled={isSyncing} className="btn" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
             <RefreshCw size={16} className={isSyncing ? 'spin' : ''} style={{ marginRight: '0.5rem' }} /> Sincronizar
           </button>
         </div>

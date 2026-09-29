@@ -16,6 +16,7 @@ import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { classifyFinancialEntry, getFinancialDisplayStatus, isForecastOnlyReceivableDocument, isPartnerWithdrawal, isRevenueTax } from "@/lib/financialClassification";
 import { getActiveProjects, getActiveProjectNames, getProjectKey } from "@/lib/projectRules";
+import { loadFinancialData } from "@/lib/clientSync";
 
 const getYearToDateRange = () => {
   const today = new Date();
@@ -80,13 +81,11 @@ export default function VisaoFinanceira() {
   const [filterContas, setFilterContas] = useState([]);
   const [compositionDrilldown, setCompositionDrilldown] = useState(null);
 
-  const fetchDados = async (force = false) => {
+  const fetchDados = async (force = false, showRefreshError = false) => {
     setIsSyncing(true);
     setError(null);
     try {
-      const response = await fetch(force ? '/api/sync?force=1' : '/api/sync', { method: 'GET', cache: 'no-store' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || result.details?.message || 'Erro desconhecido');
+      const result = await loadFinancialData({ refresh: force });
 
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
@@ -94,6 +93,9 @@ export default function VisaoFinanceira() {
       setSomaProjetos(result.somaProjetosSaldo || 0);
       const syncDate = result.syncedAt || result.snapshotAt;
       setLastSync(syncDate ? new Date(syncDate).toLocaleString('pt-BR') : null);
+      if (showRefreshError && result.refreshFailed) {
+        setError(result.refreshError || 'A atualização não foi concluída; os dados anteriores foram preservados.');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -605,7 +607,7 @@ export default function VisaoFinanceira() {
         <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '2rem' }}>
           <AlertCircle size={48} style={{ margin: '0 auto', marginBottom: '1rem', color: 'var(--text-secondary)' }} />
           <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.5rem' }}>Dados não sincronizados</h2>
-          <button onClick={() => fetchDados(true)} className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
+          <button onClick={() => fetchDados(true, true)} className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
             <RefreshCw size={16} style={{ marginRight: '0.5rem' }} /> Sincronizar Dados
           </button>
         </div>
@@ -631,7 +633,7 @@ export default function VisaoFinanceira() {
             <FileText size={14} /> {isReportMode ? 'Sair do Modo Relatório' : 'Gerar Relatório'}
           </button>
           {lastSync && <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}><Database size={12} style={{display:'inline', marginRight:'4px'}}/> {lastSync}</span>}
-          <button onClick={() => fetchDados(true)} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
+          <button onClick={() => fetchDados(true, true)} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
             <RefreshCw size={14} className={isSyncing ? "spinner" : ""} /> {isSyncing ? 'Atualizando...' : 'Atualizar'}
           </button>
         </div>

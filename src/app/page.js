@@ -13,6 +13,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { readSession, refreshFinancialData } from '@/lib/clientSync';
 
 export default function Home() {
   const router = useRouter();
@@ -26,21 +27,21 @@ export default function Home() {
     let active = true;
 
     async function initializePanel() {
+      setIsSyncing(true);
+
       try {
-        const res = await fetch('/api/session', { cache: 'no-store' });
-        const sessionData = await res.json();
-        if (!active || !sessionData?.user?.username) return;
-
-        setUserName(sessionData.user.username);
-        setIsSyncing(true);
-
-        const syncRes = await fetch('/api/sync?force=1', { method: 'GET', cache: 'no-store' });
-        const syncData = await syncRes.json();
-        if (!syncRes.ok) {
-          throw new Error(syncData.error || syncData.details?.message || 'Falha ao carregar os dados financeiros.');
+        const sessionData = await readSession();
+        if (active && sessionData?.user?.username) {
+          setUserName(sessionData.user.username);
         }
-      } catch (err) {
-        if (active) setError(err.message || 'Falha ao carregar os dados financeiros.');
+      } catch {
+        // O nome e opcional; uma falha nessa consulta nao deve bloquear o painel.
+      }
+
+      try {
+        await refreshFinancialData();
+      } catch {
+        // Na abertura, o painel preserva o ultimo snapshot sem exibir erro tecnico.
       } finally {
         if (active) setIsSyncing(false);
       }
@@ -56,12 +57,7 @@ export default function Home() {
     setMessage('');
 
     try {
-      const response = await fetch('/api/sync?force=1', { method: 'GET', cache: 'no-store' });
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || result.details?.message || 'Erro desconhecido');
-      }
+      await refreshFinancialData();
       setMessage('Dados atualizados. Todas as telas usarão os novos números.');
       setTimeout(() => setMessage(''), 5000);
     } catch (err) {
