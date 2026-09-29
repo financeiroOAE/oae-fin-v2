@@ -294,6 +294,7 @@ export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [
         valorFaturamento: isCR ? valorFaturamento : undefined,
         valorBruto: isCR ? valorFaturamento : valorLiquido,
         lancamento: String(row['Lançamento'] || row['Lanamento'] || '').trim(),
+        titulo: String(row['Título'] || row.Titulo || '').trim(),
         valorTotalTitulo: valorFaturamento,
         contaCodigo: accountCode,
         contaNome: contaNomeOriginal,

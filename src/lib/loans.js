@@ -11,6 +11,36 @@ export function dateKey(value) {
   return raw.slice(0, 10);
 }
 
+function titleInstallment(value) {
+  const match = String(value || '').trim().match(/^(.+?)\s*\/\s*0*(\d+)\s*$/);
+  if (!match) return null;
+  return { title: match[1].trim().replace(/\s+/g, ' ').toUpperCase(), number: Number(match[2]) };
+}
+
+function realizedPayment(row) {
+  const status = String(row.status || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+  return !status.startsWith('A ') && /REALIZADO|PAGO|EFETIVADO/.test(status);
+}
+
+function findInstallmentPayment(rows, installment) {
+  const sameDate = rows.filter((row) => dateKey(row.data) === dateKey(installment.dueDate));
+  const titled = sameDate.map((row) => ({ row, key: titleInstallment(row.titulo || row.lancamento) })).filter((entry) => entry.key);
+  if (titled.length) {
+    const matching = titled.filter((entry) => entry.key.number === installment.number);
+    const groups = new Map();
+    for (const entry of matching) groups.set(entry.key.title, [...(groups.get(entry.key.title) || []), entry.row]);
+    if (groups.size > 1) return { ambiguous: true };
+    if (groups.size === 1) {
+      const [title, matchedRows] = [...groups][0];
+      return { rows: matchedRows, title: `${title}/${installment.number}` };
+    }
+    return null;
+  }
+  const exact = sameDate.filter((row) => cents(row.valor) === cents(installment.total));
+  if (exact.length > 1) return { ambiguous: true };
+  return exact.length === 1 ? { rows: exact } : null;
+}
+
 export function reconcileLoans(contracts, snapshot) {
   const rows = (snapshot?.payload?.data || []).filter((row) => row.natureza === 'Saída');
   const byDocument = new Map();
@@ -23,22 +53,19 @@ export function reconcileLoans(contracts, snapshot) {
     ...contract,
     installments: contract.installments.map((installment) => {
       if (!contract.cpDocument) return { ...installment, reconciliation: 'SEM_DOCUMENTO', cpMatch: null };
-      const candidates = (byDocument.get(contract.cpDocument) || []).filter((row) =>
-        dateKey(row.data) === dateKey(installment.dueDate)
-        && cents(row.valor) === cents(installment.total)
-      );
-      const realized = candidates.filter((row) => {
-        const status = String(row.status || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
-        return !status.startsWith('A ') && /REALIZADO|PAGO|EFETIVADO/.test(status);
-      });
-      const match = candidates.length === 1 ? candidates[0] : null;
+      const payment = findInstallmentPayment(byDocument.get(contract.cpDocument) || [], installment);
+      const match = payment?.rows;
+      const amountCents = match?.reduce((sum, row) => sum + cents(row.valor), 0);
       const status = !snapshot ? 'SEM_BASE_CP'
-        : candidates.length > 1 ? 'CONFERIR'
-          : realized.length === 1 && match === realized[0] ? 'PAGO'
-            : candidates.length === 0 ? 'SEM_VINCULO'
-              : dateKey(installment.dueDate) < new Date().toISOString().slice(0, 10) ? 'VENCIDO' : 'A_VENCER';
+        : payment?.ambiguous ? 'CONFERIR'
+          : !match ? 'SEM_VINCULO'
+            : amountCents !== cents(installment.total) ? 'VALOR_DIVERGENTE'
+              : match.every(realizedPayment) ? 'PAGO'
+                : dateKey(installment.dueDate) < new Date().toISOString().slice(0, 10) ? 'VENCIDO' : 'A_VENCER';
       return { ...installment, reconciliation: status, cpMatch: match ? {
-        date: match.data, amount: Number(match.valor), status: match.status,
+        date: match[0].data, amount: amountCents / 100,
+        status: [...new Set(match.map((row) => row.status))].join(' + '),
+        title: payment.title || null, rowCount: match.length,
       } : null };
     }),
   }));
