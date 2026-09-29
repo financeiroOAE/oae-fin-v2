@@ -12,6 +12,7 @@ import InfoTooltip from "@/components/InfoTooltip";
 import { classifyFinancialEntry, normalizeAccountCode } from "@/lib/financialClassification";
 import { getActiveProjectNames } from "@/lib/projectRules";
 import { consolidateFinancialData } from "@/lib/consolidation";
+import { loadFinancialData } from "@/lib/clientSync";
 import {
   DRE_ORDER, buildMeses, buildDreStructure, tagItemsWithMesKey
 } from "@/lib/dreEngine";
@@ -570,17 +571,18 @@ export default function Dre() {
   // A ordem contábil é fixa para preservar a sequência correta dos resultados.
   const customOrder = DRE_ORDER;
 
-  const fetchDados = async (force = false) => {
+  const fetchDados = async (force = false, showRefreshError = false) => {
     setIsSyncing(true);
     setError(null);
     try {
-      const res = await fetch(force ? "/api/sync?force=1" : "/api/sync", { method: 'GET', cache: 'no-store' });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || result.details?.message || "Erro desconhecido");
+      const result = await loadFinancialData({ refresh: force });
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
       const syncDate = result.syncedAt || result.snapshotAt;
       setLastSync(syncDate ? new Date(syncDate).toLocaleString("pt-BR") : null);
+      if (showRefreshError && result.refreshFailed) {
+        setError(result.refreshError || 'A atualização não foi concluída; os dados anteriores foram preservados.');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -884,7 +886,7 @@ export default function Dre() {
             </button>
           )}
           <button
-            onClick={() => fetchDados(true)}
+            onClick={() => fetchDados(true, true)}
             disabled={isSyncing}
             style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1.25rem", background: "var(--primary)", borderRadius: "8px", border: "none", color: "#fff", fontSize: "13px", fontWeight: "600", cursor: isSyncing ? "not-allowed" : "pointer", opacity: isSyncing ? 0.7 : 1 }}
           >

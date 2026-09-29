@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { RefreshCw, Database, CheckCircle, AlertTriangle, Clock, ServerCrash, CheckSquare } from "lucide-react";
+import { loadFinancialData } from "@/lib/clientSync";
 
 export default function AtualizacaoDados() {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -13,7 +14,7 @@ export default function AtualizacaoDados() {
   const [errorDetails, setErrorDetails] = useState(null);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
 
-  const fetchDados = async () => {
+  const fetchDados = async (showRefreshError = true) => {
     setIsSyncing(true);
     setStatusMsg("Conectando ao Google Sheets e processando dados...");
     setErrorMsg(null);
@@ -22,19 +23,24 @@ export default function AtualizacaoDados() {
     const startTime = performance.now();
 
     try {
-      const response = await fetch('/api/sync?force=1', { cache: 'no-store' });
-      const result = await response.json();
+      const result = await loadFinancialData({ refresh: true });
 
       const endTime = performance.now();
       setDuration(((endTime - startTime) / 1000).toFixed(2));
 
-      if (!response.ok) {
-        throw new Error(result.error || result.message || 'Falha ao conectar ou processar os dados.');
-      }
-
       setStats(result.stats || null);
-      setLastSync(new Date().toLocaleString('pt-BR'));
-      setStatusMsg(`Sincronização concluída com sucesso! Total de ${result.recordsCount || (result.stats ? Object.values(result.stats).reduce((a,b)=>a+b,0) : 0)} registros processados.`);
+      const syncDate = result.syncedAt || result.snapshotAt;
+      setLastSync(syncDate ? new Date(syncDate).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR'));
+
+      if (result.refreshFailed) {
+        setStatusMsg('Os dados anteriores foram carregados e permanecem disponíveis.');
+        if (showRefreshError) {
+          setErrorMsg('A atualização não foi concluída.');
+          setErrorDetails(result.refreshError || 'Tente novamente em alguns segundos.');
+        }
+      } else {
+        setStatusMsg(`Sincronização concluída com sucesso! Total de ${result.recordsCount || (result.stats ? Object.values(result.stats).reduce((a,b)=>a+b,0) : 0)} registros processados.`);
+      }
     } catch (err) {
       setErrorMsg("Ocorreu um erro durante a atualização dos dados.");
       setErrorDetails(err.message);
@@ -45,7 +51,7 @@ export default function AtualizacaoDados() {
   };
 
   useEffect(() => {
-    fetchDados();
+    fetchDados(false);
   }, []);
 
   return (
@@ -59,7 +65,7 @@ export default function AtualizacaoDados() {
             Os dados são atualizados ao abrir esta tela e sempre que você clicar em Atualizar Dados.
           </p>
         </div>
-        <button onClick={fetchDados} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '14px', padding: '0.75rem 1.5rem' }}>
+        <button onClick={() => fetchDados(true)} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '14px', padding: '0.75rem 1.5rem' }}>
           <RefreshCw size={16} className={isSyncing ? "spin" : ""} /> {isSyncing ? 'Atualizando Dados...' : 'Atualizar Dados'}
         </button>
       </header>
