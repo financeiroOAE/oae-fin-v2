@@ -104,8 +104,8 @@ export default function VisaoFinanceira() {
   };
 
   useEffect(() => {
-    // Toda abertura ou recarga deve consultar novamente a planilha.
-    fetchDados(true);
+    // A abertura carrega apenas o último snapshot salvo.
+    fetchDados();
   }, []);
 
   const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
