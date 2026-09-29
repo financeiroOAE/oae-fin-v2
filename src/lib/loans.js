@@ -17,6 +17,10 @@ function titleInstallment(value) {
   return { title: match[1].trim().replace(/\s+/g, ' ').toUpperCase(), number: Number(match[2]) };
 }
 
+function documentKey(value) {
+  return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+}
+
 function realizedPayment(row) {
   const status = String(row.status || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
   return !status.startsWith('A ') && /REALIZADO|PAGO|EFETIVADO/.test(status);
@@ -34,18 +38,30 @@ function findInstallmentPayment(rows, installment) {
       const [title, matchedRows] = [...groups][0];
       return { rows: matchedRows, title: `${title}/${installment.number}` };
     }
-    return null;
+    // O título pode reiniciar sua numeração no sistema de 2026. Com um único
+    // lançamento do documento na data, a data identifica a parcela cadastrada.
+    const datedGroups = new Map();
+    for (const entry of titled) {
+      const key = `${entry.key.title}/${entry.key.number}`;
+      datedGroups.set(key, [...(datedGroups.get(key) || []), entry.row]);
+    }
+    if (datedGroups.size === 1 && titled.length === sameDate.length) {
+      const [title, matchedRows] = [...datedGroups][0];
+      return { rows: matchedRows, title };
+    }
+    return { ambiguous: true };
   }
   const exact = sameDate.filter((row) => cents(row.valor) === cents(installment.total));
   if (exact.length > 1) return { ambiguous: true };
-  return exact.length === 1 ? { rows: exact } : null;
+  if (exact.length === 1) return { rows: exact };
+  return sameDate.length === 1 ? { rows: sameDate } : null;
 }
 
 export function reconcileLoans(contracts, snapshot) {
   const rows = (snapshot?.payload?.data || []).filter((row) => row.natureza === 'Saída');
   const byDocument = new Map();
   for (const row of rows) {
-    const key = String(row.documento || '').trim();
+    const key = documentKey(row.documento);
     if (!key) continue;
     byDocument.set(key, [...(byDocument.get(key) || []), row]);
   }
@@ -53,19 +69,19 @@ export function reconcileLoans(contracts, snapshot) {
     ...contract,
     installments: contract.installments.map((installment) => {
       if (!contract.cpDocument) return { ...installment, reconciliation: 'SEM_DOCUMENTO', cpMatch: null };
-      const payment = findInstallmentPayment(byDocument.get(contract.cpDocument) || [], installment);
+      const payment = findInstallmentPayment(byDocument.get(documentKey(contract.cpDocument)) || [], installment);
       const match = payment?.rows;
       const amountCents = match?.reduce((sum, row) => sum + cents(row.valor), 0);
       const status = !snapshot ? 'SEM_BASE_CP'
         : payment?.ambiguous ? 'CONFERIR'
-          : !match ? 'SEM_VINCULO'
-            : amountCents !== cents(installment.total) ? 'VALOR_DIVERGENTE'
+          : !match ? (dateKey(installment.dueDate) < '2026-01-01' ? 'HISTORICO_ANTERIOR' : 'SEM_VINCULO')
+            : amountCents !== cents(installment.total) ? (match.every(realizedPayment) ? 'PAGO_DIVERGENTE' : 'VALOR_DIVERGENTE')
               : match.every(realizedPayment) ? 'PAGO'
                 : dateKey(installment.dueDate) < new Date().toISOString().slice(0, 10) ? 'VENCIDO' : 'A_VENCER';
       return { ...installment, reconciliation: status, cpMatch: match ? {
         date: match[0].data, amount: amountCents / 100,
         status: [...new Set(match.map((row) => row.status))].join(' + '),
-        title: payment.title || null, rowCount: match.length,
+        realized: match.every(realizedPayment), title: payment.title || null, rowCount: match.length,
       } : null };
     }),
   }));
