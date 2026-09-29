@@ -22,6 +22,7 @@ export function reconcileLoans(contracts, snapshot) {
   return contracts.map((contract) => ({
     ...contract,
     installments: contract.installments.map((installment) => {
+      if (!contract.cpDocument) return { ...installment, reconciliation: 'SEM_DOCUMENTO', cpMatch: null };
       const candidates = (byDocument.get(contract.cpDocument) || []).filter((row) =>
         dateKey(row.data) === dateKey(installment.dueDate)
         && cents(row.valor) === cents(installment.total)
@@ -48,8 +49,8 @@ export function loanPayload(body) {
   const bank = String(body.bank || '').trim();
   const count = Number(body.installmentCount);
   const amount = Number(body.amount);
-  if (!cpDocument || cpDocument.length > 100 || !bank || bank.length > 120) throw new Error('Informe o documento CP e o banco.');
-  if (!Number.isInteger(count) || count < 1 || count > 600) throw new Error('Quantidade de parcelas inválida.');
+  if (cpDocument.length > 100 || !bank || bank.length > 120) throw new Error('Informe o banco (ou A confirmar).');
+  if (!Number.isInteger(count) || count < 0 || count > 600) throw new Error('Quantidade de parcelas inválida.');
   if (!Number.isFinite(amount) || amount <= 0 || Math.abs(cents(amount) - amount * 100) > 0.00001) throw new Error('Valor contratado inválido.');
   const installments = (body.installments || []).map((item) => {
     const number = Number(item.number);
@@ -69,12 +70,18 @@ export function loanPayload(body) {
   if (installments.length > count || new Set(installments.map((item) => item.number)).size !== installments.length) {
     throw new Error('Há parcelas repetidas ou acima da quantidade contratada.');
   }
-  const status = ['ATIVO', 'QUITADO', 'RENEGOCIADO', 'SUSPENSO'].includes(body.status) ? body.status : 'ATIVO';
+  const status = ['ATIVO', 'A_CONFERIR', 'QUITADO', 'RENEGOCIADO', 'SUSPENSO'].includes(body.status) ? body.status : 'A_CONFERIR';
   if (body.startDate && (!/^\d{4}-\d{2}-\d{2}$/.test(body.startDate) || Number.isNaN(new Date(`${body.startDate}T12:00:00Z`).getTime()) || dateKey(new Date(`${body.startDate}T12:00:00Z`)) !== body.startDate)) {
     throw new Error('Data inicial inválida.');
   }
   return {
-    cpDocument, bank, contractNumber: String(body.contractNumber || '').trim().slice(0, 100) || null,
+    cpDocument: cpDocument || null, bank, contractNumber: String(body.contractNumber || '').trim().slice(0, 100) || null,
+    sourceKey: String(body.sourceKey || '').trim().slice(0, 100) || null,
+    holder: String(body.holder || '').trim().slice(0, 120) || null,
+    kind: body.kind === 'CONSORCIO' ? 'CONSORCIO' : 'EMPRESTIMO',
+    sourceNote: String(body.sourceNote || '').trim().slice(0, 2000) || null,
+    reviewNotes: String(body.reviewNotes || '').trim().slice(0, 2000) || null,
+    scheduleBasis: ['OFICIAL', 'PROJETADO', 'SEM_CRONOGRAMA'].includes(body.scheduleBasis) ? body.scheduleBasis : 'SEM_CRONOGRAMA',
     modality: String(body.modality || '').trim().slice(0, 100) || null,
     amount, installmentCount: count, status,
     startDate: body.startDate ? new Date(`${body.startDate}T12:00:00Z`) : null,

@@ -1,6 +1,7 @@
 .loans-page { max-width: 1440px; margin: 0 auto; padding-bottom: 4rem; color: var(--text-main); }
 .loans-header, .loans-section-title { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 .loans-header { margin-bottom: 1.5rem; align-items: center; }
+.loans-header-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .loans-header h1 { font-size: clamp(1.65rem, 3vw, 2.2rem); margin: .35rem 0; letter-spacing: -.035em; }
 .loans-header p, .loans-section-title p, .loans-muted, .loans-note { color: var(--text-secondary); font-size: .86rem; line-height: 1.5; }
 .loans-eyebrow { display: inline-flex; align-items: center; gap: .4rem; color: var(--primary); letter-spacing: .09em; font-size: .68rem; font-weight: 700; }
@@ -39,6 +40,12 @@
 .loans-form label, .loans-full-label, .loans-row-actions label { display: flex; flex-direction: column; gap: .4rem; color: var(--text-secondary); font-size: .78rem; font-weight: 600; }
 .loans-page input, .loans-page select { background: var(--bg-elevated); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 7px; min-height: 37px; padding: .4rem .6rem; font: inherit; max-width: 100%; }
 .loans-fields input, .loans-fields select, .loans-full-label input, .loans-full-label select { width: 100%; }
+.loans-notes-fields { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; margin-top: 1rem; }
+.loans-notes-fields label { display: flex; flex-direction: column; gap: .4rem; color: var(--text-secondary); font-size: .78rem; font-weight: 600; }
+.loans-notes-fields textarea { width: 100%; background: var(--bg-elevated); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 7px; padding: .6rem; font: inherit; resize: vertical; }
+.loans-review { border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-elevated); padding: 1rem; margin-top: 1rem; font-size: .86rem; line-height: 1.5; white-space: pre-wrap; }
+.loans-review h3 { font-size: .83rem; margin: 1rem 0 .25rem; }
+.loans-review p { margin: .35rem 0; }
 .loans-row-actions { display: flex; flex-wrap: wrap; align-items: end; gap: .8rem; margin-bottom: 1rem; }
 .loans-table input { width: 130px; }
 .loans-table input[type="date"] { width: 155px; }
@@ -55,4 +62,4 @@
 .loans-simulation .highlight { border: 0; background: var(--bg-elevated); border-radius: 8px; margin-top: 1rem; padding: 1rem; }
 .loans-simulation .highlight strong { color: var(--primary); }
 @media (max-width: 950px) { .loans-kpis { grid-template-columns: repeat(2,minmax(0,1fr)); } .loans-two-col { grid-template-columns: 1fr; } }
-@media (max-width: 600px) { .loans-kpis { grid-template-columns: 1fr 1fr; } .loans-kpis strong { font-size: 1rem; } .loans-detail-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .loans-kpis { grid-template-columns: 1fr 1fr; } .loans-kpis strong { font-size: 1rem; } .loans-detail-grid, .loans-notes-fields { grid-template-columns: 1fr; } }
