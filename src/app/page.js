@@ -51,12 +51,11 @@ export default function Home() {
     setMessage('');
 
     try {
-      await refreshFinancialData();
-      setMessage('Dados atualizados. Todas as telas usarão os novos números.');
-      setTimeout(() => setMessage(''), 5000);
+      const result = await refreshFinancialData();
+      const time = result.syncedAt ? new Date(result.syncedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'agora';
+      setMessage(`Base atualizada em ${time}. ${result.recordsCount || 0} registros processados; abra novamente as telas para ver os novos números.`);
     } catch (err) {
-      setError(err.message);
-      setTimeout(() => setError(null), 5000);
+      setError(`${err.message} Os números anteriores continuam disponíveis. Confira o Histórico de sincronização.`);
     } finally {
       setIsSyncing(false);
     }

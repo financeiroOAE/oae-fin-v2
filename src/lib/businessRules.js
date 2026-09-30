@@ -189,6 +189,12 @@ export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [
   const nature = isCR ? 'Entrada' : 'Saída';
   const projectIndex = buildProjectIndex(projectCatalog);
   const exactProjectNameIndex = buildExactProjectNameIndex(projectCatalog);
+  const costCenterNames = new Map();
+  sheetData.forEach((row) => {
+    const code = String(row['Código centro de custo'] ?? '').trim();
+    const name = String(row['Nome centro de custo'] ?? '').trim();
+    if (code && name && !costCenterNames.has(code)) costCenterNames.set(code, name);
+  });
 
   return sheetData
     .filter((row) => {
@@ -213,11 +219,7 @@ export function processSiengeData(sheetData, type, deparaMap, projectCatalog = [
       let projetoCodigoValidado = '';
 
       if (rawCodigo && rawNome === '') {
-        const found = sheetData.find((sourceRow) =>
-          String(sourceRow['Código centro de custo'] ?? '').trim() === rawCodigo
-          && String(sourceRow['Nome centro de custo'] ?? '').trim() !== ''
-        );
-        projetoResolvido = found ? String(found['Nome centro de custo']).trim() : rawCodigo;
+        projetoResolvido = costCenterNames.get(rawCodigo) || rawCodigo;
       }
 
       const canonicalSourceProject = resolveCanonicalSourceProject(projetoResolvido, rawCodigo, exactProjectNameIndex, projectIndex);
