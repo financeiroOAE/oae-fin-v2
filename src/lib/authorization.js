@@ -8,6 +8,9 @@ export const MENU_DEFINITIONS = [
   { key: 'projetos', label: 'Projetos', path: '/projetos' },
   { key: 'dre', label: 'DRE Gerencial', path: '/dre' },
   { key: 'emprestimos', label: 'Empréstimos', path: '/emprestimos' },
+  { key: 'equipe', label: 'Equipe', path: '/equipe' },
+  { key: 'previsao_faturamento', label: 'Previsão de Faturamento', path: '/previsao-faturamento' },
+  { key: 'diretores', label: 'Diretores', path: '/diretores' },
   { key: 'configuracoes', label: 'Configurações', path: '/configuracoes' },
   { key: 'atualizacao_dados', label: 'Atualização de Dados', path: '/atualizacao-dados' },
   { key: 'historico', label: 'Histórico', path: '/historico' },
@@ -64,6 +67,15 @@ export async function requireLoansAccess() {
   if (!user) return { ok: false, status: 401, error: 'Sessão inválida ou expirada.' };
   if (user.role !== 'ADMIN' && !normalizePermissions(user.menuPermissions).includes('emprestimos')) {
     return { ok: false, status: 403, error: 'Acesso a Empréstimos não autorizado.' };
+  }
+  return { ok: true, user };
+}
+
+export async function requireMenuAccess(permission) {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, status: 401, error: 'Sessão inválida ou expirada.' };
+  if (!allowedPermissionKeys.has(permission) || (user.role !== 'ADMIN' && !normalizePermissions(user.menuPermissions).includes(permission))) {
+    return { ok: false, status: 403, error: 'Acesso não autorizado.' };
   }
   return { ok: true, user };
 }
