@@ -102,3 +102,102 @@ model LoanDocument {
   createdAt   DateTime @default(now())
   contract    LoanContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 }
+
+model TeamPerson {
+  id             String   @id @default(cuid())
+  name           String
+  department     String
+  relationship   String   @default("PJ")
+  modality       String?
+  jobTitle       String?
+  company        String?
+  email          String?
+  phone          String?
+  cpBeneficiary  String?
+  status         String   @default("ATIVO")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  contracts      TeamContract[]
+  cpLinks        TeamCpLink[]
+
+  @@index([department, name])
+}
+
+model TeamContract {
+  id             String   @id @default(cuid())
+  personId       String
+  project        String
+  object         String   @db.Text
+  contractNumber String?
+  documentUrl    String?
+  accountCode    String?
+  amount         Decimal  @db.Decimal(14, 2)
+  startDate      DateTime?
+  endDate        DateTime?
+  status         String   @default("ATIVO")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  person         TeamPerson @relation(fields: [personId], references: [id], onDelete: Restrict)
+  stages         TeamStage[]
+  cpLinks        TeamCpLink[]
+
+  @@index([personId, project])
+}
+
+model TeamStage {
+  id          String   @id @default(cuid())
+  contractId  String
+  label       String
+  dueDate     DateTime
+  amount      Decimal  @db.Decimal(14, 2)
+  cpDocument  String?
+  createdAt   DateTime @default(now())
+  contract    TeamContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([dueDate])
+}
+
+model TeamCpLink {
+  id         String   @id @default(cuid())
+  sourceKey  String   @unique
+  personId   String
+  contractId String?
+  createdAt  DateTime @default(now())
+  person     TeamPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  contract   TeamContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  @@index([personId])
+}
+
+model BillingTarget {
+  id        String   @id @default(cuid())
+  month     String
+  project   String
+  amount    Decimal  @db.Decimal(14, 2)
+  createdBy String
+  createdAt DateTime @default(now())
+
+  @@unique([month, project])
+}
+
+model DirectorProfile {
+  id         String   @id @default(cuid())
+  name       String
+  userId     String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  cpLinks    DirectorCpLink[]
+}
+
+model DirectorCpLink {
+  id          String   @id @default(cuid())
+  sourceKey   String   @unique
+  profileId   String
+  category    String
+  allocations Json?
+  note        String?
+  createdAt   DateTime @default(now())
+  profile     DirectorProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
