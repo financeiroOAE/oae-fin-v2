@@ -13,7 +13,7 @@ async function readJsonResponse(response) {
   }
 
   if (!response.ok) {
-    throw new Error(data.error || data.details?.message || 'Não foi possível atualizar os dados.');
+    throw new Error(data.refreshError || data.details?.message || data.error || 'Não foi possível atualizar os dados.');
   }
 
   return data;

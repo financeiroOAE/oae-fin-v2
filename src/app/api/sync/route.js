@@ -6,13 +6,13 @@ import {
   registerSyncError,
 } from '@/lib/financialSync';
 
-const SYNC_TIMEOUT_MS = 30000;
+const SYNC_TIMEOUT_MS = 180000;
 
 async function withTimeout(promise, timeoutMs = SYNC_TIMEOUT_MS) {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
-      const error = new Error('O Google Sheets não respondeu dentro de 30 segundos. Tente novamente.');
+      const error = new Error('A sincronização não terminou em três minutos. Os dados anteriores foram preservados.');
       error.code = 'SYNC_TIMEOUT';
       reject(error);
     }, timeoutMs);
@@ -92,6 +92,7 @@ export async function GET(request) {
                 fromSnapshot: true,
                 snapshotAt: snapshot.updatedAt,
                 refreshFailed: true,
+                refreshError: refreshError?.message || 'Falha ao atualizar dados',
               },
               { status: 502 }
             );
