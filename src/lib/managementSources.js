@@ -52,7 +52,7 @@ export function revenueTitles(snapshot) {
     key: item.key, month: item.month, document: item.document, forecast: item.forecast, realized: item.realized,
     value: Math.round((item.forecast ? item.value : item.largestGross) * 100) / 100,
     project: item.projectCandidates.size === 1 ? [...item.projectCandidates][0] : null,
-    review: item.projectCandidates.size !== 1 || (item.realized && item.dateSource !== 'EMISSAO'),
+    review: item.projectCandidates.size !== 1,
     dateSource: item.dateSource,
   }));
 }

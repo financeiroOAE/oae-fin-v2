@@ -1,0 +1,13 @@
+.mgmt-search{width:min(260px,100%);background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-main);border-radius:7px;padding:10px;font:inherit;font-size:12px}
+.mgmt-selected-row{background:var(--bg-card-hover)}
+.mgmt-table td small{color:var(--text-secondary)}
+.mgmt-table select{max-width:165px;background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-main);border-radius:6px;padding:7px;font:inherit}
+.mgmt-tabs{flex-wrap:wrap}
+.mgmt-bars{margin:20px 0}
+.mgmt-bar-row{display:grid;grid-template-columns:65px minmax(0,1fr) 115px;align-items:center;gap:10px;margin:13px 0;font-size:11px}
+.mgmt-bar-row b{text-align:right;font-size:11px}
+.mgmt-bar-track{height:13px;border-radius:7px;background:var(--bg-elevated);display:flex;overflow:hidden}
+.mgmt-bar-track i{display:block;height:100%}
+.mgmt-bar-paid{background:#24a881}
+.mgmt-bar-open{background:#e1a44a}
+@media(max-width:600px){.mgmt-bar-row{grid-template-columns:50px minmax(0,1fr) 90px}}
