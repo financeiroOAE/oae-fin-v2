@@ -49,13 +49,24 @@ export async function batchReadSheets() {
   };
 
   try {
-    const response = await sheets.spreadsheets.values.batchGet({
-      spreadsheetId,
-      ranges,
-      valueRenderOption: 'UNFORMATTED_VALUE',
-      dateTimeRenderOption: 'FORMATTED_STRING',
-      majorDimension: 'ROWS'
-    }, { timeout: 25000 });
+    let response;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        response = await sheets.spreadsheets.values.batchGet({
+          spreadsheetId,
+          ranges,
+          valueRenderOption: 'UNFORMATTED_VALUE',
+          dateTimeRenderOption: 'FORMATTED_STRING',
+          majorDimension: 'ROWS'
+        }, { timeout: 60000 });
+        break;
+      } catch (error) {
+        const status = error?.response?.status;
+        const isTransient = !status || status === 429 || status >= 500;
+        if (attempt === 1 || !isTransient) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+    }
 
     const valueRanges = [...(response.data.valueRanges || [])];
     valueRanges.forEach((rangeData) => {

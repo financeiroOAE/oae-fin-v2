@@ -34,16 +34,22 @@ export async function refreshFinancialData() {
 
 export async function loadFinancialData({ refresh = false } = {}) {
   let refreshError = null;
+  let refreshedAt = null;
 
   if (refresh) {
     try {
-      await refreshFinancialData();
+      const result = await refreshFinancialData();
+      refreshedAt = result.syncedAt;
     } catch (error) {
       refreshError = error;
     }
   }
 
   const snapshot = await requestJson('/api/sync?snapshot=1');
+
+  if (refreshedAt && snapshot.syncedAt !== refreshedAt) {
+    refreshError = new Error('A base foi processada, mas a tela não recebeu a versão atualizada. Recarregue os dados.');
+  }
 
   return {
     ...snapshot,

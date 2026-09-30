@@ -214,27 +214,6 @@ async function performFullSync(triggeredBy) {
     message: 'Sincronização concluída com sucesso!',
   };
 
-  await prisma.syncHistory.create({
-    data: {
-      triggeredBy,
-      status: 'SUCCESS',
-      recordsCount: totalRecords,
-      details: JSON.stringify({
-        ...stats,
-        syncedAt,
-        somaProjetosContrato,
-        somaProjetosFaturado,
-        somaProjetosSaldo,
-        somaCRFaturamento,
-        somaCRLiquido,
-        somaCRRealizado,
-        cashLogicVersion: CASH_LOGIC_VERSION,
-      }),
-    },
-  }).catch((historyError) => {
-    console.error('Falha ao gravar histórico de sincronização:', historyError?.message || historyError);
-  });
-
   return payload;
 }
 
@@ -292,6 +271,28 @@ export async function refreshFinancialSnapshot(triggeredBy) {
         username: triggeredBy,
         payload: JSON.stringify(payload),
       },
+    });
+
+    // O histórico só pode indicar sucesso depois que a nova base estiver gravada.
+    await prisma.syncHistory.create({
+      data: {
+        triggeredBy,
+        status: 'SUCCESS',
+        recordsCount: payload.recordsCount,
+        details: JSON.stringify({
+          ...payload.stats,
+          syncedAt: payload.syncedAt,
+          somaProjetosContrato: payload.somaProjetosContrato,
+          somaProjetosFaturado: payload.somaProjetosFaturado,
+          somaProjetosSaldo: payload.somaProjetosSaldo,
+          somaCRFaturamento: payload.somaCRFaturamento,
+          somaCRLiquido: payload.somaCRLiquido,
+          somaCRRealizado: payload.somaCRRealizado,
+          cashLogicVersion: payload.cashLogicVersion,
+        }),
+      },
+    }).catch((historyError) => {
+      console.error('Falha ao gravar histórico de sincronização:', historyError?.message || historyError);
     });
 
     return payload;
