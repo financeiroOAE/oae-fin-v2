@@ -79,7 +79,7 @@ export default function SettingsPage() {
           )}
 
           {activeSection === 'acessos' && isAdmin && <UserAccessManager />}
-          {activeSection === 'backup' && isAdmin && <section><div className="settings-section-heading"><div><h2>Backup dos cadastros</h2><p>Baixe uma cópia dos dados lançados no painel e dos PDFs dos empréstimos.</p></div></div><div className="settings-info-row"><Shield size={17} /><div><strong>Arquivo ZIP para guardar em local restrito</strong><span>Inclui Equipe, contratos, vínculos, metas, Diretores, empréstimos e permissões. A base CP/CR e os documentos externos permanecem nas suas fontes de origem.</span></div></div><a className="btn btn-primary" style={{ marginTop: 20 }} href="/api/backup">Baixar backup</a></section>}
+          {activeSection === 'backup' && isAdmin && <section><div className="settings-section-heading"><div><h2>Backup dos cadastros</h2><p>Baixe uma cópia dos cadastros ativos do painel.</p></div></div><div className="settings-info-row"><Shield size={17} /><div><strong>Arquivo ZIP para guardar em local restrito</strong><span>Inclui Equipe, contratos, vínculos, metas, Diretores e permissões. A base CP/CR e os documentos externos permanecem nas suas fontes de origem.</span></div></div><a className="btn btn-primary" style={{ marginTop: 20 }} href="/api/backup">Baixar backup</a></section>}
         </main>
       </div>
       <p className="settings-version">v2.0.0 • OAE Financeiro</p>
