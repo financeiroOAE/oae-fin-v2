@@ -17,9 +17,7 @@ import {
   ChevronRight,
   ChevronDown,
   Menu,
-  Landmark,
   UsersRound,
-  CalendarRange,
   UserRoundCheck
 } from 'lucide-react';
 
@@ -74,7 +72,7 @@ export default function Sidebar() {
 
   if (pathname === '/login') return null;
 
-  const canAccess = (permission) => ['emprestimos', 'equipe', 'previsao_faturamento', 'diretores'].includes(permission)
+  const canAccess = (permission) => ['equipe', 'diretores'].includes(permission)
     ? Boolean(sessionUser && (sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission)))
     : !sessionUser || sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission);
   const isSettingsPath = ['/configuracoes', '/atualizacao-dados', '/historico'].some((path) => pathname.startsWith(path));
@@ -85,9 +83,7 @@ export default function Sidebar() {
     { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: Activity, permission: 'fluxo_caixa' },
     { name: 'Projetos', path: '/projetos', icon: FolderKanban, permission: 'projetos' },
     { name: 'DRE Gerencial', path: '/dre', icon: ChartColumn, permission: 'dre' },
-    { name: 'Empréstimos', path: '/emprestimos', icon: Landmark, permission: 'emprestimos' },
     { name: 'Equipe', path: '/equipe', icon: UsersRound, permission: 'equipe' },
-    { name: 'Previsão de Faturamento', path: '/previsao-faturamento', icon: CalendarRange, permission: 'previsao_faturamento' },
     { name: 'Diretores', path: '/diretores', icon: UserRoundCheck, permission: 'diretores' },
     {
       name: 'Configurações', path: '/configuracoes', icon: Settings, permission: 'configuracoes',
