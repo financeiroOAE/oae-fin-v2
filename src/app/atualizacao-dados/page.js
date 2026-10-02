@@ -14,7 +14,7 @@ export default function AtualizacaoDados() {
   const [errorDetails, setErrorDetails] = useState(null);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
 
-  const fetchDados = async (refresh = false, showRefreshError = true) => {
+  const fetchDados = async (refresh = false, showRefreshError = true, manual = refresh) => {
     setIsSyncing(true);
     setStatusMsg(refresh ? "Conectando ao Google Sheets e processando dados..." : "Carregando o último snapshot salvo...");
     setErrorMsg(null);
@@ -23,7 +23,7 @@ export default function AtualizacaoDados() {
     const startTime = performance.now();
 
     try {
-      const result = await loadFinancialData({ refresh, manual: refresh });
+      const result = await loadFinancialData({ refresh, manual });
 
       const endTime = performance.now();
       setDuration(((endTime - startTime) / 1000).toFixed(2));
@@ -53,7 +53,8 @@ export default function AtualizacaoDados() {
   };
 
   useEffect(() => {
-    fetchDados(false, false);
+    const timeoutId = setTimeout(() => fetchDados(true, false, false), 0);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   return (

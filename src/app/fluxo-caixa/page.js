@@ -43,11 +43,11 @@ export default function FluxoDeCaixa() {
   const [modalResumo, setModalResumo] = useState(null);
   const [expandedEmpresa, setExpandedEmpresa] = useState(null);
 
-  const fetchDados = async (force = false, showRefreshError = false) => {
+  const fetchDados = async (force = false, showRefreshError = false, manual = force) => {
     setIsSyncing(true);
     setError(null);
     try {
-      const result = await loadFinancialData({ refresh: force, manual: force });
+      const result = await loadFinancialData({ refresh: force, manual });
 
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
@@ -65,7 +65,8 @@ export default function FluxoDeCaixa() {
   };
 
   useEffect(() => {
-    fetchDados();
+    const timeoutId = setTimeout(() => fetchDados(true, false, false), 0);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
