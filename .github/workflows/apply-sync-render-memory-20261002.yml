@@ -1,0 +1,37 @@
+name: Apply Sync Render Memory Hotfix 2026-10-02
+
+on:
+  push:
+    branches:
+      - fix-sync-render-memory-20261002
+    paths:
+      - '.github/workflows/apply-sync-render-memory-20261002.yml'
+      - '.github/workflows/sync-render-memory-hotfix.patch.gz.b64'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix-sync-render-memory-20261002
+          fetch-depth: 0
+
+      - name: Apply validated patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          base64 --decode .github/workflows/sync-render-memory-hotfix.patch.gz.b64 | gzip -d > /tmp/sync-render-memory-hotfix.patch
+          git am /tmp/sync-render-memory-hotfix.patch
+
+      - name: Remove temporary automation files
+        run: |
+          git rm .github/workflows/apply-sync-render-memory-20261002.yml
+          git rm .github/workflows/sync-render-memory-hotfix.patch.gz.b64
+          git commit -m "chore: remover arquivos temporarios do hotfix de memoria"
+          git push origin HEAD:fix-sync-render-memory-20261002
