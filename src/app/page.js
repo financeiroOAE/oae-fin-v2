@@ -36,6 +36,18 @@ export default function Home() {
         }
       } catch {
         // O nome e opcional; uma falha nessa consulta nao deve bloquear o painel.
+      }
+
+      try {
+        const result = await refreshFinancialData({ manual: false });
+        if (active && result?.syncedAt) {
+          const time = new Date(result.syncedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+          setMessage(`Base atualizada automaticamente em ${time}.`);
+        }
+      } catch (err) {
+        if (active) {
+          setError(`${err.message} Os números anteriores continuam disponíveis.`);
+        }
       } finally {
         if (active) setIsSyncing(false);
       }

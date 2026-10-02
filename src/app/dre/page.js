@@ -571,11 +571,11 @@ export default function Dre() {
   // A ordem contábil é fixa para preservar a sequência correta dos resultados.
   const customOrder = DRE_ORDER;
 
-  const fetchDados = async (force = false, showRefreshError = false) => {
+  const fetchDados = async (force = false, showRefreshError = false, manual = force) => {
     setIsSyncing(true);
     setError(null);
     try {
-      const result = await loadFinancialData({ refresh: force, manual: force });
+      const result = await loadFinancialData({ refresh: force, manual });
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
       const syncDate = result.syncedAt || result.snapshotAt;
@@ -591,7 +591,8 @@ export default function Dre() {
   };
 
   useEffect(() => {
-    fetchDados();
+    const timeoutId = setTimeout(() => fetchDados(true, false, false), 0);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const handleVisaoChange = (nextVisao) => {
