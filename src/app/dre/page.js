@@ -575,7 +575,7 @@ export default function Dre() {
     setIsSyncing(true);
     setError(null);
     try {
-      const result = await loadFinancialData({ refresh: force });
+      const result = await loadFinancialData({ refresh: force, manual: force });
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
       const syncDate = result.syncedAt || result.snapshotAt;
