@@ -20,23 +20,23 @@ export async function getGoogleSheetsClient() {
   return google.sheets({ version: 'v4', auth: oAuth2Client });
 }
 
-export async function batchReadSheets() {
+const DEFAULT_RANGES = [
+  'EMPRESAS!A:J',
+  'PROJETOS_2026!A:L',
+  'CENTROS_CUSTO!A:E',
+  'PLANOS_FINANCEIROS!A:E',
+  'CP_GERAL!A:L',
+  'CR_GERAL!A:N',
+  'DEPARA!A:F'
+];
+
+export async function batchReadSheets(ranges = DEFAULT_RANGES) {
   const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
   if (!spreadsheetId) {
     throw new Error('GOOGLE_SPREADSHEET_ID não está configurado.');
   }
 
   const sheets = await getGoogleSheetsClient();
-
-  const ranges = [
-    'EMPRESAS!A:J',
-    'PROJETOS_2026!A:L',
-    'CENTROS_CUSTO!A:E',
-    'PLANOS_FINANCEIROS!A:E',
-    'CP_GERAL!A:L',
-    'CR_GERAL!A:N',
-    'DEPARA!A:F'
-  ];
 
   const resultData = {
     EMPRESAS: [],

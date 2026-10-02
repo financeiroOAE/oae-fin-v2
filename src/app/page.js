@@ -51,7 +51,7 @@ export default function Home() {
     setMessage('');
 
     try {
-      const result = await refreshFinancialData();
+      const result = await refreshFinancialData({ manual: true });
       const time = result.syncedAt ? new Date(result.syncedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'agora';
       setMessage(`Base atualizada em ${time}. ${result.recordsCount || 0} registros processados; abra novamente as telas para ver os novos números.`);
     } catch (err) {

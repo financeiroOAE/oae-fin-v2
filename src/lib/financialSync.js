@@ -4,6 +4,13 @@ import { processSiengeData, extractAccountCode, parseBRL } from '@/lib/businessR
 
 const SNAPSHOT_ID = 'current';
 const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA'];
+const REFERENCE_RANGES = [
+  'EMPRESAS!A:J',
+  'PROJETOS_2026!A:L',
+  'CENTROS_CUSTO!A:E',
+  'PLANOS_FINANCEIROS!A:E',
+  'DEPARA!A:F',
+];
 const CASH_LOGIC_VERSION = 8;
 
 function parseSortDate(value) {
@@ -91,15 +98,19 @@ function normalizeForecastRevenueBilling(rows) {
 
 async function performFullSync(triggeredBy) {
   const startedAt = Date.now();
-  const sheetsData = await batchReadSheets();
+  console.log('[financial-sync] início', { triggeredBy });
 
-  for (const sheetName of REQUIRED_SHEETS) {
-    if (!Array.isArray(sheetsData[sheetName]) || sheetsData[sheetName].length === 0) {
+  // As duas bases transacionais são grandes. Ler referências, CP e CR em
+  // etapas evita manter todos os arrays brutos simultaneamente na memória do Render.
+  const referenceData = await batchReadSheets(REFERENCE_RANGES);
+  for (const sheetName of REQUIRED_SHEETS.filter((name) => name !== 'CP_GERAL' && name !== 'CR_GERAL')) {
+    if (!Array.isArray(referenceData[sheetName]) || referenceData[sheetName].length === 0) {
       throw new Error(`Sincronização interrompida: a aba obrigatória ${sheetName} está vazia ou indisponível.`);
     }
   }
+  console.log('[financial-sync] referências carregadas');
 
-  const rawEmpresas = sheetsData.EMPRESAS || [];
+  const rawEmpresas = referenceData.EMPRESAS || [];
 
   const cadastroEmpresas = {};
   rawEmpresas.forEach((row) => {
@@ -123,7 +134,7 @@ async function performFullSync(triggeredBy) {
       };
     });
 
-  const projetos = (sheetsData.PROJETOS_2026 || [])
+  const projetos = (referenceData.PROJETOS_2026 || [])
     .filter((p) => String(p.OBRA || '').trim())
     .map((proj) => ({
       ...proj,
@@ -133,11 +144,9 @@ async function performFullSync(triggeredBy) {
       'SALDO CONTRATUAL': parseBRL(proj['SALDO CONTRATUAL']),
     }));
 
-  const centrosCusto = sheetsData.CENTROS_CUSTO || [];
-  const planos = sheetsData.PLANOS_FINANCEIROS || [];
-  const cpGeralRaw = sheetsData.CP_GERAL || [];
-  const crGeralRaw = sheetsData.CR_GERAL || [];
-  const depara = sheetsData.DEPARA || [];
+  const centrosCusto = referenceData.CENTROS_CUSTO || [];
+  const planos = referenceData.PLANOS_FINANCEIROS || [];
+  const depara = referenceData.DEPARA || [];
 
   const deparaMap = {};
   depara.forEach((row) => {
@@ -151,16 +160,33 @@ async function performFullSync(triggeredBy) {
     if (code) planosMap[code] = row;
   });
 
+  let transactionData = await batchReadSheets(['CP_GERAL!A:L']);
+  let cpGeralRaw = transactionData.CP_GERAL || [];
+  if (cpGeralRaw.length === 0) {
+    throw new Error('Sincronização interrompida: a aba obrigatória CP_GERAL está vazia ou indisponível.');
+  }
   const cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap, projetos, planosMap);
+  console.log('[financial-sync] CP processado', { records: cpProcessed.length });
+  cpGeralRaw = null;
+  transactionData = null;
+
+  transactionData = await batchReadSheets(['CR_GERAL!A:N']);
+  let crGeralRaw = transactionData.CR_GERAL || [];
+  if (crGeralRaw.length === 0) {
+    throw new Error('Sincronização interrompida: a aba obrigatória CR_GERAL está vazia ou indisponível.');
+  }
   const crBase = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos, planosMap).map((row) => ({
     ...row,
     valorCaixa: Number(row.valor) || 0,
     valorFaturamentoOriginal: Number(row.valorFaturamento) || 0,
     recebimentoLiquidoFonte: 'CR_GERAL_K_VALOR',
   }));
+  crGeralRaw = null;
+  transactionData = null;
   // Regra global da receita prevista: A RECEBER / A REALIZAR / PREVISTO usa K.
   // J fica preservado somente em valorFaturamentoOriginal para auditoria.
   const crProcessed = normalizeForecastRevenueBilling(crBase);
+  console.log('[financial-sync] CR processado', { records: crProcessed.length });
 
   const stats = {
     EMPRESAS: empresas.length,
@@ -214,10 +240,14 @@ async function performFullSync(triggeredBy) {
     message: 'Sincronização concluída com sucesso!',
   };
 
+  console.log('[financial-sync] processamento concluído', {
+    recordsCount: totalRecords,
+    durationMs: Date.now() - startedAt,
+  });
   return payload;
 }
 
-export async function readCurrentSnapshot() {
+export async function readCurrentSnapshotRecord() {
   let snapshot = await prisma.financialSnapshot.findUnique({
     where: { id: SNAPSHOT_ID },
   });
@@ -245,6 +275,23 @@ export async function readCurrentSnapshot() {
 
   if (!snapshot?.payload) return null;
 
+  return snapshot;
+}
+
+export async function readCurrentSnapshotMetadata() {
+  return prisma.financialSnapshot.findUnique({
+    where: { id: SNAPSHOT_ID },
+    select: {
+      username: true,
+      updatedAt: true,
+    },
+  });
+}
+
+export async function readCurrentSnapshot() {
+  const snapshot = await readCurrentSnapshotRecord();
+  if (!snapshot) return null;
+
   return {
     payload: JSON.parse(snapshot.payload),
     updatedAt: snapshot.updatedAt,
@@ -259,17 +306,18 @@ export async function refreshFinancialSnapshot(triggeredBy) {
 
   const syncPromise = (async () => {
     const payload = await performFullSync(triggeredBy);
+    const serializedPayload = JSON.stringify(payload);
 
     await prisma.financialSnapshot.upsert({
       where: { id: SNAPSHOT_ID },
       update: {
         username: triggeredBy,
-        payload: JSON.stringify(payload),
+        payload: serializedPayload,
       },
       create: {
         id: SNAPSHOT_ID,
         username: triggeredBy,
-        payload: JSON.stringify(payload),
+        payload: serializedPayload,
       },
     });
 
@@ -295,7 +343,12 @@ export async function refreshFinancialSnapshot(triggeredBy) {
       console.error('Falha ao gravar histórico de sincronização:', historyError?.message || historyError);
     });
 
-    return payload;
+    return {
+      ok: true,
+      syncedAt: payload.syncedAt,
+      recordsCount: payload.recordsCount,
+      stats: payload.stats,
+    };
   })();
 
   globalThis.__oaeFinancialSyncPromise = syncPromise;

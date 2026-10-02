@@ -85,7 +85,7 @@ export default function VisaoFinanceira() {
     setIsSyncing(true);
     setError(null);
     try {
-      const result = await loadFinancialData({ refresh: force });
+      const result = await loadFinancialData({ refresh: force, manual: force });
 
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);

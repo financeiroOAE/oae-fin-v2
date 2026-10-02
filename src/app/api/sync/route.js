@@ -1,28 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import {
-  readCurrentSnapshot,
+  readCurrentSnapshotMetadata,
+  readCurrentSnapshotRecord,
   refreshFinancialSnapshot,
   registerSyncError,
 } from '@/lib/financialSync';
 
-const SYNC_TIMEOUT_MS = 180000;
+const REFRESH_COOLDOWN_MS = 15000;
+const JSON_HEADERS = {
+  'Content-Type': 'application/json; charset=utf-8',
+  'Cache-Control': 'no-store, max-age=0',
+};
 
-async function withTimeout(promise, timeoutMs = SYNC_TIMEOUT_MS) {
-  let timeoutId;
-  const timeout = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      const error = new Error('A sincronização não terminou em três minutos. Os dados anteriores foram preservados.');
-      error.code = 'SYNC_TIMEOUT';
-      reject(error);
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    clearTimeout(timeoutId);
-  }
+function snapshotResponse(snapshot) {
+  return new Response(snapshot.payload, { status: 200, headers: JSON_HEADERS });
 }
 
 export async function GET(request) {
@@ -33,33 +25,51 @@ export async function GET(request) {
 
   const username = session.user.username;
 
-  const visiblePayload = (payload) => payload;
   try {
     // Route handlers do Next recebem NextRequest; usar nextUrl evita reconstruir/parsing manual da URL.
     const force = request.nextUrl?.searchParams?.get('force') === '1';
     const refreshOnly = request.nextUrl?.searchParams?.get('refresh') === '1';
-    const snapshotOnly = request.nextUrl?.searchParams?.get('snapshot') === '1';
+    const manual = request.nextUrl?.searchParams?.get('manual') === '1';
 
     const requestedRefresh = force || refreshOnly;
 
     if (requestedRefresh) {
       try {
-        const payload = await withTimeout(refreshFinancialSnapshot(username));
+        // Coalesce chamadas automáticas quase simultâneas. O clique manual
+        // sempre ignora esta janela e força uma nova leitura do Sheets.
+        if (!manual) {
+          const metadata = await readCurrentSnapshotMetadata();
+          const snapshotAge = metadata?.updatedAt
+            ? Date.now() - new Date(metadata.updatedAt).getTime()
+            : Number.POSITIVE_INFINITY;
+          if (snapshotAge < REFRESH_COOLDOWN_MS) {
+            return NextResponse.json({
+              ok: true,
+              syncedAt: metadata.updatedAt.toISOString(),
+              skipped: true,
+              refreshReason: 'RECENT_SNAPSHOT',
+            }, { headers: JSON_HEADERS });
+          }
+        }
+
+        // Não usamos Promise.race como timeout: ele devolvia erro ao navegador,
+        // mas deixava o processamento pesado vivo no servidor, acumulando memória.
+        const payload = await refreshFinancialSnapshot(username);
 
         if (refreshOnly) {
           return NextResponse.json({
             ok: true,
             syncedAt: payload.syncedAt,
             recordsCount: payload.recordsCount,
-            refreshReason: 'MANUAL',
-          });
+            refreshReason: manual ? 'MANUAL' : 'REQUESTED',
+          }, { headers: JSON_HEADERS });
         }
 
-        return NextResponse.json({
-          ...visiblePayload(payload),
-          fromSnapshot: false,
-          refreshReason: 'MANUAL',
-        });
+        const refreshedSnapshot = await readCurrentSnapshotRecord();
+        if (!refreshedSnapshot) {
+          throw new Error('A base foi processada, mas o snapshot não pôde ser lido.');
+        }
+        return snapshotResponse(refreshedSnapshot);
       } catch (refreshError) {
         await registerSyncError(username, refreshError);
         return NextResponse.json(
@@ -76,21 +86,16 @@ export async function GET(request) {
 
     // Na atualização não carregamos o JSON anterior (potencialmente grande)
     // junto com a leitura e o processamento da planilha.
-    const snapshot = await readCurrentSnapshot();
+    const snapshot = await readCurrentSnapshotRecord();
 
-    if (!snapshot?.payload) {
+    if (!snapshot) {
       return NextResponse.json(
         { error: 'Ainda não existe uma base financeira sincronizada. Clique em Sincronizar Dados.' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({
-      ...visiblePayload(snapshot.payload),
-      fromSnapshot: true,
-      snapshotAt: snapshot.updatedAt,
-      snapshotUpdatedBy: snapshot.updatedBy,
-    });
+    return snapshotResponse(snapshot);
   } catch (error) {
     const erroTecnico = {
       message: error.message,

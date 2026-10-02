@@ -23,7 +23,7 @@ export default function AtualizacaoDados() {
     const startTime = performance.now();
 
     try {
-      const result = await loadFinancialData({ refresh });
+      const result = await loadFinancialData({ refresh, manual: refresh });
 
       const endTime = performance.now();
       setDuration(((endTime - startTime) / 1000).toFixed(2));

@@ -47,7 +47,7 @@ export default function FluxoDeCaixa() {
     setIsSyncing(true);
     setError(null);
     try {
-      const result = await loadFinancialData({ refresh: force });
+      const result = await loadFinancialData({ refresh: force, manual: force });
 
       setData(result.data || []);
       setProjetosBrutos(result.projetos || []);
@@ -456,6 +456,7 @@ export default function FluxoDeCaixa() {
         <div className="card" style={{ maxWidth: '400px', margin: '0 auto', padding: '2rem' }}>
           <AlertCircle size={48} style={{ margin: '0 auto', marginBottom: '1rem', color: 'var(--text-secondary)' }} />
           <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.5rem' }}>Dados não sincronizados</h2>
+          {error && <p style={{ color: 'var(--danger)', fontSize: '13px', lineHeight: 1.5 }}>{error}</p>}
           <button onClick={() => fetchDados(true, true)} className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
             <RefreshCw size={16} style={{ marginRight: '0.5rem' }} /> Sincronizar Dados
           </button>
