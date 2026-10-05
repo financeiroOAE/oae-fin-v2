@@ -102,3 +102,24 @@
 
 .mgmt-overlay-project{z-index:220;background:rgba(0,0,0,.78)}
 .mgmt-project-modal{width:min(1180px,calc(100vw - 28px));max-height:calc(100vh - 28px);box-shadow:0 36px 100px rgba(0,0,0,.62)}
+
+.mgmt-metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
+.mgmt-metrics-six{grid-template-columns:repeat(6,minmax(0,1fr))}
+.mgmt-metric-card{position:relative;padding:15px 16px;border:1px solid var(--border-color);border-top:3px solid var(--primary);border-radius:10px;background:var(--bg-card);min-width:0}
+.mgmt-metric-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.mgmt-metric-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary)}
+.mgmt-metric-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);font-weight:650}
+.mgmt-metric-value{display:block;font-size:clamp(17px,1.6vw,23px);margin-top:6px;color:var(--text-main);font-variant-numeric:tabular-nums;letter-spacing:-.025em;overflow-wrap:anywhere}
+.mgmt-metric-card.tone-success{border-top-color:var(--success)}.mgmt-metric-card.tone-success .mgmt-metric-icon{color:var(--success);background:rgba(16,185,129,.12)}
+.mgmt-metric-card.tone-warning{border-top-color:var(--warning)}.mgmt-metric-card.tone-warning .mgmt-metric-icon{color:var(--warning);background:rgba(245,158,11,.12)}
+.mgmt-metric-card.tone-danger{border-top-color:var(--danger)}.mgmt-metric-card.tone-danger .mgmt-metric-icon{color:var(--danger);background:rgba(239,68,68,.12)}
+.mgmt-metric-card.tone-info{border-top-color:#3b82f6}.mgmt-metric-card.tone-info .mgmt-metric-icon{color:#60a5fa;background:rgba(59,130,246,.12)}
+.mgmt-metric-card.tone-violet{border-top-color:#8b5cf6}.mgmt-metric-card.tone-violet .mgmt-metric-icon{color:#a78bfa;background:rgba(139,92,246,.12)}
+.mgmt-metric-card.tone-cyan{border-top-color:#06b6d4}.mgmt-metric-card.tone-cyan .mgmt-metric-icon{color:#22d3ee;background:rgba(6,182,212,.12)}
+.mgmt-revenue-banner>div{position:relative;padding-top:16px}
+.mgmt-banner-icon{display:flex;width:34px;height:34px;align-items:center;justify-content:center;border-radius:8px;margin-bottom:10px;background:rgba(59,130,246,.12);color:#60a5fa}
+.mgmt-revenue-banner>div.tone-success{border-top-color:var(--success)}.mgmt-revenue-banner>div.tone-success .mgmt-banner-icon{background:rgba(16,185,129,.12);color:var(--success)}
+.mgmt-revenue-banner>div.tone-warning{border-top-color:var(--warning)}.mgmt-revenue-banner>div.tone-warning .mgmt-banner-icon{background:rgba(245,158,11,.12);color:var(--warning)}
+@media(max-width:1200px){.mgmt-metrics-six{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){.mgmt-metrics-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.mgmt-metrics-grid,.mgmt-metrics-six{grid-template-columns:1fr}}
