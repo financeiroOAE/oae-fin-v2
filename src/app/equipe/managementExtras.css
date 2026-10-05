@@ -210,3 +210,21 @@
 .mgmt-banner-head .mgmt-banner-icon{margin:0;flex:0 0 auto}
 .mgmt-banner-head .mgmt-kpi-title{margin:0;min-width:0;flex:1}
 .mgmt-banner-head .mgmt-kpi-title>span{white-space:normal}
+
+/* Corrige sobrescrita de .mgmt-revenue-banner span { display:block } nos ícones */
+.mgmt-revenue-banner .mgmt-banner-icon{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:34px;
+  height:34px;
+  flex:0 0 34px;
+  line-height:0;
+}
+.mgmt-revenue-banner .mgmt-banner-icon svg{
+  display:block;
+  width:18px;
+  height:18px;
+  margin:0;
+  padding:0;
+}
