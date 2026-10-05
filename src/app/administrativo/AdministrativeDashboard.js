@@ -12,7 +12,7 @@ import DataTable from '@/components/DataTable';
 import '../equipe/management.css';
 import '../equipe/managementExtras.css';
 
-const COLORS={revenue:'#3b82f6',paid:'#22c55e',open:'#f59e0b',danger:'#ef4444',fran:'#a855f7',paulo:'#06b6d4',fixed:'#22c55e',withdrawal:'#f97316'};
+const COLORS={received:'#2563eb',paidExpense:'#ef4444',open:'#f59e0b',cashBalance:'#14b8a6',franFixed:'#8b5cf6',franWithdrawal:'#ec4899',pauloFixed:'#06b6d4',pauloWithdrawal:'#eab308'};
 const brl=(n)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n)||0);
 const compact=(n)=>new Intl.NumberFormat('pt-BR',{notation:'compact',maximumFractionDigits:1}).format(Number(n)||0);
 const getDateKey=(raw)=>{const value=String(raw||'');let m=value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;m=value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:'';};
@@ -25,16 +25,19 @@ function MovementModal({title,rows,onClose}){
   const paid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
   const open=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
   const monthly=Array.from({length:12},(_,i)=>{const key=`2026-${String(i+1).padStart(2,'0')}`;const items=rows.filter(r=>monthOf(r.data)===key);return{month:monthLabel(key),Pago:items.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':items.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0)}});
+  const tableRows=rows.map(r=>({...r,natureza:'Saída',projeto:r.projeto||'ADMINISTRAÇÃO',contaDescricao:r.contaNome||r.contaCodigo||'',status:r.paid?'Realizado':'A realizar'}));
+  const reportRows=rows.map(r=>({Data:r.data,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Nome:r.nome,Conta:r.contaNome||r.contaCodigo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
+  const sectionKey=`administrativo:detalhe:${title.replace(/[^a-z0-9]+/gi,'-').toLowerCase()}`;
   return <div className="mgmt-overlay mgmt-overlay-center" onMouseDown={onClose}><div className="mgmt-modal-center" onMouseDown={e=>e.stopPropagation()}>
-    <div className="mgmt-panel-head"><div><span className="mgmt-eyebrow">DETALHAMENTO · 2026</span><h2>{title}</h2><p>Pago {brl(paid)} · A pagar {brl(open)}</p></div><button className="btn" onClick={onClose}><X size={16}/> Fechar</button></div>
-    <section className="mgmt-subcard"><h3>Relação mensal</h3><div className="mgmt-chart-sm"><ResponsiveContainer><LineChart data={monthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago" stroke={COLORS.paid} strokeWidth={2.5}/><Line type="monotone" dataKey="A pagar" stroke={COLORS.open} strokeWidth={2.5}/></LineChart></ResponsiveContainer></div></section>
-    <section className="mgmt-subcard" style={{marginTop:14}}><h3>Lançamentos</h3><div className="mgmt-table-wrap"><table className="mgmt-table"><thead><tr><th>Data</th><th>Documento</th><th>Lançamento</th><th>Conta</th><th>Situação</th><th>Valor</th></tr></thead><tbody>{[...rows].sort((a,b)=>getDateKey(b.data).localeCompare(getDateKey(a.data))).map(r=><tr key={r.sourceKey}><td>{r.data||'—'}</td><td>{r.documento||'—'}</td><td>{r.lancamento||r.titulo||'—'}</td><td>{r.contaNome||r.contaCodigo||'—'}</td><td><span className={r.paid?'mgmt-pill paid':'mgmt-pill open'}>{r.paid?'Pago':'A pagar'}</span></td><td><strong>{brl(r.valor)}</strong></td></tr>)}</tbody></table></div></section>
+    <div className="mgmt-panel-head"><div><span className="mgmt-eyebrow">DETALHAMENTO · 2026</span><h2>{title}</h2><p>Pago {brl(paid)} · A pagar {brl(open)}</p></div><div className="mgmt-actions"><ReportAdder sectionKey={sectionKey} title={title} componentName="Detalhamento Administrativo" page="Administrativo" type="TABLE" data={reportRows} filters={{Ano:2026}}/><button className="btn" onClick={onClose}><X size={16}/> Fechar</button></div></div>
+    <section className="mgmt-subcard"><h3>Relação mensal</h3><div className="mgmt-chart-sm"><ResponsiveContainer><LineChart data={monthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago" stroke="#22c55e" strokeWidth={2.5}/><Line type="monotone" dataKey="A pagar" stroke={COLORS.open} strokeWidth={2.5}/></LineChart></ResponsiveContainer></div></section>
+    <section className="mgmt-subcard" style={{marginTop:14}}><h3>Lançamentos</h3><p className="mgmt-muted">Filtros, 30 por página, 50 ou Todos.</p><DataTable data={tableRows} initialPageSize={30} pageSizeOptions={[30,50,'all']}/></section>
   </div></div>;
 }
 
 export default function AdministrativeDashboard(){
   const {isReportMode,openReportBuilder,exitReportMode}=useReport();
-  const[data,setData]=useState({revenue:[],expenses:[],monthly:[]});
+  const[data,setData]=useState({revenue:[],expenses:[],adminTeamRows:[],partnerRows:[],monthly:[]});
   const[startDate,setStartDate]=useState('2026-01-01');
   const[endDate,setEndDate]=useState('2026-12-31');
   const[showAllAccounts,setShowAllAccounts]=useState(false);
@@ -59,22 +62,41 @@ export default function AdministrativeDashboard(){
   const visibleAccounts=showAllAccounts?byAccount:byAccount.slice(0,10);
 
   // A visão de Equipe ADM é anual por regra: realizado de jan-dez/2026 + tudo que está em aberto até dez/2026.
-  const adminTeamYearRows=useMemo(()=>data.expenses.filter(r=>r.adminTeamEntity&&getDateKey(r.data)>='2026-01-01'&&getDateKey(r.data)<='2026-12-31'),[data.expenses]);
+  const adminTeamYearRows=useMemo(()=>(data.adminTeamRows||[]).filter(r=>getDateKey(r.data)>='2026-01-01'&&getDateKey(r.data)<='2026-12-31'),[data.adminTeamRows]);
   const adminTeam=useMemo(()=>{const map=new Map();adminTeamYearRows.forEach(r=>{const item=map.get(r.nome)||{name:r.nome,paid:0,open:0,rows:[]};item[r.paid?'paid':'open']+=Number(r.valor||0);item.rows.push(r);map.set(r.nome,item)});return[...map.values()].map(x=>({...x,total:x.paid+x.open})).sort((a,b)=>b.total-a.total)},[adminTeamYearRows]);
   const adminTeamMonthly=useMemo(()=>Array.from({length:12},(_,i)=>{const key=`2026-${String(i+1).padStart(2,'0')}`;const rows=adminTeamYearRows.filter(r=>monthOf(r.data)===key);return{month:monthLabel(key),Pago:rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0)}}),[adminTeamYearRows]);
 
-  const chartMonthly=useMemo(()=>Array.from({length:12},(_,i)=>{const key=`2026-${String(i+1).padStart(2,'0')}`;const active=(!startDate||`${key}-31`>=startDate)&&(!endDate||`${key}-01`<=endDate);const source=(data.monthly||[]).find(m=>m.month===key)||{};return{month:monthLabel(key),'Receita ADM':active?Number(source.revenue||0):0,'Despesa paga':active?Number(source.paid||0):0,'A pagar':active?Number(source.open||0):0,Resultado:active?Number(source.result||0):0}}),[data.monthly,startDate,endDate]);
+  const chartMonthly=useMemo(()=>Array.from({length:12},(_,i)=>{
+    const key=`2026-${String(i+1).padStart(2,'0')}`;
+    const active=(!startDate||`${key}-31`>=startDate)&&(!endDate||`${key}-01`<=endDate);
+    const monthRevenue=(data.revenue||[]).filter(r=>r.month===key);
+    const source=(data.monthly||[]).find(m=>m.month===key)||{};
+    const receivedAdmin=active?monthRevenue.filter(r=>r.realized).reduce((s,r)=>s+Number(r.adminValue||0),0):0;
+    const paidExpense=active?Number(source.paid||0):0;
+    const openExpense=active?Number(source.open||0):0;
+    return{month:monthLabel(key),'Recebido ADM':receivedAdmin,'Despesa paga':paidExpense,'A pagar':openExpense,'Saldo caixa':receivedAdmin-paidExpense};
+  }),[data.monthly,data.revenue,startDate,endDate]);
 
-  const deficitMonths=chartMonthly.filter(m=>m.Resultado<0).length;
-  const largestAccount=byAccount[0];
+  const cashFlowMonthly=chartMonthly.map(row=>({month:row.month,'Recebimentos ADM':row['Recebido ADM'],'Pagamentos ADM':row['Despesa paga'],'Saldo mensal':row['Saldo caixa']}));
 
   const partnerDefs=[
-    {token:'FRANCIELLE',name:'Francielle Paiva',short:'Francielle',fixed:25000,color:COLORS.fran},
-    {token:'PAULO HENRIQUE',name:'Paulo Henrique Araújo',short:'Paulo',fixed:42000,color:COLORS.paulo}
+    {token:'FRANCIELLE',name:'Francielle Paiva',short:'Francielle',fixed:25000},
+    {token:'PAULO HENRIQUE LEMES ARAUJO',name:'Paulo Henrique Lemes Araujo',short:'Paulo',fixed:42000}
   ];
-  const partners=useMemo(()=>partnerDefs.map(def=>{const rows=data.expenses.filter(r=>String(r.nome||'').toUpperCase().includes(def.token)&&['RETIRADA','EQUIPE_ADM_SOCIO'].includes(r.type)&&getDateKey(r.data)>='2026-01-01'&&getDateKey(r.data)<='2026-12-31');return{...def,rows,fixedPaid:rows.filter(r=>r.type==='EQUIPE_ADM_SOCIO').reduce((s,r)=>s+Number(r.valor||0),0),withdrawal:rows.filter(r=>r.type==='RETIRADA').reduce((s,r)=>s+Number(r.valor||0),0)}}),[data.expenses]);
+  const partners=useMemo(()=>partnerDefs.map(def=>{
+    const rows=(data.partnerRows||[]).filter(r=>String(r.nome||'').toUpperCase().includes(def.token)&&getDateKey(r.data)>='2026-01-01'&&getDateKey(r.data)<='2026-12-31');
+    const fixedRows=rows.filter(r=>r.type==='EQUIPE_ADM_SOCIO');
+    const withdrawalRows=rows.filter(r=>r.type==='RETIRADA');
+    return{
+      ...def,
+      rows,
+      fixedPaid:fixedRows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),
+      fixedOpen:fixedRows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0),
+      withdrawal:withdrawalRows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),
+    };
+  }),[data.partnerRows]);
 
-  const partnerMonthly=useMemo(()=>Array.from({length:12},(_,i)=>{const key=`2026-${String(i+1).padStart(2,'0')}`;const row={month:monthLabel(key)};partners.forEach(p=>{const rows=p.rows.filter(r=>monthOf(r.data)===key);row[`${p.short} · Fixo pago`]=rows.filter(r=>r.type==='EQUIPE_ADM_SOCIO').reduce((s,r)=>s+Number(r.valor||0),0);row[`${p.short} · Retirada`]=rows.filter(r=>r.type==='RETIRADA').reduce((s,r)=>s+Number(r.valor||0),0)});return row}),[partners]);
+  const partnerMonthly=useMemo(()=>Array.from({length:12},(_,i)=>{const key=`2026-${String(i+1).padStart(2,'0')}`;const row={month:monthLabel(key)};partners.forEach(p=>{const rows=p.rows.filter(r=>monthOf(r.data)===key);row[`${p.short} · Fixo pago`]=rows.filter(r=>r.type==='EQUIPE_ADM_SOCIO'&&r.paid).reduce((s,r)=>s+Number(r.valor||0),0);row[`${p.short} · Retirada`]=rows.filter(r=>r.type==='RETIRADA'&&r.paid).reduce((s,r)=>s+Number(r.valor||0),0)});return row}),[partners]);
 
   const partnerSeries=partnerView==='FRAN'?['Francielle · Fixo pago','Francielle · Retirada']:partnerView==='PAULO'?['Paulo · Fixo pago','Paulo · Retirada']:['Francielle · Fixo pago','Francielle · Retirada','Paulo · Fixo pago','Paulo · Retirada'];
 
@@ -110,23 +132,17 @@ export default function AdministrativeDashboard(){
       ].map(([label,value,info])=><div key={label}><div className="mgmt-kpi-title"><span>{label}</span><InfoTooltip title={label} content={info}/></div><strong className={label==='Despesas pagas'?'mgmt-value-paid':label==='Despesas a pagar'?'mgmt-value-open':''}>{label==='Cobertura da despesa'?((Number(value)||0)*100).toFixed(1)+'%':brl(value)}</strong></div>)}
     </div>
 
-    <div className="mgmt-flow mgmt-flow-balanced">
-      <section id="report-adm-receita-despesa" data-report-section className="mgmt-panel">
+    <section id="report-adm-receita-despesa" data-report-section className="mgmt-panel mgmt-panel-wide">
         <ReportAdder sectionKey="administrativo:receita-despesa" title="Receita x Despesa — 2026" componentName="Gráfico Receita x Despesa" page="Administrativo" type="CHART" data={chartMonthly} filters={reportFilters} captureId="report-adm-receita-despesa" style={{float:'right'}}/>
-        <h2>Receita x despesa · Jan–Dez/2026</h2><p>Receita ADM, despesa paga e compromissos em aberto.</p>
-        <div className="mgmt-chart"><ResponsiveContainer><BarChart data={chartMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar dataKey="Receita ADM" fill={COLORS.revenue} radius={[4,4,0,0]}/><Bar dataKey="Despesa paga" fill={COLORS.paid} radius={[4,4,0,0]}/><Bar dataKey="A pagar" fill={COLORS.open} radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>
+        <h2>Receita x despesa · Jan–Dez/2026</h2><p>Recebimento administrativo realizado, despesa paga e compromissos em aberto.</p>
+        <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={chartMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar dataKey="Recebido ADM" fill={COLORS.received} radius={[4,4,0,0]}/><Bar dataKey="Despesa paga" fill={COLORS.paidExpense} radius={[4,4,0,0]}/><Bar dataKey="A pagar" fill={COLORS.pauloWithdrawal} radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>
       </section>
 
-      <section className="mgmt-panel mgmt-insights-panel">
-        <div className="mgmt-insight-hero"><span>Resultado após compromissos</span><strong className={result>=0?'mgmt-value-paid':'mgmt-value-danger'}>{brl(result)}</strong><small>{result>=0?'Receita administrativa cobre as despesas do período.':'Despesas e compromissos superam a receita administrativa do período.'}</small></div>
-        <div className="mgmt-decision-grid">
-          <div><span>Meses negativos</span><strong>{deficitMonths}/12</strong><div className="mgmt-mini-meter"><i style={{width:`${deficitMonths/12*100}%`}}/></div><small>Meses em que a despesa supera a Receita ADM.</small></div>
-          <div><span>Maior grupo de despesa</span><strong>{largestAccount?.name||'—'}</strong><small>{largestAccount?brl(largestAccount.total):'Sem movimento'}</small></div>
-          <div><span>Exposição em aberto</span><strong className="mgmt-value-open">{brl(open)}</strong><small>{paid+open>0?((open/(paid+open))*100).toFixed(1):'0,0'}% da despesa ainda não foi paga.</small></div>
-          <div><span>Cobertura</span><strong>{(coverage*100).toFixed(1)}%</strong><div className="mgmt-mini-meter success"><i style={{width:`${Math.min(100,coverage*100)}%`}}/></div><small>Quanto os 20% administrativos cobrem da despesa.</small></div>
-        </div>
-      </section>
-    </div>
+    <section id="report-adm-fluxo-mensal" data-report-section className="mgmt-panel">
+      <ReportAdder sectionKey="administrativo:fluxo-caixa-mensal" title="Fluxo de Caixa Mensal — Administrativo" componentName="Gráfico de Fluxo de Caixa Mensal" page="Administrativo" type="CHART" data={cashFlowMonthly} filters={reportFilters} captureId="report-adm-fluxo-mensal" style={{float:'right'}}/>
+      <h2>Fluxo de caixa mensal · Administrativo</h2><p>Recebimentos administrativos realizados, pagamentos administrativos e saldo mensal realizado.</p>
+      <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={cashFlowMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><ReferenceLine y={0} stroke="var(--border-color)"/><Bar dataKey="Recebimentos ADM" fill={COLORS.received}/><Bar dataKey="Pagamentos ADM" fill={COLORS.paidExpense}/><Bar dataKey="Saldo mensal" fill={COLORS.cashBalance}/></BarChart></ResponsiveContainer></div>
+    </section>
 
     <section className="mgmt-panel" data-report-section>
       <ReportAdder sectionKey="administrativo:despesas-conta" title="Despesas por Conta" componentName="Tabela das Principais Contas Administrativas" page="Administrativo" type="TABLE" data={byAccount.map(x=>({Conta:x.name,Pago:x.paid,'A pagar':x.open,Total:x.total}))} filters={reportFilters} style={{float:'right'}}/>
@@ -149,19 +165,19 @@ export default function AdministrativeDashboard(){
       <div className="mgmt-partner-summary">
         {partners.map(p=><button key={p.name} className="mgmt-partner-card" onClick={()=>setDetail({title:`Movimentação · ${p.name}`,rows:p.rows})}>
           <div className="mgmt-partner-name"><span>{p.name}</span><small>Fixo mensal de referência: {brl(p.fixed)}</small></div>
-          <div><span>Fixo pago em 2026</span><strong className="mgmt-value-paid">{brl(p.fixedPaid)}</strong></div>
-          <div><span>Retiradas em 2026</span><strong className="mgmt-value-open">{brl(p.withdrawal)}</strong></div>
-          <div><span>Total movimentado</span><strong>{brl(p.fixedPaid+p.withdrawal)}</strong></div>
+          <div><span>Pago como equipe em 2026</span><strong className="mgmt-value-paid">{brl(p.fixedPaid)}</strong></div>
+          <div><span>A pagar como equipe</span><strong className="mgmt-value-open">{brl(p.fixedOpen)}</strong></div>
+          <div><span>Retiradas realizadas</span><strong>{brl(p.withdrawal)}</strong></div>
         </button>)}
       </div>
 
       <div className="mgmt-chart"><ResponsiveContainer><BarChart data={partnerMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.14}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/>
-        {partnerSeries.includes('Francielle · Fixo pago')&&<Bar dataKey="Francielle · Fixo pago" fill={COLORS.fran} opacity={0.82}/>}
-        {partnerSeries.includes('Francielle · Retirada')&&<Bar dataKey="Francielle · Retirada" fill={COLORS.withdrawal}/>}
-        {partnerSeries.includes('Paulo · Fixo pago')&&<Bar dataKey="Paulo · Fixo pago" fill={COLORS.paulo} opacity={0.82}/>}
+        {partnerSeries.includes('Francielle · Fixo pago')&&<Bar dataKey="Francielle · Fixo pago" fill={COLORS.franFixed} opacity={0.88}/>}
+        {partnerSeries.includes('Francielle · Retirada')&&<Bar dataKey="Francielle · Retirada" fill={COLORS.franWithdrawal}/>}
+        {partnerSeries.includes('Paulo · Fixo pago')&&<Bar dataKey="Paulo · Fixo pago" fill={COLORS.pauloFixed} opacity={0.88}/>}
         {partnerSeries.includes('Paulo · Retirada')&&<Bar dataKey="Paulo · Retirada" fill={COLORS.open}/>}
-        {partnerView==='FRAN'&&<ReferenceLine y={25000} stroke={COLORS.fran} strokeDasharray="5 5" label={{value:'Fixo R$ 25 mil',fill:COLORS.fran,fontSize:10}}/>}
-        {partnerView==='PAULO'&&<ReferenceLine y={42000} stroke={COLORS.paulo} strokeDasharray="5 5" label={{value:'Fixo R$ 42 mil',fill:COLORS.paulo,fontSize:10}}/>}
+        {partnerView==='FRAN'&&<ReferenceLine y={25000} stroke={COLORS.franFixed} strokeDasharray="5 5" label={{value:'Fixo R$ 25 mil',fill:COLORS.franFixed,fontSize:10}}/>}
+        {partnerView==='PAULO'&&<ReferenceLine y={42000} stroke={COLORS.pauloFixed} strokeDasharray="5 5" label={{value:'Fixo R$ 42 mil',fill:COLORS.pauloFixed,fontSize:10}}/>}
       </BarChart></ResponsiveContainer></div>
     </section>
 
@@ -169,7 +185,7 @@ export default function AdministrativeDashboard(){
       <ReportAdder sectionKey="administrativo:movimentacoes" title="Movimentações Financeiras — Administrativo" componentName="Tabela de Movimentações Administrativas" page="Administrativo" type="TABLE" data={reportMovementRows} dataSets={{summary:[{'Quantidade de lançamentos':reportMovementRows.length,'Pago':paid,'A pagar':open}],visible:reportMovementRows.slice(0,30),all:reportMovementRows}} detailMode="visible" detailOptions={['summary','visible','all']} filters={reportFilters} style={{float:'right'}}/>
       <h2 style={{fontSize:'18px',fontWeight:600,marginBottom:'1rem'}}>Movimentações Financeiras · Administrativo</h2>
       <p style={{fontSize:'12px',color:'var(--text-secondary)',marginBottom:'1rem'}}>Mesma estrutura do Fluxo de Caixa, restrita às contas pagas e a pagar do Administrativo. Receita não entra nesta tabela.</p>
-      <DataTable data={adminFinancialRows} initialPageSize={30} pageSizeOptions={[30,60,90]}/>
+      <DataTable data={adminFinancialRows} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
     </section>
 
     <MovementModal title={detail?.title} rows={detail?.rows} onClose={()=>setDetail(null)}/>
