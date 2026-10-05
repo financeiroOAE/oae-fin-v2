@@ -27,7 +27,8 @@ const DEFAULT_RANGES = [
   'PLANOS_FINANCEIROS!A:E',
   'CP_GERAL!A:L',
   'CR_GERAL!A:N',
-  'DEPARA!A:F'
+  'DEPARA!A:F',
+  'EQUIPE!A:T'
 ];
 
 export async function batchReadSheets(ranges = DEFAULT_RANGES) {
@@ -45,7 +46,8 @@ export async function batchReadSheets(ranges = DEFAULT_RANGES) {
     PLANOS_FINANCEIROS: [],
     CP_GERAL: [],
     CR_GERAL: [],
-    DEPARA: []
+    DEPARA: [],
+    EQUIPE: []
   };
 
   try {
