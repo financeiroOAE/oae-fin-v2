@@ -3,15 +3,16 @@ import { batchReadSheets } from '@/lib/googleSheets';
 import { processSiengeData, extractAccountCode, parseBRL } from '@/lib/businessRules';
 
 const SNAPSHOT_ID = 'current';
-const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA'];
+const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA', 'EQUIPE'];
 const REFERENCE_RANGES = [
   'EMPRESAS!A:J',
   'PROJETOS_2026!A:L',
   'CENTROS_CUSTO!A:E',
   'PLANOS_FINANCEIROS!A:E',
   'DEPARA!A:F',
+  'EQUIPE!A:T',
 ];
-const CASH_LOGIC_VERSION = 8;
+const CASH_LOGIC_VERSION = 9;
 
 function parseSortDate(value) {
   if (!value) return 0;
@@ -96,6 +97,33 @@ function normalizeForecastRevenueBilling(rows) {
   });
 }
 
+function normalizeTeamRoster(rows) {
+  const seen = new Set();
+  return (rows || []).map((row, index) => {
+    const person = String(row.PESSOA || '').trim();
+    if (!person) return null;
+    const departmentProject = String(row['DEPARTAMENTO/OBRA'] || '').trim();
+    const role = String(row.CARGO || '').trim();
+    const account = String(row['PLANO/CONTA'] || '').trim();
+    const contractValue = parseBRL(row['VALOR CT']);
+    const accountCode = extractAccountCode(account) || '';
+    const key = [person, departmentProject, role, account, contractValue].join('|').toUpperCase();
+    if (seen.has(key)) return null;
+    seen.add(key);
+    return {
+      row: index + 2,
+      person,
+      departmentProject,
+      role,
+      contractValue,
+      fixedMonthly: contractValue === 0,
+      account,
+      accountCode,
+      thirdParty: role.toUpperCase() === 'TERCEIRO',
+    };
+  }).filter(Boolean);
+}
+
 async function performFullSync(triggeredBy) {
   const startedAt = Date.now();
   console.log('[financial-sync] início', { triggeredBy });
@@ -147,6 +175,7 @@ async function performFullSync(triggeredBy) {
   const centrosCusto = referenceData.CENTROS_CUSTO || [];
   const planos = referenceData.PLANOS_FINANCEIROS || [];
   const depara = referenceData.DEPARA || [];
+  const equipe = normalizeTeamRoster(referenceData.EQUIPE || []);
 
   const deparaMap = {};
   depara.forEach((row) => {
@@ -208,6 +237,7 @@ async function performFullSync(triggeredBy) {
     CP_GERAL: cpProcessed.length,
     CR_GERAL: crProcessed.length,
     DEPARA: depara.length,
+    EQUIPE: equipe.length,
   };
 
   const totalRecords = Object.values(stats).reduce((a, b) => a + b, 0);
@@ -238,6 +268,7 @@ async function performFullSync(triggeredBy) {
     data: allData,
     stats,
     projetos,
+    equipe,
     saldosBancarios: empresas,
     somaProjetosContrato,
     somaProjetosFaturado,
