@@ -272,7 +272,11 @@ export function consolidateFinancialData(baseData, options = {}) {
 
     const statusKey = String(item.status || '').trim().toUpperCase();
     const dateKey = parseDateToLocalMidnight(item.data, item.dataTimestamp);
-    const key = `${item.lancamento}|${statusKey}|${dateKey}`;
+    const documentKey = String(item.documento || '').trim().toUpperCase();
+    // Lançamentos podem se repetir entre títulos distintos. O documento faz
+    // parte da identidade do título para impedir que uma NF seja absorvida
+    // por outro lançamento com o mesmo número, status e vencimento.
+    const key = `${item.lancamento}|${documentKey}|${statusKey}|${dateKey}`;
 
     if (!consolidatedMap.has(key)) {
       consolidatedMap.set(key, {
