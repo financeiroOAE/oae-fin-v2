@@ -115,20 +115,25 @@ export default function AdministrativeDashboard(){
   const reportFilters={'Data inicial':startDate,'Data final':endDate};
   const reportMovementRows=adminFinancialRows.map(r=>({Data:r.data,'Nome / fornecedor':r.nome,Conta:r.contaDescricao,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
 
-  return <div className="mgmt">
+  return <div className="mgmt mgmt-admin">
     <header className="mgmt-header">
       <div><span className="mgmt-eyebrow">ADMINISTRATIVO · EXERCÍCIO 2026</span><h1>Administrativo</h1><p>Receita administrativa, custos, equipe ADM, sócios e contas a pagar.</p></div>
       <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Administrativo')} className={`btn ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do Modo Relatório':'Gerar Relatório'}</button>
     </header>
     {error&&<div className="mgmt-alert">{error}</div>}
 
-    <section className="mgmt-panel"><div className="mgmt-filter-grid mgmt-filter-grid-dates">
-      <label>Data inicial<input type="date" min="2026-01-01" max="2026-12-31" value={startDate} onChange={e=>setStartDate(e.target.value)}/></label>
-      <label>Data final<input type="date" min="2026-01-01" max="2026-12-31" value={endDate} onChange={e=>setEndDate(e.target.value)}/></label>
-    </div></section>
+    <section className="mgmt-panel mgmt-admin-filters">
+      <div className="mgmt-panel-head">
+        <div><h2>Período de análise</h2><p>Selecione o intervalo dentro do exercício de 2026.</p></div>
+      </div>
+      <div className="mgmt-filter-grid mgmt-filter-grid-dates">
+        <label>Data inicial<input type="date" min="2026-01-01" max="2026-12-31" value={startDate} onChange={e=>setStartDate(e.target.value)}/></label>
+        <label>Data final<input type="date" min="2026-01-01" max="2026-12-31" value={endDate} onChange={e=>setEndDate(e.target.value)}/></label>
+      </div>
+    </section>
 
     <section className="mgmt-revenue-banner" data-report-section>
-      <ReportAdder sectionKey="administrativo:receita-20" title="Receita Administrativa — 20%" componentName="Resumo de Receita Administrativa" page="Administrativo" type="SUMMARY" data={[{'Receita ADM':revenueTotal,'Recebido ADM':received,'A receber ADM':receivable}]} filters={reportFilters} style={{position:'absolute',right:12,top:12}}/>
+      <ReportAdder sectionKey="administrativo:receita-20" title="Receita Administrativa — 20%" componentName="Resumo de Receita Administrativa" page="Administrativo" type="SUMMARY" data={[{'Receita ADM':revenueTotal,'Recebido ADM':received,'A receber ADM':receivable}]} filters={reportFilters} style={{position:'absolute',right:14,top:14}}/>
       <div className="tone-primary"><span className="mgmt-banner-icon"><Landmark size={18}/></span><div className="mgmt-kpi-title"><span>20% · Receita administrativa</span><InfoTooltip title="Receita administrativa" content="20% das receitas dos projetos no período selecionado, conforme a regra de rateio administrativo do painel."/></div><strong>{brl(revenueTotal)}</strong><small>Parcela administrativa das receitas</small></div>
       <div className="tone-success"><span className="mgmt-banner-icon"><CircleDollarSign size={18}/></span><div className="mgmt-kpi-title"><span>20% já recebido</span><InfoTooltip title="Recebido ADM" content="Parcela administrativa correspondente às receitas já realizadas/recebidas."/></div><strong>{brl(received)}</strong><small>Receita ADM realizada</small></div>
       <div className="tone-warning"><span className="mgmt-banner-icon"><Clock3 size={18}/></span><div className="mgmt-kpi-title"><span>20% a receber</span><InfoTooltip title="A receber ADM" content="Parcela administrativa das receitas previstas e ainda não recebidas até o fim do período."/></div><strong>{brl(receivable)}</strong><small>Receita ADM prevista</small></div>
@@ -142,14 +147,18 @@ export default function AdministrativeDashboard(){
     </div>
 
     <section id="report-adm-receita-despesa" data-report-section className="mgmt-panel mgmt-panel-wide">
-        <ReportAdder sectionKey="administrativo:receita-despesa" title="Receita x Despesa — 2026" componentName="Gráfico Receita x Despesa" page="Administrativo" type="CHART" data={chartMonthly} filters={reportFilters} captureId="report-adm-receita-despesa" style={{float:'right'}}/>
-        <h2>Receita x despesa · Jan–Dez/2026</h2><p>Recebimento administrativo realizado, despesa paga e compromissos em aberto.</p>
+      <div className="mgmt-panel-head">
+        <div><h2>Receita x despesa · Jan–Dez/2026</h2><p>Recebimento administrativo realizado, despesa paga e compromissos em aberto.</p></div>
+        <ReportAdder sectionKey="administrativo:receita-despesa" title="Receita x Despesa — 2026" componentName="Gráfico Receita x Despesa" page="Administrativo" type="CHART" data={chartMonthly} filters={reportFilters} captureId="report-adm-receita-despesa"/>
+      </div>
         <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={chartMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar dataKey="Recebido ADM" fill={COLORS.received} radius={[4,4,0,0]}/><Bar dataKey="Despesa paga" fill={COLORS.paidExpense} radius={[4,4,0,0]}/><Bar dataKey="A pagar" fill={COLORS.open} radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>
       </section>
 
-    <section id="report-adm-fluxo-mensal" data-report-section className="mgmt-panel">
-      <ReportAdder sectionKey="administrativo:fluxo-caixa-mensal" title="Fluxo de Caixa Mensal — Administrativo" componentName="Gráfico de Fluxo de Caixa Mensal" page="Administrativo" type="CHART" data={cashFlowMonthly} filters={reportFilters} captureId="report-adm-fluxo-mensal" style={{float:'right'}}/>
-      <h2>Fluxo de caixa mensal · Administrativo</h2><p>Recebimentos administrativos realizados, pagamentos administrativos e saldo mensal realizado.</p>
+    <section id="report-adm-fluxo-mensal" data-report-section className="mgmt-panel mgmt-panel-wide">
+      <div className="mgmt-panel-head">
+        <div><h2>Fluxo de caixa mensal · Administrativo</h2><p>Recebimentos administrativos realizados, pagamentos administrativos e saldo mensal realizado.</p></div>
+        <ReportAdder sectionKey="administrativo:fluxo-caixa-mensal" title="Fluxo de Caixa Mensal — Administrativo" componentName="Gráfico de Fluxo de Caixa Mensal" page="Administrativo" type="CHART" data={cashFlowMonthly} filters={reportFilters} captureId="report-adm-fluxo-mensal"/>
+      </div>
       <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={cashFlowMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><ReferenceLine y={0} stroke="var(--border-color)"/><Bar dataKey="Recebimentos ADM" fill={COLORS.received}/><Bar dataKey="Pagamentos ADM" fill={COLORS.paidExpense}/><Bar dataKey="Saldo mensal" fill={COLORS.cashBalance}/></BarChart></ResponsiveContainer></div>
     </section>
 
