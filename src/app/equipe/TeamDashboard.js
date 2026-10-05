@@ -245,7 +245,7 @@ export default function TeamDashboard(){
     </section>
 
     <section className="mgmt-panel" data-report-section>
-      <ReportAdder sectionKey="equipe:por-projeto" title="Equipe por Projeto" componentName="Tabela Equipe por Projeto" page="Equipe" type="TABLE" data={projectRows.map(p=>({Projeto:p.name,'Pessoas / terceiros':p.peopleCount,Pago:p.paid,'A pagar':p.open,Total:p.total}))} filters={reportFilters} style={{float:'right'}}/>
+      <ReportAdder sectionKey="equipe:obras-custos" title="Custos por Obra" componentName="Tabela de Custos por Obra" page="Equipe" type="TABLE" data={projectRows.map(p=>({Projeto:p.name,'Pessoas / terceiros':p.peopleCount,Pago:p.paid,'A pagar':p.open,Total:p.total}))} filters={reportFilters} style={{float:'right'}}/>
       <h2>Equipe por projeto</h2><div className="mgmt-table-wrap"><table className="mgmt-table"><thead><tr><th>Projeto</th><th>Pessoas / terceiros</th><th>Pago</th><th>A pagar</th><th>Total</th></tr></thead><tbody>{projectRows.map(p=><tr key={p.name}><td><strong>{p.name}</strong></td><td>{p.peopleCount}</td><td className="mgmt-value-paid">{brl(p.paid)}</td><td className="mgmt-value-open">{brl(p.open)}</td><td><strong>{brl(p.total)}</strong></td></tr>)}</tbody></table></div>
     </section>
 
