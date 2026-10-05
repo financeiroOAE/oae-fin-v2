@@ -21,9 +21,24 @@ export function cpRows(snapshot) {
     const ordinal = occurrences.get(identity) || 0;
     occurrences.set(identity, ordinal + 1);
     const sourceKey = createHash('sha256').update(`CP|${identity}|${ordinal}`).digest('hex');
-    return { sourceKey, data: row.data, documento: row.documento, titulo: row.titulo, nome: row.nome, projeto: row.projeto,
-      contaCodigo: row.contaCodigo, contaNome: row.contaNome, valor: amount(row.valor), status: row.status,
-      paid: isRealizedFinancialStatus(row), teamAccount: isTeamExpense(row) };
+    return {
+      sourceKey,
+      data: row.data,
+      documento: row.documento,
+      titulo: row.titulo,
+      lancamento: row.lancamento,
+      natureza: row.natureza || 'Saída',
+      nome: row.nome,
+      projeto: row.projeto,
+      contaCodigo: row.contaCodigo,
+      contaNome: row.contaNome,
+      contaDescricao: row.contaDescricao,
+      valor: amount(row.valor),
+      valorTotalTitulo: amount(row.valorTotalTitulo),
+      status: row.status,
+      paid: isRealizedFinancialStatus(row),
+      teamAccount: isTeamExpense(row),
+    };
   });
 }
 
