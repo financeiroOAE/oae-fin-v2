@@ -17,6 +17,33 @@ function isPartner(row) {
   const name = norm(row.nome);
   return name.includes('FRANCIELLE PAIVA') || name.includes('PAULO HENRIQUE');
 }
+function rosterAliases(value) {
+  const raw = norm(value).replace(/^\d{2}[.\s]?\d{3}[.\s]?\d{3}\s+/, '').trim();
+  const aliases = new Set([raw]);
+  raw.split(/\s+-\s+/).map((part) => part.trim()).filter((part) => part.length >= 5).forEach((part) => aliases.add(part));
+  return [...aliases].filter(Boolean);
+}
+
+function matchesRosterEntity(roster, name) {
+  const target = norm(name);
+  if (!target) return false;
+  return roster.some((item) => rosterAliases(item.person).some((alias) =>
+    target === alias || target.includes(alias) || alias.includes(target)
+  ));
+}
+
+const ADMIN_TEAM_EXCLUSIONS = [
+  'MINISTERIO PUBLICO',
+  'IFOOD',
+  'MINISTERIO DA ECONOMIA',
+  'OLIVEIRA ARAUJO ENGENHARIA LTDA',
+];
+
+function isExcludedAdminEntity(name) {
+  const target = norm(name);
+  return ADMIN_TEAM_EXCLUSIONS.some((value) => target.includes(value));
+}
+
 
 function adminType(row) {
   const code = String(row.contaCodigo || '').replace(/\D/g, '');
@@ -33,10 +60,17 @@ export async function GET() {
 
   const snapshot = await readCurrentSnapshot();
 
+  const roster = snapshot?.payload?.equipe || [];
   const expenses = cpRows(snapshot)
     .filter((row) => monthOf(row.data)?.startsWith(YEAR))
     .filter((row) => norm(row.projeto) === 'ADMINISTRACAO')
-    .map((row) => ({ ...row, type: adminType(row) }));
+    .map((row) => {
+      const type = adminType(row);
+      const adminTeamEntity = ['EQUIPE_ADM', 'EQUIPE_ADM_SOCIO'].includes(type) &&
+        !isExcludedAdminEntity(row.nome) &&
+        (isPartner(row) || matchesRosterEntity(roster, row.nome));
+      return { ...row, type, adminTeamEntity };
+    });
 
   const revenue = revenueTitles(snapshot)
     .filter((row) => String(row.month || '').startsWith(YEAR))
