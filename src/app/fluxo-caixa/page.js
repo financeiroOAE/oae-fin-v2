@@ -65,7 +65,9 @@ export default function FluxoDeCaixa() {
   };
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => fetchDados(true, false, false), 0);
+    // A abertura da tela usa somente o último snapshot válido. A leitura pesada
+    // do Google Sheets fica restrita ao botão de sincronização e ao agendamento.
+    const timeoutId = setTimeout(() => fetchDados(false, false, false), 0);
     return () => clearTimeout(timeoutId);
   }, []);
 
@@ -237,14 +239,14 @@ export default function FluxoDeCaixa() {
   const faturamentosNfes = useMemo(() => {
     const rawList = baseData.filter(item =>
       item.natureza === 'Entrada' &&
-      item.statusExibicao === 'A receber' &&
       item.documento &&
       item.documento.toUpperCase().includes('NFES')
     );
 
     // A NF vem dividida entre Faturamento (1010101) e Administrativo (1010107).
-    // A coluna J ja traz a parcela de cada linha, portanto o valor faturado da
-    // nota/titulo e a SOMA das linhas, enquanto a coluna K continua sendo caixa.
+    // A coluna J repete o valor total do título em cada linha de rateio; por isso
+    // usamos uma única ocorrência como bruto. A coluna K é somada para formar o
+    // valor líquido operacional da nota.
     const map = {};
     rawList.forEach(item => {
       const key = String(item.lancamento || 'SEM-LANCAMENTO') + '|' + String(item.documento || item.nome || 'SEM-DOCUMENTO');
@@ -252,14 +254,18 @@ export default function FluxoDeCaixa() {
         ? item.linhasOriginais
         : [item];
 
+      const valoresBrutosTitulo = [
+        item.valorFaturamentoOriginal,
+        ...linhas.map(linha => linha.valorFaturamentoOriginal),
+      ]
+        .map(Number)
+        .filter(valor => Number.isFinite(valor) && valor !== 0);
+
       const faturamentoConsolidado = Number(
         item.valorFaturamentoTitulo
         ?? item.valorFaturamento
         ?? item.valorTotalTitulo
       ) || 0;
-      const faturamentoPelasLinhas = linhas.reduce((sum, linha) =>
-        sum + (Number(linha.valorFaturamento ?? linha.valorTotalTitulo) || 0), 0
-      );
 
       const projetoObra = linhas
         .map(linha => String(linha.projeto || '').trim())
@@ -267,7 +273,9 @@ export default function FluxoDeCaixa() {
           const upper = projeto.toUpperCase();
           return projeto && !upper.includes('ADMINISTRA') && upper !== 'GRUPO OAE' && upper !== 'SEM PROJETO';
         }) || item.projeto;
-      const valorRealNota = faturamentoConsolidado || faturamentoPelasLinhas;
+      const valorRealNota = valoresBrutosTitulo.length > 0
+        ? Math.max(...valoresBrutosTitulo.map(Math.abs))
+        : faturamentoConsolidado;
 
       if (!map[key]) {
         map[key] = {
@@ -277,7 +285,10 @@ export default function FluxoDeCaixa() {
         };
       } else {
         map[key].valor += Number(item.valor) || 0;
-        map[key].valorRealNota = (Number(map[key].valorRealNota) || 0) + (Number(valorRealNota) || 0);
+        map[key].valorRealNota = Math.max(
+          Math.abs(Number(map[key].valorRealNota) || 0),
+          Math.abs(Number(valorRealNota) || 0)
+        );
         if ((!map[key].projeto || String(map[key].projeto).toUpperCase().includes('ADMINISTRA')) && projetoObra) {
           map[key].projeto = projetoObra;
         }
@@ -313,6 +324,7 @@ export default function FluxoDeCaixa() {
       Documento: row.documento,
       Projeto: row.projeto,
       Vencimento: row.data,
+      Situação: row.statusExibicao,
       "Valor Bruto": Number(row.valorRealNota) || 0,
       "Valor Líquido": Number(row.valor) || 0,
     })),
@@ -320,6 +332,7 @@ export default function FluxoDeCaixa() {
       Documento: 'TOTAL DAS NOTAS',
       Projeto: '-',
       Vencimento: '-',
+      Situação: '-',
       "Valor Bruto": totalValorRealNfes,
       "Valor Líquido": totalFaturamentosNfes,
     }] : []),
@@ -823,7 +836,7 @@ export default function FluxoDeCaixa() {
               dataSets={{ all: reportFaturamentosNfesRows, summary: reportFaturamentosNfesSummary }}
               detailMode="all"
               detailOptions={["all", "summary"]}
-              filters={{ Tipo: "NFES", Situação: "A receber" }}
+              filters={{ Tipo: "NFES", Situação: "Todas as notas da CR_GERAL" }}
               explanation="Relação de notas fiscais faturadas com soma total do valor bruto e do valor líquido."
               style={{ float: 'right' }}
             />
@@ -831,7 +844,7 @@ export default function FluxoDeCaixa() {
               <ChartHeader
                 title="Painel de Faturamento (NFES)"
                 infoTitle="Faturamento"
-                infoContent="Relação de notas faturadas — A receber."
+                infoContent="Relação de todas as notas NFES registradas na CR_GERAL, recebidas ou a receber."
               />
               <select
                 value={filtroFaturamento}
@@ -850,6 +863,7 @@ export default function FluxoDeCaixa() {
                     <th>Documento</th>
                     <th>Projeto</th>
                     <th>Vencimento</th>
+                    <th>Situação</th>
                     <th style={{ textAlign: 'right' }}>Valor Bruto</th>
                     <th style={{ textAlign: 'right' }}>Valor Líquido</th>
                   </tr>
@@ -860,17 +874,18 @@ export default function FluxoDeCaixa() {
                       <td style={{ fontWeight: '500' }}>{row.documento}</td>
                       <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.projeto}>{row.projeto}</td>
                       <td>{row.data}</td>
+                      <td>{row.statusExibicao}</td>
                       <td style={{ textAlign: 'right', color: 'var(--text-main)', fontWeight: '600' }}>{formatCurrency(row.valorRealNota)}</td>
                       <td style={{ textAlign: 'right', color: 'var(--success)' }}>{formatCurrency(row.valor)}</td>
                     </tr>
                   )) : (
-                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhum faturamento encontrado.</td></tr>
+                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhum faturamento encontrado.</td></tr>
                   )}
                 </tbody>
                 {faturamentosNfesFiltrados.length > 0 && (
                   <tfoot style={{ position: 'sticky', bottom: 0, background: 'var(--bg-elevated)', zIndex: 10, boxShadow: '0 -2px 10px rgba(0,0,0,0.1)' }}>
                     <tr>
-                      <td colSpan="3" style={{ fontWeight: '600', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>Total:</td>
+                      <td colSpan="4" style={{ fontWeight: '600', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>Total:</td>
                       <td style={{ fontWeight: '700', color: 'var(--text-main)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>{formatCurrency(totalValorRealNfes)}</td>
                       <td style={{ fontWeight: '700', color: 'var(--success)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>{formatCurrency(totalFaturamentosNfes)}</td>
                     </tr>
