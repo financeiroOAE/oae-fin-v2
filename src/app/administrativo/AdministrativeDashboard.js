@@ -9,6 +9,7 @@ import { useReport } from '@/contexts/ReportContext';
 import ReportAdder from '@/components/report/ReportAdder';
 import InfoTooltip from '@/components/InfoTooltip';
 import DataTable from '@/components/DataTable';
+import MultiSelect from '@/components/MultiSelect';
 import '../equipe/management.css';
 import '../equipe/managementExtras.css';
 
@@ -19,6 +20,13 @@ const getDateKey=(raw)=>{const value=String(raw||'');let m=value.match(/^(\d{4})
 const monthOf=(raw)=>getDateKey(raw).slice(0,7);
 const monthLabel=(value)=>new Intl.DateTimeFormat('pt-BR',{month:'short',timeZone:'UTC'}).format(new Date(`${value}-01T12:00:00Z`));
 const inRange=(row,start,end)=>{const key=getDateKey(row.data);if(!key)return false;return(!start||key>=start)&&(!end||key<=end)};
+const planName=(value)=>String(value||'').replace(/^\s*\d{6,}\s*[-–—:]?\s*/,'').trim()||String(value||'').trim();
+const accountOption=(row)=>{
+  const code=String(row?.contaCodigo||'').replace(/\D/g,'');
+  const name=planName(row?.contaNome||row?.contaDescricao||'');
+  return code&&name?`${code} · ${name}`:(name||code||'Sem plano');
+};
+const expenseStatus=(row)=>row?.paid?'Pago':'A pagar';
 
 function AdminMetricCard({ icon: Icon, label, value, info, tone = 'primary', percent = false }) {
   return <div className={`mgmt-metric-card tone-${tone}`}>
@@ -51,6 +59,9 @@ export default function AdministrativeDashboard(){
   const[data,setData]=useState({revenue:[],expenses:[],adminTeamRows:[],partnerRows:[],monthly:[]});
   const[startDate,setStartDate]=useState('2026-01-01');
   const[endDate,setEndDate]=useState('2026-12-31');
+  const[personFilters,setPersonFilters]=useState([]);
+  const[accountFilters,setAccountFilters]=useState([]);
+  const[statusFilters,setStatusFilters]=useState([]);
   const[showAllAccounts,setShowAllAccounts]=useState(false);
   const[detail,setDetail]=useState(null);
   const[partnerView,setPartnerView]=useState('TODOS');
@@ -58,7 +69,18 @@ export default function AdministrativeDashboard(){
 
   useEffect(()=>{let active=true;fetch('/api/administrativo',{cache:'no-store'}).then(async r=>{const result=await r.json();if(!r.ok)throw new Error(result.error||'Não foi possível carregar o Administrativo.');if(active)setData(result)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[]);
 
-  const expenses=useMemo(()=>data.expenses.filter(r=>inRange(r,startDate,endDate)),[data.expenses,startDate,endDate]);
+  const peopleOptions=useMemo(()=>[...new Set((data.expenses||[]).map(r=>r.nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),[data.expenses]);
+  const accountOptions=useMemo(()=>[...new Set((data.expenses||[]).map(accountOption).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),[data.expenses]);
+
+  const matchesExpenseFilters=(row,{ignoreDate=false}={})=>{
+    if(!ignoreDate&&!inRange(row,startDate,endDate))return false;
+    if(personFilters.length>0&&!personFilters.includes(row.nome))return false;
+    if(accountFilters.length>0&&!accountFilters.includes(accountOption(row)))return false;
+    if(statusFilters.length>0&&!statusFilters.includes(expenseStatus(row)))return false;
+    return true;
+  };
+
+  const expenses=useMemo(()=>data.expenses.filter(r=>matchesExpenseFilters(r)),[data.expenses,startDate,endDate,personFilters,accountFilters,statusFilters]);
   const revenue=useMemo(()=>data.revenue.filter(r=>{const key=`${r.month}-01`;return(!startDate||key>=startDate.slice(0,7)+'-01')&&(!endDate||key<=endDate.slice(0,7)+'-31')}),[data.revenue,startDate,endDate]);
 
   const revenueTotal=revenue.reduce((s,r)=>s+Number(r.adminValue||0),0);
@@ -73,7 +95,9 @@ export default function AdministrativeDashboard(){
   const visibleAccounts=showAllAccounts?byAccount:byAccount.slice(0,10);
 
   // A visão de Equipe ADM é anual por regra: realizado de jan-dez/2026 + tudo que está em aberto até dez/2026.
-  const adminTeamYearRows=useMemo(()=>(data.adminTeamRows||[]).filter(r=>getDateKey(r.data)>='2026-01-01'&&getDateKey(r.data)<='2026-12-31'),[data.adminTeamRows]);
+  const adminTeamYearRows=useMemo(()=>(data.adminTeamRows||[])
+    .filter(r=>getDateKey(r.data)>='2026-01-01'&&getDateKey(r.data)<='2026-12-31')
+    .filter(r=>matchesExpenseFilters(r,{ignoreDate:true})),[data.adminTeamRows,personFilters,accountFilters,statusFilters]);
   const adminTeam=useMemo(()=>{const map=new Map();adminTeamYearRows.forEach(r=>{const item=map.get(r.nome)||{name:r.nome,paid:0,open:0,rows:[]};item[r.paid?'paid':'open']+=Number(r.valor||0);item.rows.push(r);map.set(r.nome,item)});return[...map.values()].map(x=>({...x,total:x.paid+x.open})).sort((a,b)=>b.total-a.total)},[adminTeamYearRows]);
   const adminTeamMonthly=useMemo(()=>Array.from({length:12},(_,i)=>{const key=`2026-${String(i+1).padStart(2,'0')}`;const rows=adminTeamYearRows.filter(r=>monthOf(r.data)===key);return{month:monthLabel(key),Pago:rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0)}}),[adminTeamYearRows]);
 
@@ -81,12 +105,12 @@ export default function AdministrativeDashboard(){
     const key=`2026-${String(i+1).padStart(2,'0')}`;
     const active=(!startDate||`${key}-31`>=startDate)&&(!endDate||`${key}-01`<=endDate);
     const monthRevenue=(data.revenue||[]).filter(r=>r.month===key);
-    const source=(data.monthly||[]).find(m=>m.month===key)||{};
+    const monthExpenses=expenses.filter(r=>monthOf(r.data)===key);
     const receivedAdmin=active?monthRevenue.filter(r=>r.realized).reduce((s,r)=>s+Number(r.adminValue||0),0):0;
-    const paidExpense=active?Number(source.paid||0):0;
-    const openExpense=active?Number(source.open||0):0;
+    const paidExpense=active?monthExpenses.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0):0;
+    const openExpense=active?monthExpenses.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0):0;
     return{month:monthLabel(key),'Recebido ADM':receivedAdmin,'Despesa paga':paidExpense,'A pagar':openExpense,'Saldo caixa':receivedAdmin-paidExpense};
-  }),[data.monthly,data.revenue,startDate,endDate]);
+  }),[data.revenue,expenses,startDate,endDate]);
 
   const cashFlowMonthly=chartMonthly.map(row=>({month:row.month,'Recebimentos ADM':row['Recebido ADM'],'Pagamentos ADM':row['Despesa paga'],'Saldo mensal':row['Saldo caixa']}));
 
@@ -95,7 +119,9 @@ export default function AdministrativeDashboard(){
     {token:'PAULO HENRIQUE LEMES ARAUJO',name:'Paulo Henrique Lemes Araujo',short:'Paulo',fixed:42000}
   ];
   const partners=useMemo(()=>partnerDefs.map(def=>{
-    const rows=(data.partnerRows||[]).filter(r=>String(r.nome||'').toUpperCase().includes(def.token)&&getDateKey(r.data)>='2026-01-01'&&getDateKey(r.data)<='2026-12-31');
+    const rows=(data.partnerRows||[])
+      .filter(r=>String(r.nome||'').toUpperCase().includes(def.token)&&getDateKey(r.data)>='2026-01-01'&&getDateKey(r.data)<='2026-12-31')
+      .filter(r=>matchesExpenseFilters(r,{ignoreDate:true}));
     const fixedRows=rows.filter(r=>r.type==='EQUIPE_ADM_SOCIO');
     const withdrawalRows=rows.filter(r=>r.type==='RETIRADA');
     return{
@@ -105,14 +131,20 @@ export default function AdministrativeDashboard(){
       fixedOpen:fixedRows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0),
       withdrawal:withdrawalRows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),
     };
-  }),[data.partnerRows]);
+  }),[data.partnerRows,personFilters,accountFilters,statusFilters]);
 
   const partnerMonthly=useMemo(()=>Array.from({length:12},(_,i)=>{const key=`2026-${String(i+1).padStart(2,'0')}`;const row={month:monthLabel(key)};partners.forEach(p=>{const rows=p.rows.filter(r=>monthOf(r.data)===key);row[`${p.short} · Fixo pago`]=rows.filter(r=>r.type==='EQUIPE_ADM_SOCIO'&&r.paid).reduce((s,r)=>s+Number(r.valor||0),0);row[`${p.short} · Retirada`]=rows.filter(r=>r.type==='RETIRADA'&&r.paid).reduce((s,r)=>s+Number(r.valor||0),0)});return row}),[partners]);
 
   const partnerSeries=partnerView==='FRAN'?['Francielle · Fixo pago','Francielle · Retirada']:partnerView==='PAULO'?['Paulo · Fixo pago','Paulo · Retirada']:['Francielle · Fixo pago','Francielle · Retirada','Paulo · Fixo pago','Paulo · Retirada'];
 
   const adminFinancialRows=useMemo(()=>expenses.map(r=>({...r,natureza:'Saída',projeto:'ADMINISTRAÇÃO',contaDescricao:r.contaNome||r.contaCodigo,status:r.paid?'Realizado':'A realizar'})),[expenses]);
-  const reportFilters={'Data inicial':startDate,'Data final':endDate};
+  const reportFilters={
+    'Data inicial':startDate,
+    'Data final':endDate,
+    'Pessoa / fornecedor':personFilters.length?personFilters.join(', '):'Todos',
+    'Plano de contas':accountFilters.length?accountFilters.join(', '):'Todos',
+    'Situação':statusFilters.length?statusFilters.join(', '):'Todas',
+  };
   const reportMovementRows=adminFinancialRows.map(r=>({Data:r.data,'Nome / fornecedor':r.nome,Conta:r.contaDescricao,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
 
   return <div className="mgmt mgmt-admin">
@@ -126,17 +158,24 @@ export default function AdministrativeDashboard(){
       <div className="mgmt-panel-head">
         <div><h2>Período de análise</h2><p>Selecione o intervalo dentro do exercício de 2026.</p></div>
       </div>
-      <div className="mgmt-filter-grid mgmt-filter-grid-dates">
+      <div className="mgmt-filter-grid mgmt-admin-filter-grid">
         <label>Data inicial<input type="date" min="2026-01-01" max="2026-12-31" value={startDate} onChange={e=>setStartDate(e.target.value)}/></label>
         <label>Data final<input type="date" min="2026-01-01" max="2026-12-31" value={endDate} onChange={e=>setEndDate(e.target.value)}/></label>
+        <label>Pessoa / fornecedor<MultiSelect options={peopleOptions} selected={personFilters} onChange={setPersonFilters} placeholder="Todas as pessoas"/></label>
+        <label>Plano de contas<MultiSelect options={accountOptions} selected={accountFilters} onChange={setAccountFilters} placeholder="Todos os planos"/></label>
+        <label>Situação<MultiSelect options={['Pago','A pagar']} selected={statusFilters} onChange={setStatusFilters} placeholder="Todas as situações"/></label>
       </div>
     </section>
 
-    <section className="mgmt-revenue-banner" data-report-section>
-      <ReportAdder sectionKey="administrativo:receita-20" title="Receita Administrativa — 20%" componentName="Resumo de Receita Administrativa" page="Administrativo" type="SUMMARY" data={[{'Receita ADM':revenueTotal,'Recebido ADM':received,'A receber ADM':receivable}]} filters={reportFilters} style={{position:'absolute',right:14,top:14}}/>
-      <div className="tone-primary"><span className="mgmt-banner-icon"><Landmark size={18}/></span><div className="mgmt-kpi-title"><span>20% · Receita administrativa</span><InfoTooltip title="Receita administrativa" content="20% das receitas dos projetos no período selecionado, conforme a regra de rateio administrativo do painel."/></div><strong>{brl(revenueTotal)}</strong><small>Parcela administrativa das receitas</small></div>
-      <div className="tone-success"><span className="mgmt-banner-icon"><CircleDollarSign size={18}/></span><div className="mgmt-kpi-title"><span>20% já recebido</span><InfoTooltip title="Recebido ADM" content="Parcela administrativa correspondente às receitas já realizadas/recebidas."/></div><strong>{brl(received)}</strong><small>Receita ADM realizada</small></div>
-      <div className="tone-warning"><span className="mgmt-banner-icon"><Clock3 size={18}/></span><div className="mgmt-kpi-title"><span>20% a receber</span><InfoTooltip title="A receber ADM" content="Parcela administrativa das receitas previstas e ainda não recebidas até o fim do período."/></div><strong>{brl(receivable)}</strong><small>Receita ADM prevista</small></div>
+    <section className="mgmt-revenue-section" data-report-section>
+      <div className="mgmt-revenue-report">
+        <ReportAdder sectionKey="administrativo:receita-20" title="Receita Administrativa — 20%" componentName="Resumo de Receita Administrativa" page="Administrativo" type="SUMMARY" data={[{'Receita ADM':revenueTotal,'Recebido ADM':received,'A receber ADM':receivable}]} filters={reportFilters}/>
+      </div>
+      <div className="mgmt-revenue-banner">
+        <div className="tone-primary"><span className="mgmt-banner-icon"><Landmark size={18}/></span><div className="mgmt-kpi-title"><span>20% · Receita administrativa</span><InfoTooltip title="Receita administrativa" content="20% das receitas dos projetos no período selecionado, conforme a regra de rateio administrativo do painel."/></div><strong>{brl(revenueTotal)}</strong><small>Parcela administrativa das receitas</small></div>
+        <div className="tone-success"><span className="mgmt-banner-icon"><CircleDollarSign size={18}/></span><div className="mgmt-kpi-title"><span>20% já recebido</span><InfoTooltip title="Recebido ADM" content="Parcela administrativa correspondente às receitas já realizadas/recebidas."/></div><strong>{brl(received)}</strong><small>Receita ADM realizada</small></div>
+        <div className="tone-warning"><span className="mgmt-banner-icon"><Clock3 size={18}/></span><div className="mgmt-kpi-title"><span>20% a receber</span><InfoTooltip title="A receber ADM" content="Parcela administrativa das receitas previstas e ainda não recebidas até o fim do período."/></div><strong>{brl(receivable)}</strong><small>Receita ADM prevista</small></div>
+      </div>
     </section>
 
     <div className="mgmt-metrics-grid">
