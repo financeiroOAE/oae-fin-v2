@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { FileText, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Wallet, CircleDollarSign, Clock3, UsersRound, BriefcaseBusiness, Building2 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   BarChart, Bar
@@ -51,6 +51,17 @@ const toFinancialRows = (rows, personName) => (rows||[]).map((row)=>({
   status:row.paid ? 'Realizado' : 'A realizar',
   projeto:row.projeto || '',
 }));
+
+function MetricCard({ icon: Icon, label, value, info, tone = 'primary', currency = true }) {
+  return <div className={`mgmt-metric-card tone-${tone}`} data-report-section>
+    <div className="mgmt-metric-top">
+      <span className="mgmt-metric-icon"><Icon size={17}/></span>
+      <InfoTooltip title={label} content={info}/>
+    </div>
+    <span className="mgmt-metric-label">{label}</span>
+    <strong className="mgmt-metric-value">{currency ? brl(value) : value}</strong>
+  </div>;
+}
 
 function Pager({ total, page, setPage, pageSize, setPageSize }) {
   const showAll = pageSize === 'all';
@@ -293,15 +304,13 @@ export default function TeamDashboard(){
       <label>Situação<MultiSelect options={['Pago','A pagar']} selected={statusFilters} onChange={setStatusFilters} placeholder="Todas as situações"/></label>
     </div></section>
 
-    <div className="mgmt-kpis mgmt-kpis-six">
-      {[
-        ['Custo no período',paid+open,'Soma de todos os pagamentos realizados e valores em aberto da equipe dentro do intervalo selecionado.'],
-        ['Pago',paid,'Valores do CP_GERAL com situação realizada/paga no período.'],
-        ['A pagar',open,'Valores ainda pendentes no CP_GERAL com vencimento dentro do período.'],
-        ['Pessoas / empresas',peopleRoster.length,'Quantidade de pessoas ou empresas da equipe após os filtros aplicados.'],
-        ['Terceiros',peopleRoster.filter(e=>e.thirdParty).length,'Quantidade de cadastros classificados como TERCEIRO na aba EQUIPE.'],
-        ['Obras com equipe',projectRows.length,'Quantidade de obras com vínculo ou movimentação de equipe, excluindo o centro transitório PROJETOS.']
-      ].map(([label,value,info])=><div key={label} data-report-section><div className="mgmt-kpi-title"><span>{label}</span><InfoTooltip title={label} content={info}/></div><strong>{typeof value==='number'&&label!=='Pessoas / empresas'&&label!=='Terceiros'&&label!=='Obras com equipe'?brl(value):value}</strong></div>)}
+    <div className="mgmt-metrics-grid mgmt-metrics-six">
+      <MetricCard icon={Wallet} label="Custo no período" value={paid+open} tone="primary" info="Soma de todos os pagamentos realizados e valores em aberto da equipe dentro do intervalo selecionado."/>
+      <MetricCard icon={CircleDollarSign} label="Pago" value={paid} tone="success" info="Valores do CP_GERAL com situação realizada/paga no período."/>
+      <MetricCard icon={Clock3} label="A pagar" value={open} tone="warning" info="Valores ainda pendentes no CP_GERAL com vencimento dentro do período."/>
+      <MetricCard icon={UsersRound} label="Pessoas / empresas" value={peopleRoster.length} currency={false} tone="info" info="Quantidade de pessoas ou empresas da equipe após os filtros aplicados."/>
+      <MetricCard icon={BriefcaseBusiness} label="Terceiros" value={peopleRoster.filter(e=>e.thirdParty).length} currency={false} tone="violet" info="Quantidade de cadastros classificados como TERCEIRO na aba EQUIPE."/>
+      <MetricCard icon={Building2} label="Obras com equipe" value={projectRows.length} currency={false} tone="cyan" info="Quantidade de obras com vínculo ou movimentação de equipe, excluindo o centro transitório PROJETOS."/>
     </div>
 
     <div className="mgmt-flow mgmt-flow-balanced">
