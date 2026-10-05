@@ -80,14 +80,14 @@ function MetricCard({ icon: Icon, label, value, info, tone = 'primary', currency
 
 function Pager({ total, page, setPage, pageSize, setPageSize }) {
   const showAll = pageSize === 'all';
-  const effective = showAll ? Math.max(total, 1) : Number(pageSize) || 30;
+  const effective = showAll ? Math.max(total, 1) : Number(pageSize) || 15;
   const pages = showAll ? 1 : Math.max(1, Math.ceil(total / effective));
   const current = Math.min(page, pages);
   return <div className="mgmt-pagination">
     <span>{total===0?'0 registros':showAll?`Exibindo todos os ${total}`:`Página ${current} de ${pages} · ${total} registros`}</span>
     <div className="mgmt-pagination-actions">
       <select value={pageSize} onChange={(e)=>{setPageSize(e.target.value==='all'?'all':Number(e.target.value));setPage(1)}}>
-        <option value={30}>30 por página</option><option value="all">Ver todos</option>
+        <option value={15}>15 por página</option><option value={30}>30 por página</option><option value="all">Ver todos</option>
       </select>
       {!showAll&&<>
         <button className="btn" onClick={()=>setPage(1)} disabled={current===1}><ChevronsLeft size={15}/></button>
@@ -208,9 +208,9 @@ export default function TeamDashboard(){
   const[accountFilters,setAccountFilters]=useState([]);
   const[statusFilters,setStatusFilters]=useState([]);
   const[rosterPage,setRosterPage]=useState(1);
-  const[rosterPageSize,setRosterPageSize]=useState(30);
+  const[rosterPageSize,setRosterPageSize]=useState(15);
   const[projectPage,setProjectPage]=useState(1);
-  const[projectPageSize,setProjectPageSize]=useState(30);
+  const[projectPageSize,setProjectPageSize]=useState(15);
   const[selectedPerson,setSelectedPerson]=useState(null);
   const[error,setError]=useState('');
 

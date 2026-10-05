@@ -205,3 +205,8 @@
 @media(max-width:600px){
   .mgmt-admin-filter-grid{grid-template-columns:1fr}
 }
+
+.mgmt-banner-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;min-width:0}
+.mgmt-banner-head .mgmt-banner-icon{margin:0;flex:0 0 auto}
+.mgmt-banner-head .mgmt-kpi-title{margin:0;min-width:0;flex:1}
+.mgmt-banner-head .mgmt-kpi-title>span{white-space:normal}
