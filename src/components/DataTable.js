@@ -6,6 +6,7 @@ import {
   ArrowDownRight, ArrowUpRight, ArrowDownAZ, ArrowUpAZ, ArrowUpDown,
   Search, FilterX
 } from 'lucide-react';
+import MultiSelect from '@/components/MultiSelect';
 
 export default function DataTable({ data, initialPageSize = 25, pageSizeOptions = [25, 50, 100] }) {
   // Configuração
@@ -17,10 +18,10 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
   // Filtros Avançados
   const [filterDataInicial, setFilterDataInicial] = useState('');
   const [filterDataFinal, setFilterDataFinal] = useState('');
-  const [filterStatus, setFilterStatus] = useState('Todos');
-  const [filterProjeto, setFilterProjeto] = useState('Todos');
-  const [filterNome, setFilterNome] = useState('Todos');
-  const [filterConta, setFilterConta] = useState('Todos');
+  const [filterStatus, setFilterStatus] = useState([]);
+  const [filterProjeto, setFilterProjeto] = useState([]);
+  const [filterNome, setFilterNome] = useState([]);
+  const [filterConta, setFilterConta] = useState([]);
 
   // Debounce do Search
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -76,9 +77,9 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
       }
 
       // 2. Selects
-      if (filterProjeto !== 'Todos' && item.projeto !== filterProjeto) return false;
-      if (filterNome !== 'Todos' && item.nome !== filterNome) return false;
-      if (filterConta !== 'Todos' && item.contaDescricao !== filterConta) return false;
+      if (filterProjeto.length > 0 && !filterProjeto.includes(item.projeto)) return false;
+      if (filterNome.length > 0 && !filterNome.includes(item.nome)) return false;
+      if (filterConta.length > 0 && !filterConta.includes(item.contaDescricao)) return false;
 
       // 3. Data
       if (filterDataInicial) {
@@ -91,7 +92,7 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
       }
 
       // 4. Status
-      if (filterStatus !== 'Todos' && item.statusExibicao !== filterStatus) return false;
+      if (filterStatus.length > 0 && !filterStatus.includes(item.statusExibicao)) return false;
 
       return true;
     });
@@ -148,10 +149,10 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
     setDebouncedSearch('');
     setFilterDataInicial('');
     setFilterDataFinal('');
-    setFilterStatus('Todos');
-    setFilterProjeto('Todos');
-    setFilterNome('Todos');
-    setFilterConta('Todos');
+    setFilterStatus([]);
+    setFilterProjeto([]);
+    setFilterNome([]);
+    setFilterConta([]);
     setCurrentPage(1);
   };
 
@@ -206,36 +207,21 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Data Final</label>
           <input type="date" value={filterDataFinal} onChange={(e) => setFilterDataFinal(e.target.value)} style={{ width: '100%', height: '32px', fontSize: '13px' }} />
         </div>
-        <div style={{ flex: '2 1 200px' }}>
+        <div style={{ flex: '2 1 200px', minWidth: 0 }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Projeto / Obra</label>
-          <select value={filterProjeto} onChange={(e) => setFilterProjeto(e.target.value)} style={{ width: '100%', height: '32px', fontSize: '13px', paddingLeft: '0.5rem' }}>
-            <option value="Todos">Todos</option>
-            {projetosDisponiveis.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          <MultiSelect options={projetosDisponiveis} selected={filterProjeto} onChange={setFilterProjeto} placeholder="Todos os projetos" />
         </div>
-        <div style={{ flex: '2 1 200px' }}>
+        <div style={{ flex: '2 1 200px', minWidth: 0 }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Nome</label>
-          <select value={filterNome} onChange={(e) => setFilterNome(e.target.value)} style={{ width: '100%', height: '32px', fontSize: '13px', paddingLeft: '0.5rem' }}>
-            <option value="Todos">Todos</option>
-            {nomesDisponiveis.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          <MultiSelect options={nomesDisponiveis} selected={filterNome} onChange={setFilterNome} placeholder="Todos os nomes" />
         </div>
-        <div style={{ flex: '2 1 200px' }}>
+        <div style={{ flex: '2 1 200px', minWidth: 0 }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Conta</label>
-          <select value={filterConta} onChange={(e) => setFilterConta(e.target.value)} style={{ width: '100%', height: '32px', fontSize: '13px', paddingLeft: '0.5rem' }}>
-            <option value="Todos">Todas</option>
-            {contasDisponiveis.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          <MultiSelect options={contasDisponiveis} selected={filterConta} onChange={setFilterConta} placeholder="Todas as contas" />
         </div>
-        <div style={{ flex: '1 1 140px' }}>
+        <div style={{ flex: '1 1 160px', minWidth: 0 }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Situação</label>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ width: '100%', height: '32px', fontSize: '13px', paddingLeft: '0.5rem' }}>
-            <option value="Todos">Todas as situações</option>
-            <option value="Pago">Pago</option>
-            <option value="A pagar">A pagar</option>
-            <option value="Recebido">Recebido</option>
-            <option value="A receber">A receber</option>
-          </select>
+          <MultiSelect options={['Pago','A pagar','Recebido','A receber']} selected={filterStatus} onChange={setFilterStatus} placeholder="Todas as situações" />
         </div>
       </div>
 

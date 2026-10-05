@@ -61,8 +61,9 @@ export async function GET() {
   const snapshot = await readCurrentSnapshot();
 
   const roster = snapshot?.payload?.equipe || [];
-  const expenses = cpRows(snapshot)
-    .filter((row) => monthOf(row.data)?.startsWith(YEAR))
+  const allCp2026 = cpRows(snapshot).filter((row) => monthOf(row.data)?.startsWith(YEAR));
+
+  const expenses = allCp2026
     .filter((row) => norm(row.projeto) === 'ADMINISTRACAO')
     .map((row) => {
       const type = adminType(row);
@@ -71,6 +72,20 @@ export async function GET() {
         (isPartner(row) || matchesRosterEntity(roster, row.nome));
       return { ...row, type, adminTeamEntity };
     });
+
+  const adminTeamRows = allCp2026
+    .filter((row) => String(row.contaCodigo || '').replace(/\D/g, '') === '2010302')
+    .filter((row) => !isExcludedAdminEntity(row.nome))
+    .filter((row) => matchesRosterEntity(roster, row.nome))
+    .map((row) => ({ ...row, type: isPartner(row) ? 'EQUIPE_ADM_SOCIO' : 'EQUIPE_ADM', adminTeamEntity: true }));
+
+  const partnerRows = allCp2026
+    .filter((row) => isPartner(row))
+    .filter((row) => {
+      const code = String(row.contaCodigo || '').replace(/\D/g, '');
+      return code === '2010302' || code === '2010522';
+    })
+    .map((row) => ({ ...row, type: adminType(row), adminTeamEntity: true }));
 
   const revenue = revenueTitles(snapshot)
     .filter((row) => String(row.month || '').startsWith(YEAR))
@@ -99,12 +114,14 @@ export async function GET() {
     year: 2026,
     revenue,
     expenses,
+    adminTeamRows,
+    partnerRows,
     monthly,
     snapshotAt: snapshot?.updatedAt || null,
     rules: {
       revenueAdministrative: '20% da receita dos títulos',
       expenseScope: 'Centro de custo ADMINISTRAÇÃO',
-      partnerScope: 'Francielle/Paulo somente Retirada dos Sócios ou Equipe ADM',
+      partnerScope: 'Francielle/Paulo: plano 2010302 em todo o CP_GERAL + retiradas 2010522',
     },
   }, { headers: { 'Cache-Control': 'private, no-store' } });
 }

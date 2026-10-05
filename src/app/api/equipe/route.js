@@ -26,6 +26,11 @@ function matchesParty(rosterName, cpName) {
   return partyAliases(rosterName).some((alias) => target === alias || target.includes(alias) || alias.includes(target));
 }
 
+function isExecutiveTeamPerson(name) {
+  const target = norm(name);
+  return target.includes('FRANCIELLE PAIVA') || target.includes('PAULO HENRIQUE LEMES ARAUJO');
+}
+
 function projectCode(value) {
   return norm(value).match(/(?:^|\b)P?\.?\s*(\d{3,4}[A-Z0-9]*)/)?.[1] || '';
 }
