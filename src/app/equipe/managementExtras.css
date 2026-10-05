@@ -42,7 +42,7 @@
 
 .mgmt-filter-grid input[type="date"]{width:100%;background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-main);border-radius:7px;padding:10px;font:inherit;font-size:12px;color-scheme:dark}
 .mgmt-filter-grid-dates{grid-template-columns:repeat(2,minmax(180px,260px));justify-content:start}
-.mgmt-filter-grid-team{grid-template-columns:repeat(5,minmax(130px,1fr))}
+.mgmt-filter-grid-team{grid-template-columns:repeat(6,minmax(125px,1fr))}
 .mgmt-kpi-title{display:flex;align-items:center;gap:6px;min-width:0}
 .mgmt-kpi-title>span{min-width:0}
 .mgmt-overlay-center{justify-content:center;align-items:center;padding:22px;overflow:auto}
@@ -162,3 +162,5 @@
   .mgmt-admin .mgmt-panel{padding:15px}
   .mgmt-admin .mgmt-chart-wide{height:300px}
 }
+
+@media(max-width:1250px){.mgmt-filter-grid-team{grid-template-columns:repeat(3,minmax(0,1fr))}}
