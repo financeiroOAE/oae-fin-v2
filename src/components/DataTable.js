@@ -7,9 +7,9 @@ import {
   Search, FilterX
 } from 'lucide-react';
 
-export default function DataTable({ data }) {
+export default function DataTable({ data, initialPageSize = 25, pageSizeOptions = [25, 50, 100] }) {
   // Configuração
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(initialPageSize);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: 'dataTimestamp', direction: 'desc' });
   const [searchTerm, setSearchTerm] = useState('');
@@ -305,9 +305,7 @@ export default function DataTable({ data }) {
             onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
             style={{ height: '28px', padding: '0 0.5rem', fontSize: '12px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }}
           >
-            <option value={25}>25 por pág.</option>
-            <option value={50}>50 por pág.</option>
-            <option value={100}>100 por pág.</option>
+            {pageSizeOptions.map((size) => <option key={size} value={size}>{size} por pág.</option>)}
           </select>
         </div>
 
