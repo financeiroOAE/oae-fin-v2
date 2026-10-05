@@ -72,7 +72,8 @@ export default function Sidebar() {
 
   if (pathname === '/login') return null;
 
-  const canAccess = (permission) => ['equipe', 'diretores'].includes(permission)
+  const restrictedManagementMenus = ['equipe_gestao', 'administrativo'];
+  const canAccess = (permission) => restrictedManagementMenus.includes(permission)
     ? Boolean(sessionUser && (sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission)))
     : !sessionUser || sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission);
   const isSettingsPath = ['/configuracoes', '/atualizacao-dados', '/historico'].some((path) => pathname.startsWith(path));
@@ -82,9 +83,9 @@ export default function Sidebar() {
     { name: 'Visão Financeira', path: '/visao-financeira', icon: BarChart3, permission: 'visao_financeira' },
     { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: Activity, permission: 'fluxo_caixa' },
     { name: 'Projetos', path: '/projetos', icon: FolderKanban, permission: 'projetos' },
+    { name: 'Equipe', path: '/equipe', icon: UsersRound, permission: 'equipe_gestao' },
+    { name: 'Administrativo', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo' },
     { name: 'DRE Gerencial', path: '/dre', icon: ChartColumn, permission: 'dre' },
-    { name: 'Equipe', path: '/equipe', icon: UsersRound, permission: 'equipe' },
-    { name: 'Diretores', path: '/diretores', icon: UserRoundCheck, permission: 'diretores' },
     {
       name: 'Configurações', path: '/configuracoes', icon: Settings, permission: 'configuracoes',
       children: [
