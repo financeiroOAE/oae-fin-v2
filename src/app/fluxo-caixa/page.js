@@ -239,6 +239,7 @@ export default function FluxoDeCaixa() {
   const faturamentosNfes = useMemo(() => {
     const rawList = baseData.filter(item =>
       item.natureza === 'Entrada' &&
+      item.statusExibicao === 'A receber' &&
       item.documento &&
       item.documento.toUpperCase().includes('NFES')
     );
@@ -324,7 +325,6 @@ export default function FluxoDeCaixa() {
       Documento: row.documento,
       Projeto: row.projeto,
       Vencimento: row.data,
-      Situação: row.statusExibicao,
       "Valor Bruto": Number(row.valorRealNota) || 0,
       "Valor Líquido": Number(row.valor) || 0,
     })),
@@ -332,7 +332,6 @@ export default function FluxoDeCaixa() {
       Documento: 'TOTAL DAS NOTAS',
       Projeto: '-',
       Vencimento: '-',
-      Situação: '-',
       "Valor Bruto": totalValorRealNfes,
       "Valor Líquido": totalFaturamentosNfes,
     }] : []),
@@ -836,7 +835,7 @@ export default function FluxoDeCaixa() {
               dataSets={{ all: reportFaturamentosNfesRows, summary: reportFaturamentosNfesSummary }}
               detailMode="all"
               detailOptions={["all", "summary"]}
-              filters={{ Tipo: "NFES", Situação: "Todas as notas da CR_GERAL" }}
+              filters={{ Tipo: "NFES", Situação: "A receber" }}
               explanation="Relação de notas fiscais faturadas com soma total do valor bruto e do valor líquido."
               style={{ float: 'right' }}
             />
@@ -844,7 +843,7 @@ export default function FluxoDeCaixa() {
               <ChartHeader
                 title="Painel de Faturamento (NFES)"
                 infoTitle="Faturamento"
-                infoContent="Relação de todas as notas NFES registradas na CR_GERAL, recebidas ou a receber."
+                infoContent="Relação de notas faturadas com status A receber."
               />
               <select
                 value={filtroFaturamento}
@@ -863,7 +862,6 @@ export default function FluxoDeCaixa() {
                     <th>Documento</th>
                     <th>Projeto</th>
                     <th>Vencimento</th>
-                    <th>Situação</th>
                     <th style={{ textAlign: 'right' }}>Valor Bruto</th>
                     <th style={{ textAlign: 'right' }}>Valor Líquido</th>
                   </tr>
@@ -874,18 +872,17 @@ export default function FluxoDeCaixa() {
                       <td style={{ fontWeight: '500' }}>{row.documento}</td>
                       <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.projeto}>{row.projeto}</td>
                       <td>{row.data}</td>
-                      <td>{row.statusExibicao}</td>
                       <td style={{ textAlign: 'right', color: 'var(--text-main)', fontWeight: '600' }}>{formatCurrency(row.valorRealNota)}</td>
                       <td style={{ textAlign: 'right', color: 'var(--success)' }}>{formatCurrency(row.valor)}</td>
                     </tr>
                   )) : (
-                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhum faturamento encontrado.</td></tr>
+                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhum faturamento encontrado.</td></tr>
                   )}
                 </tbody>
                 {faturamentosNfesFiltrados.length > 0 && (
                   <tfoot style={{ position: 'sticky', bottom: 0, background: 'var(--bg-elevated)', zIndex: 10, boxShadow: '0 -2px 10px rgba(0,0,0,0.1)' }}>
                     <tr>
-                      <td colSpan="4" style={{ fontWeight: '600', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>Total:</td>
+                      <td colSpan="3" style={{ fontWeight: '600', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>Total:</td>
                       <td style={{ fontWeight: '700', color: 'var(--text-main)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>{formatCurrency(totalValorRealNfes)}</td>
                       <td style={{ fontWeight: '700', color: 'var(--success)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>{formatCurrency(totalFaturamentosNfes)}</td>
                     </tr>
