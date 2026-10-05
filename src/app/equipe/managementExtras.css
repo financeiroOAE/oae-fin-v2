@@ -87,3 +87,15 @@
 .mgmt-project-card-button.active{border-color:var(--primary);box-shadow:0 0 0 1px color-mix(in srgb,var(--primary) 40%,transparent);background:var(--bg-card-hover)}
 .mgmt-project-movements{margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color)}
 .mgmt-project-movements .card{margin-top:10px}
+
+.mgmt-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;margin-top:10px;border-top:1px solid var(--border-color);font-size:11px;color:var(--text-secondary);flex-wrap:wrap}
+.mgmt-pagination-actions{display:flex;align-items:center;gap:5px}
+.mgmt-pagination-actions select{height:30px;background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-main);border-radius:6px;padding:0 8px;font-size:11px}
+.mgmt-pagination-actions .btn{padding:6px 8px;min-width:30px}
+.mgmt-filter-grid-team>label{min-width:0}
+.mgmt-filter-grid-team>label>div{margin-top:0}
+.mgmt-filter-grid-dates{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+.mgmt-filter-grid-dates label{width:100%}
+.mgmt-panel-wide{width:100%}
+.mgmt-chart-wide{height:380px}
+@media(max-width:700px){.mgmt-pagination{align-items:flex-start;flex-direction:column}.mgmt-pagination-actions{width:100%;flex-wrap:wrap}.mgmt-chart-wide{height:300px}}
