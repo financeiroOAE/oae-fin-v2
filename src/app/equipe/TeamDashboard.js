@@ -77,6 +77,8 @@ function PersonModal({ person, onClose }) {
   const [selectedProject, setSelectedProject] = useState(null);
   if(!person) return null;
   const rows=person.transactions||[];
+  const movementPlans=[...new Set(rows.map(r=>planLabel(r.contaNome||r.contaCodigo)).filter(Boolean))];
+  const displayPlans=movementPlans.length?movementPlans:[...new Set(person.accounts.map(planLabel).filter(Boolean))];
   const paid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
   const open=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
 
@@ -112,7 +114,7 @@ function PersonModal({ person, onClose }) {
 
       <div className="mgmt-meta-grid">
         <div><span>Tipo</span><strong>{person.thirdParty?'Terceiro':person.fixedMonthly?'Mensal / fixo':'Equipe'}</strong></div>
-        <div><span>Plano utilizado</span><strong>{person.accounts.length?[...new Set(person.accounts.map(planLabel).filter(Boolean))].join(' · '):'Não identificado'}</strong></div>
+        <div><span>Plano utilizado</span><strong>{displayPlans.length?displayPlans.join(' · '):'Não identificado'}</strong></div>
         <div><span>Projetos vinculados</span><strong>{person.projects.length}</strong></div>
         <div><span>Valor de referência</span><strong>{person.fixedMonthly&&!person.referenceValue?'Mensal / fixo':brl(person.referenceValue)}</strong></div>
       </div>
@@ -146,7 +148,7 @@ function PersonModal({ person, onClose }) {
         </div>
         {!byProject.length&&<p>Sem movimentações vinculadas a obras.</p>}
         {selectedProject&&<div className="mgmt-project-movements">
-          <div className="mgmt-panel-head"><div><h3>Movimentos · {selectedProject.name}</h3><p>{selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div><button className="mgmt-text-button" onClick={()=>setSelectedProject(null)}>Fechar relação</button></div>
+          <div className="mgmt-panel-head"><div><h3>Movimentos · {selectedProject.name}</h3><p>{selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div><div className="mgmt-actions"><ReportAdder sectionKey={`equipe:obra:${person.key}:${projectCodeLabel(selectedProject.name)}`} title={`Movimentos — ${person.name} — ${selectedProject.name}`} componentName="Movimentos da Pessoa por Obra" page="Equipe" type="TABLE" data={selectedProject.rows.map(r=>({Data:r.data,Documento:r.documento||r.titulo,Obra:r.projeto,Plano:planLabel(r.contaNome||r.contaCodigo),Situação:r.paid?'Pago':'A pagar',Valor:r.valor}))} filters={{Ano:2026}}/><button className="mgmt-text-button" onClick={()=>setSelectedProject(null)}>Fechar relação</button></div></div>
           <DataTable data={toFinancialRows(selectedProject.rows,person.name)} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
         </div>}
       </section>
