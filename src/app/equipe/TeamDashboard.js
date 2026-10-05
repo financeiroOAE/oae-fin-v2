@@ -65,7 +65,7 @@ export default function TeamDashboard() {
     if (!month) return { paid: entry.paid, open: entry.open, total: entry.total };
     const rows = (entry.transactions || []).filter((row) => {
       const raw = String(row.data || '');
-      const br = raw.match(/^\\d{1,2}\\/(\\d{1,2})\\/(\\d{4})/);
+      const br = raw.match(/^\d{1,2}\/(\d{1,2})\/(\d{4})/);
       const rowMonth = br ? `${br[2]}-${br[1].padStart(2,'0')}` : raw.slice(0,7);
       return rowMonth === month;
     });
