@@ -1,6 +1,6 @@
 # OAE Financeiro v2
 
-Painel financeiro corporativo da Oliveira Araújo Engenharia, desenvolvido em Next.js com Prisma, autenticação por usuário/senha e sincronização com Google Sheets.
+Painel financeiro corporativo da Oliveira Araújo Engenharia, desenvolvido em Next.js, Prisma e PostgreSQL/Neon, com autenticação por usuário e sincronização com Google Sheets.
 
 ## Desenvolvimento local
 
@@ -18,7 +18,7 @@ npx prisma generate
 npx prisma db push
 ```
 
-4. Se for a primeira execução, defina `ADMIN_TEMP_PASSWORD` e crie o administrador:
+4. Na primeira execução, defina `ADMIN_TEMP_PASSWORD` e crie o administrador:
 
 ```bash
 node scripts/seed.js
@@ -33,29 +33,36 @@ npm run dev -- -p 3001
 ## Variáveis obrigatórias
 
 - `JWT_SECRET`: segredo longo e exclusivo para assinar as sessões.
-- `DATABASE_URL`: URL do SQLite. Local: `file:./database.sqlite`. Em produção com volume em `/data`: `file:/data/database.sqlite`.
+- `DATABASE_URL`: connection string PostgreSQL fornecida pelo Neon.
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REFRESH_TOKEN`
 - `GOOGLE_SPREADSHEET_ID`
-- `ADMIN_TEMP_PASSWORD`: necessário apenas na criação inicial do usuário administrador.
+- `ADMIN_TEMP_PASSWORD`: necessária apenas para criar o administrador inicial.
 
-Nunca versionar `.env.local`, tokens, senhas ou o arquivo `database.sqlite`.
+Nunca versione `.env.local`, tokens, senhas ou credenciais do banco.
+
+## Sincronização financeira
+
+- Ao abrir ou recarregar uma página, o painel utiliza o último snapshot salvo.
+- Uma nova leitura do Google Sheets ocorre ao clicar em **Atualizar Dados**.
+- A sincronização automática oficial é executada diariamente às 07h pelo workflow `daily-financial-sync.yml`.
+- Se uma atualização falhar, o snapshot anterior permanece disponível.
 
 ## Produção
 
-O projeto inclui `Dockerfile`. Como o sistema mantém usuários e histórico no SQLite, o ambiente de produção precisa oferecer armazenamento persistente.
+O projeto é publicado no Render utilizando o `Dockerfile`.
 
-Configuração esperada do serviço:
+Na inicialização do container:
 
-- build a partir do `Dockerfile`;
-- porta fornecida pelo ambiente via `PORT`;
-- volume persistente montado em `/data`;
-- `DATABASE_URL=file:/data/database.sqlite`;
-- demais variáveis configuradas como secrets do provedor;
-- HTTPS habilitado no domínio público.
+1. o Prisma Client é gerado durante o build;
+2. `prisma db push` valida a estrutura no PostgreSQL/Neon;
+3. o Next.js inicia na porta fornecida pela variável `PORT`.
 
-Na inicialização do container, `prisma db push` garante que as tabelas estejam presentes antes do Next.js iniciar.
+## Workflows ativos
+
+- `build.yml`: valida o build em pushes e pull requests para a branch `main`.
+- `daily-financial-sync.yml`: atualiza o snapshot financeiro diariamente às 07h.
 
 ## Validação
 
@@ -64,5 +71,3 @@ npm ci
 npx prisma generate
 npm run build
 ```
-
-O GitHub Actions também executa esse build em alterações destinadas ao branch `main`.
