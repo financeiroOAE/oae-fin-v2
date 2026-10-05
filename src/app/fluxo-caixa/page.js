@@ -237,12 +237,19 @@ export default function FluxoDeCaixa() {
 
   // Novos blocos analíticos (Dia e Faturamento)
   const faturamentosNfes = useMemo(() => {
-    const rawList = baseData.filter(item =>
-      item.natureza === 'Entrada' &&
-      item.statusExibicao === 'A receber' &&
-      item.documento &&
-      item.documento.toUpperCase().includes('NFES')
-    );
+    const rawList = baseData.filter(item => {
+      const statusOriginal = String(item.status || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase();
+
+      return item.natureza === 'Entrada' &&
+        (statusOriginal === 'A RECEBER' || statusOriginal === 'A REALIZAR') &&
+        String(item.documento || '').toUpperCase().includes('NFES');
+    });
 
     // A NF vem dividida entre Faturamento (1010101) e Administrativo (1010107).
     // A coluna J repete o valor total do título em cada linha de rateio; por isso
@@ -835,7 +842,7 @@ export default function FluxoDeCaixa() {
               dataSets={{ all: reportFaturamentosNfesRows, summary: reportFaturamentosNfesSummary }}
               detailMode="all"
               detailOptions={["all", "summary"]}
-              filters={{ Tipo: "NFES", Situação: "A receber" }}
+              filters={{ Tipo: "NFES", Situação: "A receber / A realizar" }}
               explanation="Relação de notas fiscais faturadas com soma total do valor bruto e do valor líquido."
               style={{ float: 'right' }}
             />
@@ -843,7 +850,7 @@ export default function FluxoDeCaixa() {
               <ChartHeader
                 title="Painel de Faturamento (NFES)"
                 infoTitle="Faturamento"
-                infoContent="Relação de notas faturadas com status A receber."
+                infoContent="Relação de notas NFES pendentes na CR_GERAL com status A receber ou A realizar."
               />
               <select
                 value={filtroFaturamento}
