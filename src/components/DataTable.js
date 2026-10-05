@@ -118,8 +118,12 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
 
   // Paginação
   const totalItems = sortedData.length;
-  const totalPages = Math.ceil(totalItems / pageSize) || 1;
-  const paginatedData = sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const showAllRows = pageSize === 'all';
+  const effectivePageSize = showAllRows ? Math.max(totalItems, 1) : Number(pageSize) || 25;
+  const totalPages = showAllRows ? 1 : (Math.ceil(totalItems / effectivePageSize) || 1);
+  const paginatedData = showAllRows
+    ? sortedData
+    : sortedData.slice((currentPage - 1) * effectivePageSize, currentPage * effectivePageSize);
 
   // Totais
   const totalValorFiltrado = useMemo(() => {
@@ -299,27 +303,41 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
       {/* Pagination Footer */}
       <div style={{ padding: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', background: 'var(--bg-elevated)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '12px', color: 'var(--text-secondary)' }}>
-          <span>Exibindo {(currentPage - 1) * pageSize + 1} a {Math.min(currentPage * pageSize, totalItems)} de {totalItems}</span>
-          <select 
-            value={pageSize} 
-            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+          <span>
+            {totalItems === 0
+              ? 'Exibindo 0 de 0'
+              : `Exibindo ${showAllRows ? 1 : (currentPage - 1) * effectivePageSize + 1} a ${showAllRows ? totalItems : Math.min(currentPage * effectivePageSize, totalItems)} de ${totalItems}`}
+          </span>
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              const next = e.target.value === 'all' ? 'all' : Number(e.target.value);
+              setPageSize(next);
+              setCurrentPage(1);
+            }}
             style={{ height: '28px', padding: '0 0.5rem', fontSize: '12px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px' }}
           >
-            {pageSizeOptions.map((size) => <option key={size} value={size}>{size} por pág.</option>)}
+            {pageSizeOptions.map((size) => (
+              <option key={size} value={size}>
+                {size === 'all' ? 'Todos' : `${size} por pág.`}
+              </option>
+            ))}
           </select>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.25rem' }}>
-          <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="btn" style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', opacity: currentPage === 1 ? 0.3 : 1 }}><ChevronsLeft size={16} /></button>
-          <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="btn" style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', opacity: currentPage === 1 ? 0.3 : 1 }}><ChevronLeft size={16} /></button>
-          
-          <span style={{ display: 'flex', alignItems: 'center', padding: '0 0.5rem', fontSize: '13px', color: 'var(--text-main)' }}>
-            Pág. {currentPage} de {totalPages}
-          </span>
-          
-          <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="btn" style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', opacity: currentPage === totalPages ? 0.3 : 1 }}><ChevronRight size={16} /></button>
-          <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="btn" style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', opacity: currentPage === totalPages ? 0.3 : 1 }}><ChevronsRight size={16} /></button>
-        </div>
+        {!showAllRows && (
+          <div style={{ display: 'flex', gap: '0.25rem' }}>
+            <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="btn" style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', opacity: currentPage === 1 ? 0.3 : 1 }}><ChevronsLeft size={16} /></button>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="btn" style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', opacity: currentPage === 1 ? 0.3 : 1 }}><ChevronLeft size={16} /></button>
+
+            <span style={{ display: 'flex', alignItems: 'center', padding: '0 0.5rem', fontSize: '13px', color: 'var(--text-main)' }}>
+              Pág. {currentPage} de {totalPages}
+            </span>
+
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="btn" style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', opacity: currentPage === totalPages ? 0.3 : 1 }}><ChevronRight size={16} /></button>
+            <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="btn" style={{ padding: '0.3rem', background: 'transparent', border: '1px solid var(--border-color)', opacity: currentPage === totalPages ? 0.3 : 1 }}><ChevronsRight size={16} /></button>
+          </div>
+        )}
       </div>
     </div>
   );
