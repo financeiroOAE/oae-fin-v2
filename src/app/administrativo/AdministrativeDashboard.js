@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { FileText, ChevronDown, ChevronUp, X, Landmark, CircleDollarSign, Clock3, TrendingUp, Gauge, ReceiptText } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine
 } from 'recharts';
@@ -19,6 +19,17 @@ const getDateKey=(raw)=>{const value=String(raw||'');let m=value.match(/^(\d{4})
 const monthOf=(raw)=>getDateKey(raw).slice(0,7);
 const monthLabel=(value)=>new Intl.DateTimeFormat('pt-BR',{month:'short',timeZone:'UTC'}).format(new Date(`${value}-01T12:00:00Z`));
 const inRange=(row,start,end)=>{const key=getDateKey(row.data);if(!key)return false;return(!start||key>=start)&&(!end||key<=end)};
+
+function AdminMetricCard({ icon: Icon, label, value, info, tone = 'primary', percent = false }) {
+  return <div className={`mgmt-metric-card tone-${tone}`}>
+    <div className="mgmt-metric-top">
+      <span className="mgmt-metric-icon"><Icon size={17}/></span>
+      <InfoTooltip title={label} content={info}/>
+    </div>
+    <span className="mgmt-metric-label">{label}</span>
+    <strong className="mgmt-metric-value">{percent ? `${(Number(value||0)*100).toFixed(1)}%` : brl(value)}</strong>
+  </div>;
+}
 
 function MovementModal({title,rows,onClose}){
   if(!rows)return null;
@@ -118,18 +129,16 @@ export default function AdministrativeDashboard(){
 
     <section className="mgmt-revenue-banner" data-report-section>
       <ReportAdder sectionKey="administrativo:receita-20" title="Receita Administrativa — 20%" componentName="Resumo de Receita Administrativa" page="Administrativo" type="SUMMARY" data={[{'Receita ADM':revenueTotal,'Recebido ADM':received,'A receber ADM':receivable}]} filters={reportFilters} style={{position:'absolute',right:12,top:12}}/>
-      <div><div className="mgmt-kpi-title"><span>20% · Receita administrativa</span><InfoTooltip title="Receita administrativa" content="20% das receitas dos projetos no período selecionado, conforme a regra de rateio administrativo do painel."/></div><strong>{brl(revenueTotal)}</strong><small>Parcela administrativa das receitas</small></div>
-      <div><div className="mgmt-kpi-title"><span>20% já recebido</span><InfoTooltip title="Recebido ADM" content="Parcela administrativa correspondente às receitas já realizadas/recebidas."/></div><strong>{brl(received)}</strong><small>Receita ADM realizada</small></div>
-      <div><div className="mgmt-kpi-title"><span>20% a receber</span><InfoTooltip title="A receber ADM" content="Parcela administrativa das receitas previstas e ainda não recebidas até o fim do período."/></div><strong>{brl(receivable)}</strong><small>Receita ADM prevista</small></div>
+      <div className="tone-primary"><span className="mgmt-banner-icon"><Landmark size={18}/></span><div className="mgmt-kpi-title"><span>20% · Receita administrativa</span><InfoTooltip title="Receita administrativa" content="20% das receitas dos projetos no período selecionado, conforme a regra de rateio administrativo do painel."/></div><strong>{brl(revenueTotal)}</strong><small>Parcela administrativa das receitas</small></div>
+      <div className="tone-success"><span className="mgmt-banner-icon"><CircleDollarSign size={18}/></span><div className="mgmt-kpi-title"><span>20% já recebido</span><InfoTooltip title="Recebido ADM" content="Parcela administrativa correspondente às receitas já realizadas/recebidas."/></div><strong>{brl(received)}</strong><small>Receita ADM realizada</small></div>
+      <div className="tone-warning"><span className="mgmt-banner-icon"><Clock3 size={18}/></span><div className="mgmt-kpi-title"><span>20% a receber</span><InfoTooltip title="A receber ADM" content="Parcela administrativa das receitas previstas e ainda não recebidas até o fim do período."/></div><strong>{brl(receivable)}</strong><small>Receita ADM prevista</small></div>
     </section>
 
-    <div className="mgmt-kpis">
-      {[
-        ['Despesas pagas',paid,'Total efetivamente pago no centro de custo ADMINISTRAÇÃO dentro do período selecionado.'],
-        ['Despesas a pagar',open,'Compromissos administrativos ainda em aberto dentro do período selecionado.'],
-        ['Resultado projetado',result,'Receita ADM menos despesas já pagas e valores ainda a pagar.'],
-        ['Cobertura da despesa',coverage,'Percentual das despesas totais do período coberto pela Receita Administrativa de 20%.']
-      ].map(([label,value,info])=><div key={label}><div className="mgmt-kpi-title"><span>{label}</span><InfoTooltip title={label} content={info}/></div><strong className={label==='Despesas pagas'?'mgmt-value-paid':label==='Despesas a pagar'?'mgmt-value-open':''}>{label==='Cobertura da despesa'?((Number(value)||0)*100).toFixed(1)+'%':brl(value)}</strong></div>)}
+    <div className="mgmt-metrics-grid">
+      <AdminMetricCard icon={ReceiptText} label="Despesas pagas" value={paid} tone="danger" info="Total efetivamente pago no centro de custo ADMINISTRAÇÃO dentro do período selecionado."/>
+      <AdminMetricCard icon={Clock3} label="Despesas a pagar" value={open} tone="warning" info="Compromissos administrativos ainda em aberto dentro do período selecionado."/>
+      <AdminMetricCard icon={TrendingUp} label="Resultado projetado" value={result} tone={result>=0?'success':'danger'} info="Receita ADM menos despesas já pagas e valores ainda a pagar."/>
+      <AdminMetricCard icon={Gauge} label="Cobertura da despesa" value={coverage} percent tone="info" info="Percentual das despesas totais do período coberto pela Receita Administrativa de 20%."/>
     </div>
 
     <section id="report-adm-receita-despesa" data-report-section className="mgmt-panel mgmt-panel-wide">
