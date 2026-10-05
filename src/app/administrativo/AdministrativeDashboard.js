@@ -135,7 +135,7 @@ export default function AdministrativeDashboard(){
     <section id="report-adm-receita-despesa" data-report-section className="mgmt-panel mgmt-panel-wide">
         <ReportAdder sectionKey="administrativo:receita-despesa" title="Receita x Despesa — 2026" componentName="Gráfico Receita x Despesa" page="Administrativo" type="CHART" data={chartMonthly} filters={reportFilters} captureId="report-adm-receita-despesa" style={{float:'right'}}/>
         <h2>Receita x despesa · Jan–Dez/2026</h2><p>Recebimento administrativo realizado, despesa paga e compromissos em aberto.</p>
-        <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={chartMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar dataKey="Recebido ADM" fill={COLORS.received} radius={[4,4,0,0]}/><Bar dataKey="Despesa paga" fill={COLORS.paidExpense} radius={[4,4,0,0]}/><Bar dataKey="A pagar" fill={COLORS.pauloWithdrawal} radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>
+        <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={chartMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar dataKey="Recebido ADM" fill={COLORS.received} radius={[4,4,0,0]}/><Bar dataKey="Despesa paga" fill={COLORS.paidExpense} radius={[4,4,0,0]}/><Bar dataKey="A pagar" fill={COLORS.open} radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>
       </section>
 
     <section id="report-adm-fluxo-mensal" data-report-section className="mgmt-panel">
@@ -153,7 +153,7 @@ export default function AdministrativeDashboard(){
     <section id="report-adm-equipe" data-report-section className="mgmt-panel">
       <ReportAdder sectionKey="administrativo:equipe-adm" title="Visão da Equipe Administrativa" componentName="Equipe Administrativa 2026" page="Administrativo" type="CHART" data={adminTeamMonthly} captureId="report-adm-equipe" filters={{Ano:2026}} style={{float:'right'}}/>
       <div className="mgmt-panel-head"><div><h2>Visão da equipe administrativa</h2><p>Regra anual: todo o pago em 2026 e todo o a pagar previsto até dezembro/2026.</p></div><InfoTooltip title="Equipe Administrativa" content="Este bloco ignora o filtro superior de período por regra: mostra o exercício completo de janeiro a dezembro/2026."/></div>
-      <div className="mgmt-chart-sm"><ResponsiveContainer><LineChart data={adminTeamMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago" stroke={COLORS.paid} strokeWidth={2.5}/><Line type="monotone" dataKey="A pagar" stroke={COLORS.open} strokeWidth={2.5}/></LineChart></ResponsiveContainer></div>
+      <div className="mgmt-chart-sm"><ResponsiveContainer><LineChart data={adminTeamMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago" stroke="#22c55e" strokeWidth={2.5}/><Line type="monotone" dataKey="A pagar" stroke={COLORS.open} strokeWidth={2.5}/></LineChart></ResponsiveContainer></div>
       <div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Pessoa / empresa</th><th>Pago 2026</th><th>A pagar até dez/2026</th><th>Total</th></tr></thead><tbody>{adminTeam.map(x=><tr key={x.name} onClick={()=>setDetail({title:`Equipe ADM · ${x.name}`,rows:x.rows})}><td><strong>{x.name}</strong></td><td className="mgmt-value-paid">{brl(x.paid)}</td><td className="mgmt-value-open">{brl(x.open)}</td><td>{brl(x.total)}</td></tr>)}</tbody></table></div>
       {!adminTeam.length&&<p>Sem pessoas/empresas classificadas como Equipe ADM.</p>}
     </section>
@@ -175,7 +175,7 @@ export default function AdministrativeDashboard(){
         {partnerSeries.includes('Francielle · Fixo pago')&&<Bar dataKey="Francielle · Fixo pago" fill={COLORS.franFixed} opacity={0.88}/>}
         {partnerSeries.includes('Francielle · Retirada')&&<Bar dataKey="Francielle · Retirada" fill={COLORS.franWithdrawal}/>}
         {partnerSeries.includes('Paulo · Fixo pago')&&<Bar dataKey="Paulo · Fixo pago" fill={COLORS.pauloFixed} opacity={0.88}/>}
-        {partnerSeries.includes('Paulo · Retirada')&&<Bar dataKey="Paulo · Retirada" fill={COLORS.open}/>}
+        {partnerSeries.includes('Paulo · Retirada')&&<Bar dataKey="Paulo · Retirada" fill={COLORS.pauloWithdrawal}/>}
         {partnerView==='FRAN'&&<ReferenceLine y={25000} stroke={COLORS.franFixed} strokeDasharray="5 5" label={{value:'Fixo R$ 25 mil',fill:COLORS.franFixed,fontSize:10}}/>}
         {partnerView==='PAULO'&&<ReferenceLine y={42000} stroke={COLORS.pauloFixed} strokeDasharray="5 5" label={{value:'Fixo R$ 42 mil',fill:COLORS.pauloFixed,fontSize:10}}/>}
       </BarChart></ResponsiveContainer></div>
