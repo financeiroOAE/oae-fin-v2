@@ -168,3 +168,40 @@
 .mgmt-project-card{width:100%;min-height:116px;box-sizing:border-box}
 @media(max-width:1250px){.mgmt-filter-grid-team{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:560px){.mgmt-project-cards{grid-template-columns:1fr}.mgmt-project-card{min-height:auto}}
+
+/* Administrativo: filtros completos e receita sem quebra de grade */
+.mgmt-admin-filter-grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:12px;
+  width:100%;
+}
+.mgmt-admin-filter-grid label{min-width:0}
+.mgmt-admin-filter-grid input[type="date"]{height:40px;box-sizing:border-box}
+.mgmt-admin-filter-grid label>div{margin-top:0}
+.mgmt-revenue-section{position:relative;width:100%;margin:18px 0}
+.mgmt-revenue-report{position:absolute;right:8px;top:-2px;z-index:5}
+.mgmt-revenue-section .mgmt-revenue-banner{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin:0;
+  width:100%;
+}
+.mgmt-revenue-section .mgmt-revenue-banner>div{
+  min-width:0;
+  width:100%;
+  min-height:150px;
+  box-sizing:border-box;
+}
+@media(max-width:1200px){
+  .mgmt-admin-filter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:850px){
+  .mgmt-admin-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mgmt-revenue-section .mgmt-revenue-banner{grid-template-columns:1fr}
+  .mgmt-revenue-report{position:static;display:flex;justify-content:flex-end;margin-bottom:8px}
+}
+@media(max-width:600px){
+  .mgmt-admin-filter-grid{grid-template-columns:1fr}
+}
