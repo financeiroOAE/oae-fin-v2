@@ -186,7 +186,19 @@ async function performFullSync(triggeredBy) {
   // Regra global da receita prevista: A RECEBER / A REALIZAR / PREVISTO usa K.
   // J fica preservado somente em valorFaturamentoOriginal para auditoria.
   const crProcessed = normalizeForecastRevenueBilling(crBase);
-  console.log('[financial-sync] CR processado', { records: crProcessed.length });
+  const nfes132Rows = crProcessed.filter((row) =>
+    String(row?.documento || '').trim().toUpperCase().includes('NFES.132')
+  );
+  console.log('[financial-sync] CR processado', {
+    records: crProcessed.length,
+    nfes132Rows: nfes132Rows.length,
+    nfes132Lancamentos: nfes132Rows.map((row) => row.lancamento),
+    nfes132Statuses: nfes132Rows.map((row) => row.status),
+    nfes132ValorCaixa: Math.round(nfes132Rows.reduce((sum, row) => sum + (Number(row.valorCaixa) || 0), 0) * 100) / 100,
+    nfes132ValorBruto: nfes132Rows.length
+      ? Math.max(...nfes132Rows.map((row) => Math.abs(Number(row.valorFaturamentoOriginal) || 0)))
+      : 0,
+  });
 
   const stats = {
     EMPRESAS: empresas.length,
