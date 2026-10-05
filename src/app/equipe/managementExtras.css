@@ -52,7 +52,7 @@
 .mgmt-meta-grid span,.mgmt-meta-grid strong{display:block}
 .mgmt-meta-grid span{font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
 .mgmt-meta-grid strong{font-size:12px;line-height:1.45;overflow-wrap:anywhere}
-.mgmt-project-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:12px}
+.mgmt-project-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,240px));justify-content:start;align-items:stretch;gap:10px;margin-top:12px}
 .mgmt-project-card{border:1px solid var(--border-color);border-radius:9px;background:var(--bg-main);padding:13px}
 .mgmt-project-card>strong{display:block;font-size:12px;margin-bottom:9px}
 .mgmt-project-card>div{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--border-color);font-size:11px}
@@ -164,3 +164,6 @@
 }
 
 @media(max-width:1250px){.mgmt-filter-grid-team{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+.mgmt-project-card{width:100%;min-height:116px;box-sizing:border-box}
+@media(max-width:560px){.mgmt-project-cards{grid-template-columns:1fr}.mgmt-project-card{min-height:auto}}
