@@ -51,6 +51,7 @@ export async function GET() {
     const accountCode = String(item.accountCode || '').replace(/\D/g, '');
     const transactions = cp.filter((row) => {
       if (accountCode && String(row.contaCodigo || '').replace(/\D/g, '') !== accountCode) return false;
+      if (!accountCode && !row.teamAccount) return false;
       if (!matchesParty(item.person, row.nome)) return false;
       if (item.thirdParty && !matchesProject(item.departmentProject, row.projeto)) return false;
       return true;
