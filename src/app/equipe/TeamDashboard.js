@@ -147,10 +147,7 @@ function PersonModal({ person, onClose }) {
           </button>)}
         </div>
         {!byProject.length&&<p>Sem movimentações vinculadas a obras.</p>}
-        {selectedProject&&<div className="mgmt-project-movements">
-          <div className="mgmt-panel-head"><div><h3>Movimentos · {selectedProject.name}</h3><p>{selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div><div className="mgmt-actions"><ReportAdder sectionKey={`equipe:obra:${person.key}:${projectCodeLabel(selectedProject.name)}`} title={`Movimentos — ${person.name} — ${selectedProject.name}`} componentName="Movimentos da Pessoa por Obra" page="Equipe" type="TABLE" data={selectedProject.rows.map(r=>({Data:r.data,Documento:r.documento||r.titulo,Obra:r.projeto,Plano:planLabel(r.contaNome||r.contaCodigo),Situação:r.paid?'Pago':'A pagar',Valor:r.valor}))} filters={{Ano:2026}}/><button className="mgmt-text-button" onClick={()=>setSelectedProject(null)}>Fechar relação</button></div></div>
-          <DataTable data={toFinancialRows(selectedProject.rows,person.name)} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
-        </div>}
+
       </section>
 
       <section className="mgmt-subcard" style={{marginTop:14}}>
@@ -159,6 +156,19 @@ function PersonModal({ person, onClose }) {
         <DataTable data={toFinancialRows(rows,person.name)} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
       </section>
     </div>
+
+    {selectedProject&&<div className="mgmt-overlay mgmt-overlay-center mgmt-overlay-project" onMouseDown={()=>setSelectedProject(null)}>
+      <div className="mgmt-modal-center mgmt-project-modal" onMouseDown={(e)=>e.stopPropagation()}>
+        <div className="mgmt-panel-head">
+          <div><span className="mgmt-eyebrow">MOVIMENTOS DA OBRA · 2026</span><h2>{selectedProject.name}</h2><p>{person.name} · {selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div>
+          <div className="mgmt-actions">
+            <ReportAdder sectionKey={`equipe:obra:${person.key}:${projectCodeLabel(selectedProject.name)}`} title={`Movimentos — ${person.name} — ${selectedProject.name}`} componentName="Movimentos da Pessoa por Obra" page="Equipe" type="TABLE" data={selectedProject.rows.map(r=>({Data:r.data,Documento:r.documento||r.titulo,Obra:r.projeto,Plano:planLabel(r.contaNome||r.contaCodigo),Situação:r.paid?'Pago':'A pagar',Valor:r.valor}))} filters={{Ano:2026}}/>
+            <button className="btn" onClick={()=>setSelectedProject(null)}><X size={16}/> Fechar</button>
+          </div>
+        </div>
+        <DataTable data={toFinancialRows(selectedProject.rows,person.name)} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
+      </div>
+    </div>}
   </div>;
 }
 
