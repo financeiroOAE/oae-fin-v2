@@ -14,6 +14,18 @@ const REFERENCE_RANGES = [
 ];
 const CASH_LOGIC_VERSION = 9;
 
+function memorySnapshot(stage) {
+  const usage = process.memoryUsage();
+  const mb = (value) => Math.round((value / 1024 / 1024) * 10) / 10;
+  console.log('[financial-sync] memória', {
+    stage,
+    rssMB: mb(usage.rss),
+    heapUsedMB: mb(usage.heapUsed),
+    heapTotalMB: mb(usage.heapTotal),
+    externalMB: mb(usage.external),
+  });
+}
+
 function parseSortDate(value) {
   if (!value) return 0;
   const raw = String(value).trim();
@@ -79,22 +91,20 @@ function distributeAmount(rows, total) {
 }
 
 function normalizeForecastRevenueBilling(rows) {
-  return (rows || []).map((row) => {
-    if (!isForecastRevenueEntry(row)) return row;
+  for (const row of rows || []) {
+    if (!isForecastRevenueEntry(row)) continue;
 
     // Regra oficial: A RECEBER / A REALIZAR / PREVISTO usa sempre a coluna K.
-    // Mantemos o J original apenas para auditoria, mas todos os aliases de valor
-    // da previsao passam a apontar para K para impedir uso acidental de J.
+    // A atualização é feita no próprio registro para evitar duplicar o CR_GERAL
+    // inteiro na memória durante a sincronização.
     const forecastValue = Number(row.valorCaixa ?? row.valor) || 0;
-    return {
-      ...row,
-      valorFaturamentoOriginal: Number(row.valorFaturamentoOriginal ?? row.valorFaturamento) || 0,
-      valorFaturamento: forecastValue,
-      valorTotalTitulo: forecastValue,
-      valorBruto: forecastValue,
-      previsaoFaturamentoFonte: 'CR_GERAL_K_VALOR',
-    };
-  });
+    row.valorFaturamentoOriginal = Number(row.valorFaturamentoOriginal ?? row.valorFaturamento) || 0;
+    row.valorFaturamento = forecastValue;
+    row.valorTotalTitulo = forecastValue;
+    row.valorBruto = forecastValue;
+    row.previsaoFaturamentoFonte = 'CR_GERAL_K_VALOR';
+  }
+  return rows || [];
 }
 
 function normalizeTeamRoster(rows) {
@@ -137,6 +147,7 @@ async function performFullSync(triggeredBy) {
     }
   }
   console.log('[financial-sync] referências carregadas');
+  memorySnapshot('referencias-carregadas');
 
   const rawEmpresas = referenceData.EMPRESAS || [];
 
@@ -177,6 +188,12 @@ async function performFullSync(triggeredBy) {
   const depara = referenceData.DEPARA || [];
   const equipe = normalizeTeamRoster(referenceData.EQUIPE || []);
 
+  // Libera referências que já foram convertidas para estruturas menores.
+  // Não apaga nenhum dado persistido; apenas remove referências temporárias da RAM.
+  referenceData.EMPRESAS = null;
+  referenceData.PROJETOS_2026 = null;
+  referenceData.EQUIPE = null;
+
   const deparaMap = {};
   depara.forEach((row) => {
     const code = extractAccountCode(row.Conta);
@@ -188,46 +205,40 @@ async function performFullSync(triggeredBy) {
     const code = String(row.ID || '').replace(/\D/g, '') || extractAccountCode(row['PLANO FINANCEIRO']);
     if (code) planosMap[code] = row;
   });
+  referenceData.CENTROS_CUSTO = null;
+  referenceData.PLANOS_FINANCEIROS = null;
+  referenceData.DEPARA = null;
+  memorySnapshot('referencias-normalizadas');
 
   let transactionData = await batchReadSheets(['CP_GERAL!A:L']);
   let cpGeralRaw = transactionData.CP_GERAL || [];
   if (cpGeralRaw.length === 0) {
     throw new Error('Sincronização interrompida: a aba obrigatória CP_GERAL está vazia ou indisponível.');
   }
-  const cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap, projetos, planosMap);
+  let cpProcessed = processSiengeData(cpGeralRaw, 'CP_GERAL', deparaMap, projetos, planosMap);
   console.log('[financial-sync] CP processado', { records: cpProcessed.length });
   cpGeralRaw = null;
   transactionData = null;
+  memorySnapshot('cp-processado');
 
   transactionData = await batchReadSheets(['CR_GERAL!A:N']);
   let crGeralRaw = transactionData.CR_GERAL || [];
   if (crGeralRaw.length === 0) {
     throw new Error('Sincronização interrompida: a aba obrigatória CR_GERAL está vazia ou indisponível.');
   }
-  const crBase = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos, planosMap).map((row) => ({
-    ...row,
-    valorCaixa: Number(row.valor) || 0,
-    valorFaturamentoOriginal: Number(row.valorFaturamento) || 0,
-    recebimentoLiquidoFonte: 'CR_GERAL_K_VALOR',
-  }));
+  let crProcessed = processSiengeData(crGeralRaw, 'CR_GERAL', deparaMap, projetos, planosMap);
+  for (const row of crProcessed) {
+    row.valorCaixa = Number(row.valor) || 0;
+    row.valorFaturamentoOriginal = Number(row.valorFaturamento) || 0;
+    row.recebimentoLiquidoFonte = 'CR_GERAL_K_VALOR';
+  }
   crGeralRaw = null;
   transactionData = null;
   // Regra global da receita prevista: A RECEBER / A REALIZAR / PREVISTO usa K.
   // J fica preservado somente em valorFaturamentoOriginal para auditoria.
-  const crProcessed = normalizeForecastRevenueBilling(crBase);
-  const nfes132Rows = crProcessed.filter((row) =>
-    String(row?.documento || '').trim().toUpperCase().includes('NFES.132')
-  );
-  console.log('[financial-sync] CR processado', {
-    records: crProcessed.length,
-    nfes132Rows: nfes132Rows.length,
-    nfes132Lancamentos: nfes132Rows.map((row) => row.lancamento),
-    nfes132Statuses: nfes132Rows.map((row) => row.status),
-    nfes132ValorCaixa: Math.round(nfes132Rows.reduce((sum, row) => sum + (Number(row.valorCaixa) || 0), 0) * 100) / 100,
-    nfes132ValorBruto: nfes132Rows.length
-      ? Math.max(...nfes132Rows.map((row) => Math.abs(Number(row.valorFaturamentoOriginal) || 0)))
-      : 0,
-  });
+  normalizeForecastRevenueBilling(crProcessed);
+  console.log('[financial-sync] CR processado', { records: crProcessed.length });
+  memorySnapshot('cr-processado');
 
   const stats = {
     EMPRESAS: empresas.length,
@@ -241,7 +252,7 @@ async function performFullSync(triggeredBy) {
   };
 
   const totalRecords = Object.values(stats).reduce((a, b) => a + b, 0);
-  const allData = [...cpProcessed, ...crProcessed];
+  const allData = cpProcessed.concat(crProcessed);
   allData.sort((a, b) => parseSortDate(b.data) - parseSortDate(a.data));
 
   const somaCP = cpProcessed.reduce((acc, row) => acc + (Number(row.valor) || 0), 0);
@@ -282,6 +293,12 @@ async function performFullSync(triggeredBy) {
     syncedAt,
     message: 'Sincronização concluída com sucesso!',
   };
+
+  // As referências separadas deixam de ser necessárias depois que o payload final
+  // passa a apontar para os mesmos objetos. Isso reduz retenção temporária de arrays.
+  cpProcessed = null;
+  crProcessed = null;
+  memorySnapshot('payload-pronto');
 
   console.log('[financial-sync] processamento concluído', {
     recordsCount: totalRecords,
@@ -349,7 +366,9 @@ export async function refreshFinancialSnapshot(triggeredBy) {
 
   const syncPromise = (async () => {
     const payload = await performFullSync(triggeredBy);
+    memorySnapshot('antes-serializacao');
     const serializedPayload = JSON.stringify(payload);
+    memorySnapshot('depois-serializacao');
 
     await prisma.financialSnapshot.upsert({
       where: { id: SNAPSHOT_ID },
@@ -363,6 +382,8 @@ export async function refreshFinancialSnapshot(triggeredBy) {
         payload: serializedPayload,
       },
     });
+
+    memorySnapshot('snapshot-gravado');
 
     // O histórico só pode indicar sucesso depois que a nova base estiver gravada.
     await prisma.syncHistory.create({
