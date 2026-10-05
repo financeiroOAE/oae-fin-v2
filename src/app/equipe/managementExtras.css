@@ -42,7 +42,7 @@
 
 .mgmt-filter-grid input[type="date"]{width:100%;background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-main);border-radius:7px;padding:10px;font:inherit;font-size:12px;color-scheme:dark}
 .mgmt-filter-grid-dates{grid-template-columns:repeat(2,minmax(180px,260px));justify-content:start}
-.mgmt-filter-grid-team{grid-template-columns:repeat(5,minmax(130px,1fr))}
+.mgmt-filter-grid-team{grid-template-columns:repeat(6,minmax(125px,1fr))}
 .mgmt-kpi-title{display:flex;align-items:center;gap:6px;min-width:0}
 .mgmt-kpi-title>span{min-width:0}
 .mgmt-overlay-center{justify-content:center;align-items:center;padding:22px;overflow:auto}
@@ -123,3 +123,44 @@
 @media(max-width:1200px){.mgmt-metrics-six{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:900px){.mgmt-metrics-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.mgmt-metrics-grid,.mgmt-metrics-six{grid-template-columns:1fr}}
+
+/* Administrativo: malha estável, sem espaços mortos entre blocos */
+.mgmt-admin{display:flex;flex-direction:column;gap:0}
+.mgmt-admin>.mgmt-panel,
+.mgmt-admin>.mgmt-revenue-banner,
+.mgmt-admin>.mgmt-metrics-grid,
+.mgmt-admin>section{width:100%;min-width:0}
+.mgmt-admin .mgmt-admin-filters{padding:18px 20px}
+.mgmt-admin .mgmt-admin-filters .mgmt-panel-head{margin-bottom:12px}
+.mgmt-admin .mgmt-filter-grid-dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;max-width:none}
+.mgmt-admin .mgmt-filter-grid-dates label{min-width:0}
+.mgmt-admin .mgmt-filter-grid-dates input{height:40px;box-sizing:border-box}
+.mgmt-admin .mgmt-revenue-banner{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
+.mgmt-admin .mgmt-revenue-banner>div{min-height:145px;display:flex;flex-direction:column;justify-content:flex-start}
+.mgmt-admin .mgmt-revenue-banner>div strong{margin-top:auto;padding-top:8px}
+.mgmt-admin .mgmt-metrics-grid{grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch}
+.mgmt-admin .mgmt-metric-card{height:100%;box-sizing:border-box}
+.mgmt-admin .mgmt-panel-wide{grid-column:1/-1;width:100%;max-width:none}
+.mgmt-admin .mgmt-panel-head{width:100%;min-width:0}
+.mgmt-admin .mgmt-panel-head>div:first-child{min-width:0;flex:1}
+.mgmt-admin .mgmt-chart,
+.mgmt-admin .mgmt-chart-wide,
+.mgmt-admin .mgmt-chart-sm{width:100%;min-width:0}
+.mgmt-admin .mgmt-chart-wide{height:360px}
+.mgmt-admin .mgmt-table-wrap{width:100%;max-width:100%}
+.mgmt-admin [data-report-section]{min-width:0}
+@media(max-width:1050px){
+  .mgmt-admin .mgmt-revenue-banner{grid-template-columns:1fr 1fr}
+  .mgmt-admin .mgmt-revenue-banner>div:first-of-type{grid-column:1/-1}
+  .mgmt-admin .mgmt-metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:700px){
+  .mgmt-admin .mgmt-filter-grid-dates,
+  .mgmt-admin .mgmt-revenue-banner,
+  .mgmt-admin .mgmt-metrics-grid{grid-template-columns:1fr}
+  .mgmt-admin .mgmt-revenue-banner>div:first-of-type{grid-column:auto}
+  .mgmt-admin .mgmt-panel{padding:15px}
+  .mgmt-admin .mgmt-chart-wide{height:300px}
+}
+
+@media(max-width:1250px){.mgmt-filter-grid-team{grid-template-columns:repeat(3,minmax(0,1fr))}}

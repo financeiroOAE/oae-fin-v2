@@ -280,7 +280,36 @@ export default function TeamDashboard(){
 
   const reportFilters={'Data inicial':startDate,'Data final':endDate,Pessoa:personFilters.length?personFilters.join(', '):'Todas',Projeto:projectFilters.length?projectFilters.join(', '):'Todos',Situação:statusFilters.length?statusFilters.join(', '):'Todas'};
   const projectChart=projectRows.slice(0,10).map(p=>({Projeto:projectCodeLabel(p.name),'Obra completa':p.name,Pago:p.paid,'A pagar':p.open}));
-  const rosterReport=peopleRoster.map(item=>({'Pessoa / empresa':item.name,'Cargo / função':item.roles.join(' · '),'Tipo':item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe','Valor de referência':item.referenceValue,'Projetos':item.projects.length,'Pago':item.transactions.filter(r=>r.paid&&inRange(r,startDate,endDate)).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':item.transactions.filter(r=>!r.paid&&inRange(r,startDate,endDate)).reduce((s,r)=>s+Number(r.valor||0),0)}));
+  const rosterReport=peopleRoster.map(item=>({'Pessoa / empresa':item.name,'Cargo / função':item.roles.join(' · '),'Tipo':item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe','Valor de referência':item.referenceValue,'Projetos':item.projects.length,'Plano(s)':item.accounts.map(planLabel).join(' · '),'Pago':item.transactions.filter(r=>r.paid&&inRange(r,startDate,endDate)).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':item.transactions.filter(r=>!r.paid&&inRange(r,startDate,endDate)).reduce((s,r)=>s+Number(r.valor||0),0)}));
+  const detailedRosterReport=peopleRoster.flatMap(item=>{
+    const rows=item.transactions.filter(r=>inRange(r,startDate,endDate));
+    const base={
+      'Pessoa / empresa':item.name,
+      'Cargo / função':item.roles.join(' · '),
+      'Tipo':item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe',
+      'Valor de referência':item.referenceValue,
+      'Projetos vinculados':item.projects.join(' · '),
+      'Plano(s) cadastral(is)':item.accounts.map(planLabel).join(' · '),
+    };
+    if(rows.length===0) return [{...base,Data:'',Documento:'',Obra:'',Plano:'',Situação:'Sem movimentação',Valor:0}];
+    return rows.map(r=>({
+      ...base,
+      Data:r.data||'',
+      Documento:r.documento||r.titulo||'',
+      Obra:r.projeto||'',
+      Plano:planLabel(r.contaNome||r.contaCodigo),
+      Situação:r.paid?'Pago':'A pagar',
+      Valor:Number(r.valor||0),
+    }));
+  });
+  const rosterSummaryReport=[{
+    'Pessoas / empresas':peopleRoster.length,
+    'Terceiros':peopleRoster.filter(e=>e.thirdParty).length,
+    'Obras com equipe':projectRows.length,
+    'Pago':paid,
+    'A pagar':open,
+    'Custo total':paid+open,
+  }];
 
   const rosterEffective=rosterPageSize==='all'?Math.max(peopleRoster.length,1):rosterPageSize;
   const visibleRoster=rosterPageSize==='all'?peopleRoster:peopleRoster.slice((rosterPage-1)*rosterEffective,rosterPage*rosterEffective);
@@ -328,7 +357,23 @@ export default function TeamDashboard(){
     </div>
 
     <section className="mgmt-panel" data-report-section>
-      <ReportAdder sectionKey="equipe:cadastro" title="Cadastro da Equipe" componentName="Tabela de Cadastro da Equipe" page="Equipe" type="TABLE" data={rosterReport} filters={reportFilters} style={{float:'right'}}/>
+      <ReportAdder
+        sectionKey="equipe:cadastro"
+        title="Cadastro da Equipe"
+        componentName="Tabela de Cadastro da Equipe"
+        page="Equipe"
+        type="TABLE"
+        data={rosterReport}
+        dataSets={{
+          summary: rosterSummaryReport,
+          visible: visibleRoster.map(item=>rosterReport.find(row=>row['Pessoa / empresa']===item.name)).filter(Boolean),
+          all: detailedRosterReport,
+        }}
+        detailMode="visible"
+        detailOptions={['summary','visible','all']}
+        filters={reportFilters}
+        style={{float:'right'}}
+      />
       <div className="mgmt-panel-head"><div><h2>Cadastro da equipe</h2><p>Clique no cadastro para abrir a ficha financeira completa no centro da tela.</p></div></div>
       <div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Pessoa / empresa</th><th>Cargo / função</th><th>Tipo</th><th>Valor de referência</th><th>Projetos</th><th>Pago</th><th>A pagar</th></tr></thead><tbody>
         {visibleRoster.map(item=>{const rows=item.transactions.filter(r=>inRange(r,startDate,endDate));const rowPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const rowOpen=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);return <tr key={item.key} onClick={()=>setSelectedPerson(item)}><td><strong>{item.name}</strong></td><td>{item.roles.join(' · ')||'—'}</td><td>{item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe'}</td><td>{item.fixedMonthly&&!item.referenceValue?'Mensal / fixo':brl(item.referenceValue)}</td><td>{item.projects.length}</td><td className="mgmt-value-paid">{brl(rowPaid)}</td><td className="mgmt-value-open">{brl(rowOpen)}</td></tr>})}
