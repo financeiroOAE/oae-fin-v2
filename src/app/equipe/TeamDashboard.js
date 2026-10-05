@@ -178,9 +178,19 @@ export default function TeamDashboard() {
     return [...map.values()].map((p)=>({...p, peopleCount:p.people.size, total:p.paid+p.open})).sort((a,b)=>b.total-a.total);
   }, [filteredEntries, month]);
 
-  const evolutionData = useMemo(() => (data.monthly || []).map((m)=>({
-    month:monthLabel(m.month), Pago:m.paid, 'A pagar':m.open
-  })), [data.monthly]);
+  const evolutionData = useMemo(() => Array.from({length:12},(_,i)=>{
+    const key=`2026-${String(i+1).padStart(2,'0')}`;
+    const map=new Map();
+    filteredEntries.forEach((entry)=>(entry.transactions||[]).forEach((row)=>{
+      if(getMonth(row.data)===key) map.set(row.sourceKey,row);
+    }));
+    const rows=[...map.values()];
+    return {
+      month:monthLabel(key),
+      Pago:rows.filter((row)=>row.paid).reduce((s,row)=>s+Number(row.valor||0),0),
+      'A pagar':rows.filter((row)=>!row.paid).reduce((s,row)=>s+Number(row.valor||0),0),
+    };
+  }), [filteredEntries]);
 
   const projectChart = projectRows.slice(0,10).map((p)=>({ projeto:p.name, Pago:p.paid, 'A pagar':p.open }));
 
