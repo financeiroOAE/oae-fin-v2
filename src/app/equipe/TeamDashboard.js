@@ -61,6 +61,18 @@ export default function TeamDashboard() {
 
   const paid = filteredTransactions.filter((r) => r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
   const open = filteredTransactions.filter((r) => !r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
+  const entryPeriodTotals = (entry) => {
+    if (!month) return { paid: entry.paid, open: entry.open, total: entry.total };
+    const rows = (entry.transactions || []).filter((row) => {
+      const raw = String(row.data || '');
+      const br = raw.match(/^\\d{1,2}\\/(\\d{1,2})\\/(\\d{4})/);
+      const rowMonth = br ? `${br[2]}-${br[1].padStart(2,'0')}` : raw.slice(0,7);
+      return rowMonth === month;
+    });
+    const rowPaid = rows.filter((row)=>row.paid).reduce((sum,row)=>sum+Number(row.valor||0),0);
+    const rowOpen = rows.filter((row)=>!row.paid).reduce((sum,row)=>sum+Number(row.valor||0),0);
+    return { paid: rowPaid, open: rowOpen, total: rowPaid + rowOpen };
+  };
   const uniquePeople = new Set(filteredEntries.map((e)=>norm(e.person))).size;
   const thirdParties = new Set(filteredEntries.filter((e)=>e.thirdParty).map((e)=>norm(e.person))).size;
   const uniqueProjects = new Set(filteredEntries.flatMap((e)=>e.project ? [e.project] : e.projects || []).filter(Boolean)).size;
@@ -123,7 +135,7 @@ export default function TeamDashboard() {
     <section className="mgmt-panel">
       <h2>Pessoas e vínculos</h2>
       <div className="mgmt-table-wrap"><table className="mgmt-table"><thead><tr><th>Pessoa</th><th>Departamento / obra</th><th>Cargo</th><th>Tipo</th><th>Valor CT</th><th>Pago</th><th>A pagar</th><th>Total</th></tr></thead><tbody>
-        {filteredEntries.map((e)=><tr key={e.id}><td><strong>{e.person}</strong></td><td>{e.departmentProject}</td><td>{e.role || '—'}</td><td>{e.thirdParty ? 'Terceiro' : e.fixedMonthly ? 'Mensal / fixo' : 'Equipe'}</td><td>{e.fixedMonthly ? 'Mensal / fixo' : brl(e.contractValue)}</td><td>{brl(e.paid)}</td><td>{brl(e.open)}</td><td><strong>{brl(e.total)}</strong></td></tr>)}
+        {filteredEntries.map((e)=>{const period=entryPeriodTotals(e); return <tr key={e.id}><td><strong>{e.person}</strong></td><td>{e.departmentProject}</td><td>{e.role || '—'}</td><td>{e.thirdParty ? 'Terceiro' : e.fixedMonthly ? 'Mensal / fixo' : 'Equipe'}</td><td>{e.fixedMonthly ? 'Mensal / fixo' : brl(e.contractValue)}</td><td>{brl(period.paid)}</td><td>{brl(period.open)}</td><td><strong>{brl(period.total)}</strong></td></tr>})}
       </tbody></table></div>
     </section>
 
