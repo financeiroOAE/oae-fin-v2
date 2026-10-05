@@ -9,6 +9,7 @@ import {
 import { useReport } from '@/contexts/ReportContext';
 import ReportAdder from '@/components/report/ReportAdder';
 import InfoTooltip from '@/components/InfoTooltip';
+import DataTable from '@/components/DataTable';
 import './management.css';
 import './managementExtras.css';
 
@@ -33,7 +34,25 @@ const inRange = (row,start,end) => {
   return (!start||key>=start)&&(!end||key<=end);
 };
 
+const projectCodeLabel = (value) => {
+  const raw=String(value||'').trim();
+  const match=raw.match(/(?:^|\b)P?\.?\s*(\d{3,4}[A-Z0-9]*)/i);
+  return match?.[1] || raw.split(/[-\s]/)[0] || raw;
+};
+const planLabel = (value) => String(value||'')
+  .replace(/^\s*\d{6,}\s*[-–—:]?\s*/, '')
+  .trim() || String(value||'').trim();
+const toFinancialRows = (rows, personName) => (rows||[]).map((row)=>({
+  ...row,
+  natureza:'Saída',
+  nome:personName || row.nome,
+  contaDescricao:row.contaNome || row.contaDescricao || row.contaCodigo || '',
+  status:row.paid ? 'Realizado' : 'A realizar',
+  projeto:row.projeto || '',
+}));
+
 function PersonModal({ person, onClose }) {
+  const [selectedProject, setSelectedProject] = useState(null);
   if(!person) return null;
   const rows=person.transactions||[];
   const paid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
@@ -68,7 +87,7 @@ function PersonModal({ person, onClose }) {
 
       <div className="mgmt-meta-grid">
         <div><span>Tipo</span><strong>{person.thirdParty?'Terceiro':person.fixedMonthly?'Mensal / fixo':'Equipe'}</strong></div>
-        <div><span>Conta / plano utilizado</span><strong>{person.accounts.length?person.accounts.join(' · '):'Não identificado'}</strong></div>
+        <div><span>Plano utilizado</span><strong>{person.accounts.length?[...new Set(person.accounts.map(planLabel).filter(Boolean))].join(' · '):'Não identificado'}</strong></div>
         <div><span>Projetos vinculados</span><strong>{person.projects.length}</strong></div>
         <div><span>Valor de referência</span><strong>{person.fixedMonthly&&!person.referenceValue?'Mensal / fixo':brl(person.referenceValue)}</strong></div>
       </div>
@@ -93,24 +112,24 @@ function PersonModal({ person, onClose }) {
       <section className="mgmt-subcard" style={{marginTop:14}}>
         <h3>Resumo por obra</h3>
         <div className="mgmt-project-cards">
-          {byProject.map(item=><div className="mgmt-project-card" key={item.name}>
+          {byProject.map(item=><button type="button" className={`mgmt-project-card mgmt-project-card-button ${selectedProject?.name===item.name?'active':''}`} key={item.name} onClick={()=>setSelectedProject(selectedProject?.name===item.name?null:item)}>
             <strong>{item.name}</strong>
             <div><span>Pago</span><b className="mgmt-value-paid">{brl(item.paid)}</b></div>
             <div><span>A pagar</span><b className="mgmt-value-open">{brl(item.open)}</b></div>
-            <small>{item.rows.length} lançamento{item.rows.length!==1?'s':''}</small>
-          </div>)}
+            <small>{item.rows.length} lançamento{item.rows.length!==1?'s':''} · clique para ver</small>
+          </button>)}
         </div>
         {!byProject.length&&<p>Sem movimentações vinculadas a obras.</p>}
+        {selectedProject&&<div className="mgmt-project-movements">
+          <div className="mgmt-panel-head"><div><h3>Movimentos · {selectedProject.name}</h3><p>{selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div><button className="mgmt-text-button" onClick={()=>setSelectedProject(null)}>Fechar relação</button></div>
+          <DataTable data={toFinancialRows(selectedProject.rows,person.name)} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
+        </div>}
       </section>
 
       <section className="mgmt-subcard" style={{marginTop:14}}>
         <h3>Pagamentos e valores em aberto</h3>
-        <div className="mgmt-table-wrap"><table className="mgmt-table"><thead><tr><th>Data</th><th>Documento</th><th>Obra</th><th>Conta / plano</th><th>Situação</th><th>Valor</th></tr></thead><tbody>
-          {[...rows].sort((a,b)=>getDateKey(b.data).localeCompare(getDateKey(a.data))).map(row=><tr key={row.sourceKey}>
-            <td>{row.data||'—'}</td><td>{row.documento||row.titulo||'—'}</td><td>{row.projeto||'—'}</td><td>{row.contaNome||row.contaCodigo||'—'}</td>
-            <td><span className={row.paid?'mgmt-pill paid':'mgmt-pill open'}>{row.paid?'Pago':'A pagar'}</span></td><td><strong>{brl(row.valor)}</strong></td>
-          </tr>)}
-        </tbody></table></div>
+        <p className="mgmt-muted">Filtros financeiros, 30 movimentos por página, opção de 50 ou Todos e navegação entre páginas.</p>
+        <DataTable data={toFinancialRows(rows,person.name)} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
       </section>
     </div>
   </div>;
@@ -193,7 +212,7 @@ export default function TeamDashboard(){
   }),[filteredEntries,startDate,endDate]);
 
   const reportFilters={'Data inicial':startDate,'Data final':endDate,Pessoa:personFilter||'Todas',Projeto:project||'Todos',Situação:status||'Todas'};
-  const projectChart=projectRows.slice(0,10).map(p=>({Projeto:p.name,Pago:p.paid,'A pagar':p.open}));
+  const projectChart=projectRows.slice(0,10).map(p=>({Projeto:projectCodeLabel(p.name),'Obra completa':p.name,Pago:p.paid,'A pagar':p.open}));
   const rosterReport=peopleRoster.map(item=>({'Pessoa / empresa':item.name,'Cargo / função':item.roles.join(' · '),'Tipo':item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe','Valor de referência':item.referenceValue,'Projetos':item.projects.length,'Pago':item.transactions.filter(r=>r.paid&&inRange(r,startDate,endDate)).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':item.transactions.filter(r=>!r.paid&&inRange(r,startDate,endDate)).reduce((s,r)=>s+Number(r.valor||0),0)}));
 
   return <div className="mgmt">
@@ -232,7 +251,7 @@ export default function TeamDashboard(){
       <section id="report-equipe-obras" data-report-section className="mgmt-panel">
         <ReportAdder sectionKey="equipe:obras-maior-gasto" title="Obras com maior gasto de equipe" componentName="Ranking de Obras" page="Equipe" type="CHART" data={projectChart} filters={reportFilters} captureId="report-equipe-obras" style={{float:'right'}}/>
         <h2>Obras com maior gasto de equipe</h2><p>Top 10 do período. O centro transitório <strong>PROJETOS</strong> é desconsiderado.</p>
-        <div className="mgmt-chart"><ResponsiveContainer><BarChart data={projectChart} layout="vertical" margin={{top:5,right:15,left:20,bottom:0}}><CartesianGrid strokeDasharray="3 3" opacity={0.14}/><XAxis type="number" tickFormatter={compact} tick={{fontSize:10}}/><YAxis type="category" dataKey="Projeto" width={150} tick={{fontSize:9}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar dataKey="Pago" stackId="team" fill={PAID_COLOR}/><Bar dataKey="A pagar" stackId="team" fill={OPEN_COLOR}/></BarChart></ResponsiveContainer></div>
+        <div className="mgmt-chart"><ResponsiveContainer><BarChart data={projectChart} layout="vertical" margin={{top:5,right:15,left:20,bottom:0}}><CartesianGrid strokeDasharray="3 3" opacity={0.14}/><XAxis type="number" tickFormatter={compact} tick={{fontSize:10}}/><YAxis type="category" dataKey="Projeto" width={72} tick={{fontSize:12,fontWeight:700}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar dataKey="Pago" stackId="team" fill={PAID_COLOR}/><Bar dataKey="A pagar" stackId="team" fill={OPEN_COLOR}/></BarChart></ResponsiveContainer></div>
       </section>
     </div>
 
