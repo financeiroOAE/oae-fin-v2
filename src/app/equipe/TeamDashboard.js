@@ -16,6 +16,8 @@ import './managementExtras.css';
 
 const PAID_COLOR = '#22c55e';
 const OPEN_COLOR = '#f59e0b';
+const THIRD_PAID_COLOR = '#8b5cf6';
+const THIRD_OPEN_COLOR = '#ec4899';
 const PRIMARY_COLOR = '#3b82f6';
 const brl = (n) => new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format(Number(n)||0);
 const compact = (n) => new Intl.NumberFormat('pt-BR', { notation:'compact', maximumFractionDigits:1 }).format(Number(n)||0);
@@ -198,6 +200,80 @@ function PersonModal({ person, onClose }) {
   </div>;
 }
 
+function ProjectSummaryModal({ project, onClose }) {
+  if(!project) return null;
+  const rows=project.rows||[];
+  const monthly=Array.from({length:12},(_,i)=>{
+    const key=`2026-${String(i+1).padStart(2,'0')}`;
+    const monthRows=rows.filter(r=>getMonth(r.data)===key);
+    return {
+      month:monthLabel(key),
+      Pago:monthRows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),
+      'A pagar':monthRows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0),
+    };
+  });
+  const tableRows=rows.map(row=>({
+    ...row,
+    natureza:'Saída',
+    nome:row.rosterPerson||row.nome,
+    contaDescricao:row.contaNome||row.contaDescricao||row.contaCodigo||'',
+    status:row.paid?'Realizado':'A realizar',
+    projeto:project.name,
+  }));
+  const reportRows=rows.map(row=>({
+    Data:row.data,
+    'Pessoa / empresa':row.rosterPerson||row.nome,
+    Documento:row.documento||row.titulo||'',
+    Plano:planLabel(row.contaNome||row.contaCodigo),
+    Situação:row.paid?'Pago':'A pagar',
+    Valor:Number(row.valor||0),
+  }));
+
+  return <div className="mgmt-overlay mgmt-overlay-center mgmt-overlay-project" onMouseDown={onClose}>
+    <div className="mgmt-modal-center mgmt-project-modal" onMouseDown={(e)=>e.stopPropagation()}>
+      <div className="mgmt-panel-head">
+        <div>
+          <span className="mgmt-eyebrow">EQUIPE POR PROJETO · 2026</span>
+          <h2>{project.name}</h2>
+          <p>{project.peopleCount} pessoa{project.peopleCount!==1?'s':''} / empresa{project.peopleCount!==1?'s':''} · {rows.length} movimento{rows.length!==1?'s':''}</p>
+        </div>
+        <div className="mgmt-actions">
+          <ReportAdder
+            sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}`}
+            title={`Equipe do Projeto — ${project.name}`}
+            componentName="Movimentações da Equipe por Projeto"
+            page="Equipe"
+            type="TABLE"
+            data={reportRows}
+            filters={{Ano:2026,Projeto:project.name}}
+          />
+          <button className="btn" onClick={onClose}><X size={16}/> Fechar</button>
+        </div>
+      </div>
+
+      <section className="mgmt-subcard">
+        <h3>Fluxo mensal de pagamentos</h3>
+        <div className="mgmt-chart-sm"><ResponsiveContainer>
+          <BarChart data={monthly}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.16}/>
+            <XAxis dataKey="month" tick={{fontSize:10}}/>
+            <YAxis tickFormatter={compact} tick={{fontSize:10}}/>
+            <Tooltip formatter={(v)=>brl(v)}/>
+            <Legend/>
+            <Bar dataKey="Pago" fill={PAID_COLOR} radius={[4,4,0,0]}/>
+            <Bar dataKey="A pagar" fill={OPEN_COLOR} radius={[4,4,0,0]}/>
+          </BarChart>
+        </ResponsiveContainer></div>
+      </section>
+
+      <section className="mgmt-subcard" style={{marginTop:14}}>
+        <h3>Movimentações e pessoas do projeto</h3>
+        <DataTable data={tableRows} initialPageSize={10} pageSizeOptions={[10,30,50,'all']}/>
+      </section>
+    </div>
+  </div>;
+}
+
 export default function TeamDashboard(){
   const {isReportMode,openReportBuilder,exitReportMode}=useReport();
   const[data,setData]=useState({entries:[],monthly:[]});
@@ -226,6 +302,7 @@ export default function TeamDashboard(){
   const[projectOpenFilter,setProjectOpenFilter]=useState('');
   const[projectTotalFilter,setProjectTotalFilter]=useState('');
   const[selectedPerson,setSelectedPerson]=useState(null);
+  const[selectedProjectSummary,setSelectedProjectSummary]=useState(null);
   const[error,setError]=useState('');
 
   useEffect(()=>{let active=true;fetch('/api/equipe',{cache:'no-store'}).then(async r=>{const result=await r.json();if(!r.ok)throw new Error(result.error||'Não foi possível carregar a equipe.');if(active)setData(result)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[]);
@@ -293,17 +370,20 @@ export default function TeamDashboard(){
       const list=(entry.project?[entry.project]:(entry.projects||[])).filter(name=>projectFilters.length===0||projectFilters.includes(name));
       list.forEach(name=>{
         if(!name||norm(name)==='PROJETOS')return;
-        const item=map.get(name)||{name,people:new Set(),paid:0,open:0};
+        const item=map.get(name)||{name,people:new Set(),paid:0,open:0,rows:new Map()};
         item.people.add(entry.person);
         (entry.transactions||[])
           .filter(row=>norm(row.projeto)===norm(name)&&inRange(row,startDate,endDate))
           .filter(row=>accountFilters.length===0||accountFilters.includes(rowAccountOption(row)))
           .filter(row=>statusFilters.length===0||statusFilters.includes(row.paid?'Pago':'A pagar'))
-          .forEach(row=>{item[row.paid?'paid':'open']+=Number(row.valor||0)});
+          .forEach(row=>{
+            item[row.paid?'paid':'open']+=Number(row.valor||0);
+            item.rows.set(row.sourceKey,{...row,rosterPerson:entry.person,thirdParty:Boolean(entry.thirdParty)});
+          });
         map.set(name,item);
       });
     });
-    return[...map.values()].map(p=>({...p,peopleCount:p.people.size,total:p.paid+p.open})).sort((a,b)=>b.total-a.total);
+    return[...map.values()].map(p=>({...p,peopleCount:p.people.size,total:p.paid+p.open,rows:[...p.rows.values()]})).sort((a,b)=>b.total-a.total);
   },[filteredEntries,startDate,endDate,projectFilters,accountFilters,statusFilters]);
 
   const evolutionData=useMemo(()=>Array.from({length:12},(_,i)=>{
@@ -314,10 +394,18 @@ export default function TeamDashboard(){
       if(projectFilters.length>0&&!projectFilters.includes(row.projeto))return;
       if(accountFilters.length>0&&!accountFilters.includes(rowAccountOption(row)))return;
       if(statusFilters.length>0&&!statusFilters.includes(row.paid?'Pago':'A pagar'))return;
-      map.set(row.sourceKey,row);
+      map.set(row.sourceKey,{row,thirdParty:Boolean(entry.thirdParty)});
     }));
-    const rows=[...map.values()];
-    return{month:monthLabel(key),Pago:rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0)};
+    const items=[...map.values()];
+    const regular=items.filter(item=>!item.thirdParty);
+    const third=items.filter(item=>item.thirdParty);
+    return{
+      month:monthLabel(key),
+      'Equipe · Pago':regular.filter(item=>item.row.paid).reduce((s,item)=>s+Number(item.row.valor||0),0),
+      'Equipe · A pagar':regular.filter(item=>!item.row.paid).reduce((s,item)=>s+Number(item.row.valor||0),0),
+      'Terceiros · Pago':third.filter(item=>item.row.paid).reduce((s,item)=>s+Number(item.row.valor||0),0),
+      'Terceiros · A pagar':third.filter(item=>!item.row.paid).reduce((s,item)=>s+Number(item.row.valor||0),0),
+    };
   }),[filteredEntries,startDate,endDate,projectFilters,accountFilters,statusFilters]);
 
   const reportFilters={'Data inicial':startDate,'Data final':endDate,Pessoa:personFilters.length?personFilters.join(', '):'Todas',Projeto:projectFilters.length?projectFilters.join(', '):'Todos','Conta / Plano':accountFilters.length?accountFilters.join(', '):'Todas',Situação:statusFilters.length?statusFilters.join(', '):'Todas'};
@@ -430,8 +518,8 @@ export default function TeamDashboard(){
     <div className="mgmt-flow mgmt-flow-balanced">
       <section id="report-equipe-evolucao" data-report-section className="mgmt-panel">
         <ReportAdder sectionKey="equipe:evolucao" title="Evolução mensal da Equipe" componentName="Gráfico de Evolução Mensal" page="Equipe" type="CHART" data={evolutionData} filters={reportFilters} captureId="report-equipe-evolucao" style={{float:'right'}}/>
-        <h2>Evolução mensal da equipe</h2><p>Pago e a pagar de janeiro a dezembro de 2026.</p>
-        <div className="mgmt-chart"><ResponsiveContainer><LineChart data={evolutionData}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago" stroke={PAID_COLOR} strokeWidth={2.8}/><Line type="monotone" dataKey="A pagar" stroke={OPEN_COLOR} strokeWidth={2.8}/></LineChart></ResponsiveContainer></div>
+        <h2>Evolução mensal da equipe</h2><p>Comparação mensal entre a equipe vinculada à operação e terceiros, separando pago e a pagar.</p>
+        <div className="mgmt-chart"><ResponsiveContainer><LineChart data={evolutionData}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Equipe · Pago" stroke={PAID_COLOR} strokeWidth={2.8}/><Line type="monotone" dataKey="Equipe · A pagar" stroke={OPEN_COLOR} strokeWidth={2.4}/><Line type="monotone" dataKey="Terceiros · Pago" stroke={THIRD_PAID_COLOR} strokeWidth={2.8}/><Line type="monotone" dataKey="Terceiros · A pagar" stroke={THIRD_OPEN_COLOR} strokeWidth={2.4}/></LineChart></ResponsiveContainer></div>
       </section>
 
       <section id="report-equipe-obras" data-report-section className="mgmt-panel">
@@ -485,10 +573,11 @@ export default function TeamDashboard(){
         <label>A pagar<input type="text" value={projectOpenFilter} onChange={e=>setProjectOpenFilter(e.target.value)} placeholder="Valor exato"/></label>
         <label>Total<input type="text" value={projectTotalFilter} onChange={e=>setProjectTotalFilter(e.target.value)} placeholder="Valor exato"/></label>
       </div>
-      <div className="mgmt-table-wrap"><table className="mgmt-table"><thead><tr><th>Projeto</th><th>Pessoas / terceiros</th><th>Pago</th><th>A pagar</th><th>Total</th></tr></thead><tbody>{visibleProjects.map(p=><tr key={p.name}><td><strong>{p.name}</strong></td><td>{p.peopleCount}</td><td className="mgmt-value-paid">{brl(p.paid)}</td><td className="mgmt-value-open">{brl(p.open)}</td><td><strong>{brl(p.total)}</strong></td></tr>)}</tbody></table></div>
+      <div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Projeto</th><th>Pessoas / terceiros</th><th>Pago</th><th>A pagar</th><th>Total</th></tr></thead><tbody>{visibleProjects.map(p=><tr key={p.name} onClick={()=>setSelectedProjectSummary(p)}><td><strong>{p.name}</strong></td><td>{p.peopleCount}</td><td className="mgmt-value-paid">{brl(p.paid)}</td><td className="mgmt-value-open">{brl(p.open)}</td><td><strong>{brl(p.total)}</strong></td></tr>)}</tbody></table></div>
       <Pager total={projectFiltered.length} page={projectPage} setPage={setProjectPage} pageSize={projectPageSize} setPageSize={setProjectPageSize}/>
     </section>
 
+    <ProjectSummaryModal project={selectedProjectSummary} onClose={()=>setSelectedProjectSummary(null)}/>
     <PersonModal person={selectedPerson} onClose={()=>setSelectedPerson(null)}/>
   </div>;
 }
