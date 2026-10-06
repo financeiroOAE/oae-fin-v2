@@ -239,6 +239,7 @@
   background:var(--bg-elevated);
 }
 .mgmt-table-filters-seven{grid-template-columns:1.35fr 1.2fr .9fr 1fr 1.1fr .9fr .9fr}
+.mgmt-table-filters-six{grid-template-columns:1.35fr 1.2fr .9fr 1.1fr .9fr .9fr}
 .mgmt-table-filters-five{grid-template-columns:1.6fr 1fr 1fr 1fr 1fr}
 .mgmt-table-filters label{
   display:flex;
@@ -263,12 +264,12 @@
 }
 .mgmt-table-filters label>div{margin-top:0}
 @media(max-width:1250px){
-  .mgmt-table-filters-seven{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .mgmt-table-filters-seven,.mgmt-table-filters-six{grid-template-columns:repeat(4,minmax(0,1fr))}
   .mgmt-table-filters-five{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(max-width:850px){
-  .mgmt-table-filters-seven,.mgmt-table-filters-five{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mgmt-table-filters-seven,.mgmt-table-filters-six,.mgmt-table-filters-five{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:560px){
-  .mgmt-table-filters-seven,.mgmt-table-filters-five{grid-template-columns:1fr}
+  .mgmt-table-filters-seven,.mgmt-table-filters-six,.mgmt-table-filters-five{grid-template-columns:1fr}
 }
