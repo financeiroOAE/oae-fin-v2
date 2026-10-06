@@ -8,6 +8,7 @@ import {
 } from '@/lib/financialSync';
 
 const REFRESH_COOLDOWN_MS = 15000;
+const MANUAL_REFRESH_COOLDOWN_MS = 2 * 60 * 60 * 1000;
 const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
   'Cache-Control': 'no-store, max-age=0',
@@ -34,10 +35,16 @@ export async function GET(request) {
 
     if (metadataOnly) {
       const metadata = await readCurrentSnapshotMetadata();
+      const syncedAtMs = metadata?.updatedAt ? new Date(metadata.updatedAt).getTime() : 0;
+      const nextManualRefreshAtMs = syncedAtMs ? syncedAtMs + MANUAL_REFRESH_COOLDOWN_MS : 0;
+      const canManualRefresh = !nextManualRefreshAtMs || Date.now() >= nextManualRefreshAtMs;
       return NextResponse.json({
         ok: Boolean(metadata),
         syncedAt: metadata?.updatedAt?.toISOString?.() || null,
         updatedBy: metadata?.username || null,
+        canManualRefresh,
+        nextManualRefreshAt: nextManualRefreshAtMs ? new Date(nextManualRefreshAtMs).toISOString() : null,
+        manualCooldownMinutes: MANUAL_REFRESH_COOLDOWN_MS / 60000,
       }, { headers: JSON_HEADERS });
     }
 
@@ -45,13 +52,25 @@ export async function GET(request) {
 
     if (requestedRefresh) {
       try {
-        // Coalesce chamadas automáticas quase simultâneas. O clique manual
-        // sempre ignora esta janela e força uma nova leitura do Sheets.
+        const metadata = await readCurrentSnapshotMetadata();
+        const snapshotAge = metadata?.updatedAt
+          ? Date.now() - new Date(metadata.updatedAt).getTime()
+          : Number.POSITIVE_INFINITY;
+
+        if (manual && snapshotAge < MANUAL_REFRESH_COOLDOWN_MS) {
+          const nextManualRefreshAt = new Date(new Date(metadata.updatedAt).getTime() + MANUAL_REFRESH_COOLDOWN_MS);
+          return NextResponse.json({
+            ok: false,
+            error: `Atualização bloqueada por segurança. Uma nova sincronização manual estará disponível às ${nextManualRefreshAt.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}.`,
+            code: 'MANUAL_REFRESH_COOLDOWN',
+            syncedAt: metadata.updatedAt.toISOString(),
+            nextManualRefreshAt: nextManualRefreshAt.toISOString(),
+            manualCooldownMinutes: MANUAL_REFRESH_COOLDOWN_MS / 60000,
+          }, { status: 429, headers: JSON_HEADERS });
+        }
+
+        // Coalesce chamadas automáticas quase simultâneas.
         if (!manual) {
-          const metadata = await readCurrentSnapshotMetadata();
-          const snapshotAge = metadata?.updatedAt
-            ? Date.now() - new Date(metadata.updatedAt).getTime()
-            : Number.POSITIVE_INFINITY;
           if (snapshotAge < REFRESH_COOLDOWN_MS) {
             return NextResponse.json({
               ok: true,
