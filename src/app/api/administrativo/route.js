@@ -91,7 +91,7 @@ export async function GET() {
     .filter((row) => String(row.month || '').startsWith(YEAR))
     .map((row) => ({
       ...row,
-      adminValue: Math.round(Number(row.value || 0) * 0.20 * 100) / 100,
+      adminValue: Math.round(Number(row.adminValue || 0) * 100) / 100,
       status: row.realized ? 'Recebido' : 'A receber',
     }));
 
@@ -119,7 +119,7 @@ export async function GET() {
     monthly,
     snapshotAt: snapshot?.updatedAt || null,
     rules: {
-      revenueAdministrative: '20% da receita dos títulos',
+      revenueAdministrative: 'Parcela 1010107 da coluna K; fallback de 20% apenas quando a linha administrativa não existe',
       expenseScope: 'Centro de custo ADMINISTRAÇÃO',
       partnerScope: 'Francielle/Paulo: plano 2010302 em todo o CP_GERAL + retiradas 2010522',
     },
