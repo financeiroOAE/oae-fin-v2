@@ -1034,12 +1034,17 @@ export default function FluxoDeCaixa() {
                 <tbody>
                   {faturamentosNfesFiltrados.length > 0 ? faturamentosNfesFiltrados.map((row, idx) => (
                     <tr key={`${row.lancamento || 'sem-lancamento'}-${row.documento || idx}-${idx}`}>
-                      <td style={{ fontWeight: '500' }}>{row.documento}</td>
-                      <td style={{ maxWidth: '170px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.projeto}>{row.projeto}</td>
-                      <td>{row.situacao}</td>
-                      <td>{row.data}</td>
-                      <td style={{ textAlign: 'right', color: 'var(--text-main)', fontWeight: '600' }}>{formatCurrency(row.valorRealNota)}</td>
-                      <td style={{ textAlign: 'right', color: 'var(--success)' }}>{formatCurrency(row.valor)}</td>
+                      {(() => {
+                        const situacaoColor = row.situacao === 'Recebido' ? 'var(--success)' : 'var(--warning)';
+                        return <>
+                          <td style={{ fontWeight: '500' }}>{row.documento}</td>
+                          <td style={{ maxWidth: '170px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.projeto}>{row.projeto}</td>
+                          <td style={{ color: situacaoColor, fontWeight: '700' }}>{row.situacao}</td>
+                          <td>{row.data}</td>
+                          <td style={{ textAlign: 'right', color: situacaoColor, fontWeight: '600' }}>{formatCurrency(row.valorRealNota)}</td>
+                          <td style={{ textAlign: 'right', color: situacaoColor, fontWeight: '700' }}>{formatCurrency(row.valor)}</td>
+                        </>;
+                      })()}
                     </tr>
                   )) : (
                     <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhuma nota fiscal encontrada para os filtros selecionados.</td></tr>
