@@ -454,12 +454,11 @@ export default function FluxoDeCaixa() {
   };
   const reportMovementRows = filteredData.map((item) => ({
     Data: item.data,
-    Projeto: item.projeto,
-    Nome: item.nome,
-    Conta: item.contaDescricao,
-    Situação: item.statusExibicao,
-    Natureza: item.natureza,
-    Valor: item.valor,
+    "Nome / Pessoa / Fornecedor": item.nome || "-",
+    "Projeto / Obra": item.projeto || "-",
+    "Conta / Plano": item.contaDescricao || "-",
+    Situação: item.statusExibicao || "-",
+    Valor: Number(item.valor) || 0,
   }));
 
   const handleBarClick = (e) => {
@@ -947,11 +946,10 @@ export default function FluxoDeCaixa() {
           detailOptions={["summary", "visible", "all"]}
           columns={[
             { key: "Data", label: "Data", format: "date" },
-            { key: "Nome", label: "Nome / Pessoa / Fornecedor", format: "text" },
-            { key: "Projeto", label: "Projeto / Obra", format: "text" },
-            { key: "Conta", label: "Conta / Plano", format: "text" },
+            { key: "Nome / Pessoa / Fornecedor", label: "Nome / Pessoa / Fornecedor", format: "text" },
+            { key: "Projeto / Obra", label: "Projeto / Obra", format: "text" },
+            { key: "Conta / Plano", label: "Conta / Plano", format: "text" },
             { key: "Situação", label: "Situação", format: "text" },
-            { key: "Natureza", label: "Natureza", format: "text" },
             { key: "Valor", label: "Valor", format: "currency" }
           ]}
           filters={reportFilters}
