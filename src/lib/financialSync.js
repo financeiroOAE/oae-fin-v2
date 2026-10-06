@@ -180,7 +180,8 @@ async function performFullSync(triggeredBy) {
       CONTRATO: parseBRL(proj.CONTRATO),
       'NF FATURADAS': parseBRL(proj['NF FATURADAS']),
       FATURADO_2026: parseBRL(
-        proj.FATURADO_2026_COL_L
+        proj.FATURADO_2026_COL_J
+        ?? proj.FATURADO_2026_HEADER
         ?? proj.FATURADO_2026
         ?? proj['FATURADO 2026']
         ?? proj['FATURADO EM 2026']
