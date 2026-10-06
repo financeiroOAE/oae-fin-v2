@@ -17,6 +17,7 @@ import ReportAdder from "@/components/report/ReportAdder";
 import { classifyFinancialEntry, getFinancialDisplayStatus, isForecastOnlyReceivableDocument, isPartnerWithdrawal, isRevenueTax } from "@/lib/financialClassification";
 import { getActiveProjects, getActiveProjectNames, getProjectKey } from "@/lib/projectRules";
 import { loadFinancialData } from "@/lib/clientSync";
+import FinancialRefreshButton from "@/components/FinancialRefreshButton";
 
 const getYearToDateRange = () => {
   const today = new Date();
@@ -633,9 +634,7 @@ export default function VisaoFinanceira() {
             <FileText size={14} /> {isReportMode ? 'Sair do Modo Relatório' : 'Gerar Relatório'}
           </button>
           {lastSync && <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}><Database size={12} style={{display:'inline', marginRight:'4px'}}/> {lastSync}</span>}
-          <button onClick={() => fetchDados(true, true)} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
-            <RefreshCw size={14} className={isSyncing ? "spinner" : ""} /> {isSyncing ? 'Atualizando...' : 'Atualizar'}
-          </button>
+          <FinancialRefreshButton onUpdated={()=>fetchDados(false,false,false)} onError={setError} label="Atualizar"/>
         </div>
       </header>
 
