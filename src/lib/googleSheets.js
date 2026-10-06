@@ -101,12 +101,13 @@ export async function batchReadSheets(ranges = DEFAULT_RANGES) {
             rowData[header] = row[index] ?? '';
           });
 
-          // Faturamento acumulado de 2026: prioriza o cabeçalho real da planilha.
-          // A coluna L fica apenas como fallback legado para bases antigas.
+          // Faturamento acumulado de 2026: fonte oficial = coluna J.
+          // O cabeçalho identificado dinamicamente fica apenas como fallback.
           if (sheetName === 'PROJETOS_2026') {
-            rowData.FATURADO_2026_COL_L = faturado2026Index >= 0
+            rowData.FATURADO_2026_COL_J = row[9] ?? '';
+            rowData.FATURADO_2026_HEADER = faturado2026Index >= 0
               ? (row[faturado2026Index] ?? '')
-              : (row[11] ?? '');
+              : '';
           }
 
           return rowData;
