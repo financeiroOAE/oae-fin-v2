@@ -119,6 +119,7 @@ function PersonModal({ person, onClose }) {
   const [selectedProject, setSelectedProject] = useState(null);
   const { openReportBuilder } = useReport();
   if(!person) return null;
+  const personReportScope=`equipe:ficha:${person.key}`;
   const rows=person.transactions||[];
   const movementPlans=[...new Set(rows.map(r=>planLabel(r.contaNome||r.contaCodigo)).filter(Boolean))];
   const displayPlans=movementPlans.length?movementPlans:[...new Set(person.accounts.map(planLabel).filter(Boolean))];
@@ -199,7 +200,7 @@ function PersonModal({ person, onClose }) {
           <p>{person.roles.join(' · ')||'Sem função informada'} · relatório configurável por blocos e orientação</p>
         </div>
         <div className="mgmt-actions">
-          <button className="btn" onClick={()=>openReportBuilder('Equipe')}><FileText size={15}/> Gerar Relatório</button>
+          <button className="btn" onClick={()=>openReportBuilder('Equipe',personReportScope,`Ficha — ${person.name}`)}><FileText size={15}/> Gerar Relatório</button>
           <button className="btn" onClick={onClose}><X size={16}/> Fechar</button>
         </div>
       </div>
@@ -212,6 +213,7 @@ function PersonModal({ person, onClose }) {
             title={item.title}
             componentName={item.componentName}
             page={item.page}
+            scope={personReportScope}
             type={item.type}
             data={item.data}
             filters={item.filters}
@@ -269,7 +271,11 @@ function PersonModal({ person, onClose }) {
         <div className="mgmt-panel-head">
           <div><span className="mgmt-eyebrow">MOVIMENTOS DA OBRA · 2026</span><h2>{selectedProject.name}</h2><p>{person.name} · {selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div>
           <div className="mgmt-actions">
-            <button className="btn" onClick={()=>openReportBuilder('Equipe')}><FileText size={15}/> Gerar Relatório</button>
+            <button className="btn" onClick={()=>openReportBuilder(
+              'Equipe',
+              `equipe:pessoa-projeto:${person.key}:${projectCodeLabel(selectedProject.name)}`,
+              `${person.name} · ${selectedProject.name}`
+            )}><FileText size={15}/> Gerar Relatório</button>
             <button className="btn" onClick={()=>setSelectedProject(null)}><X size={16}/> Fechar</button>
           </div>
         </div>
@@ -279,6 +285,7 @@ function PersonModal({ person, onClose }) {
             title={`Resumo — ${person.name} — ${selectedProject.name}`}
             componentName="Resumo da Pessoa por Projeto"
             page="Equipe"
+            scope={`equipe:pessoa-projeto:${person.key}:${projectCodeLabel(selectedProject.name)}`}
             type="SUMMARY"
             data={[{Pessoa:person.name,Projeto:selectedProject.name,Pago:selectedProject.paid,'A pagar':selectedProject.open,Total:selectedProject.paid+selectedProject.open,Lançamentos:selectedProject.rows.length}]}
             filters={{Pessoa:person.name,Projeto:selectedProject.name}}
@@ -288,6 +295,7 @@ function PersonModal({ person, onClose }) {
             title={`Movimentações — ${person.name} — ${selectedProject.name}`}
             componentName="Movimentações da Pessoa por Projeto"
             page="Equipe"
+            scope={`equipe:pessoa-projeto:${person.key}:${projectCodeLabel(selectedProject.name)}`}
             type="TABLE"
             data={reportMovementRows(selectedProject.rows,person.name)}
             filters={{Pessoa:person.name,Projeto:selectedProject.name}}
@@ -302,6 +310,7 @@ function PersonModal({ person, onClose }) {
 function ProjectSummaryModal({ project, onClose }) {
   const { openReportBuilder } = useReport();
   if(!project) return null;
+  const projectReportScope=`equipe:projeto:${projectCodeLabel(project.name)}`;
   const rows=project.rows||[];
   const monthly=Array.from({length:12},(_,i)=>{
     const key=`2026-${String(i+1).padStart(2,'0')}`;
@@ -338,7 +347,7 @@ function ProjectSummaryModal({ project, onClose }) {
           <p>{project.peopleCount} pessoa{project.peopleCount!==1?'s':''} / empresa{project.peopleCount!==1?'s':''} · {rows.length} movimento{rows.length!==1?'s':''} · relatório configurável</p>
         </div>
         <div className="mgmt-actions">
-          <button className="btn" onClick={()=>openReportBuilder('Equipe')}><FileText size={15}/> Gerar Relatório</button>
+          <button className="btn" onClick={()=>openReportBuilder('Equipe',projectReportScope,`Projeto — ${project.name}`)}><FileText size={15}/> Gerar Relatório</button>
           <button className="btn" onClick={onClose}><X size={16}/> Fechar</button>
         </div>
       </div>
@@ -349,6 +358,7 @@ function ProjectSummaryModal({ project, onClose }) {
           title={`Resumo do projeto — ${project.name}`}
           componentName="Resumo Financeiro da Equipe por Projeto"
           page="Equipe"
+          scope={projectReportScope}
           type="SUMMARY"
           data={[{Projeto:project.name,'Pessoas / empresas':project.peopleCount,Pago:project.paid,'A pagar':project.open,Total:project.total,Lançamentos:rows.length}]}
           filters={{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'}}
@@ -358,6 +368,7 @@ function ProjectSummaryModal({ project, onClose }) {
           title={`Fluxo mensal — ${project.name}`}
           componentName="Fluxo Mensal da Equipe por Projeto"
           page="Equipe"
+          scope={projectReportScope}
           type="TABLE"
           data={monthly}
           filters={{Projeto:project.name,Ano:2026}}
@@ -367,6 +378,7 @@ function ProjectSummaryModal({ project, onClose }) {
           title={`Movimentações do projeto — ${project.name}`}
           componentName="Movimentações da Equipe por Projeto"
           page="Equipe"
+          scope={projectReportScope}
           type="TABLE"
           data={reportRows}
           filters={{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'}}
