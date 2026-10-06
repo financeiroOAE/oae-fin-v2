@@ -591,7 +591,7 @@ export default function Dre() {
   };
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => fetchDados(true, false, false), 0);
+    const timeoutId = setTimeout(() => fetchDados(false, false, false), 0);
     return () => clearTimeout(timeoutId);
   }, []);
 
