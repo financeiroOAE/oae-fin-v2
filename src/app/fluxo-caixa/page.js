@@ -997,21 +997,6 @@ export default function FluxoDeCaixa() {
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <div style={{ padding: '0.65rem 0.75rem', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '7px' }}>
-                <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Valor bruto</span>
-                <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--text-main)', fontSize: '15px' }}>{formatCurrency(totalValorRealNfes)}</strong>
-              </div>
-              <div style={{ padding: '0.65rem 0.75rem', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: '7px' }}>
-                <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Valor líquido</span>
-                <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--success)', fontSize: '15px' }}>{formatCurrency(totalFaturamentosNfes)}</strong>
-              </div>
-              <div style={{ padding: '0.65rem 0.75rem', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '7px' }}>
-                <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Notas exibidas</span>
-                <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--text-main)', fontSize: '15px' }}>{faturamentosNfesFiltrados.length}</strong>
-              </div>
-            </div>
-
             <div className="table-container" style={{ marginTop: '0.5rem', maxHeight: '310px', overflowY: 'auto' }}>
               <table style={{ fontSize: '11px', minWidth: '860px' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
