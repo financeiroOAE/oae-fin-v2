@@ -37,6 +37,32 @@ const parsePercentFilter = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const parseMoneyFilter = (value) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/R\$/gi, '').replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeNfText = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/\u00a0/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .toUpperCase();
+
+const dateToTimestamp = (value) => {
+  if (!value) return 0;
+  const raw = String(value).trim();
+  let match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (match) return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1])).getTime();
+  match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getTime();
+  return 0;
+};
+
 const FINANCIAL_UNALLOCATED_PROJECT_KEY = '__RECEITA_PROJETO_NAO_ALOCADA__';
 const FINANCIAL_UNALLOCATED_PROJECT_NAME = 'Receita de Projeto não alocada';
 
@@ -220,6 +246,17 @@ export default function Projetos() {
   const [filterEmpresas, setFilterEmpresas] = useState([]);
   const [filterTipos, setFilterTipos] = useState([]);
   const [filterStatusProjeto, setFilterStatusProjeto] = useState('TODOS');
+
+  // Painel de Notas Fiscais (independente dos filtros gerais)
+  const [nfProjectFilters, setNfProjectFilters] = useState([]);
+  const [nfStatusFilters, setNfStatusFilters] = useState([]);
+  const [nfDocumentFilter, setNfDocumentFilter] = useState('');
+  const [nfDueStart, setNfDueStart] = useState('');
+  const [nfDueEnd, setNfDueEnd] = useState('');
+  const [nfLiquidMin, setNfLiquidMin] = useState('');
+  const [nfLiquidMax, setNfLiquidMax] = useState('');
+  const [nfPage, setNfPage] = useState(1);
+  const [nfPageSize, setNfPageSize] = useState(10);
   
   // Filtros Inline da Tabela
   const [colFilterProjeto, setColFilterProjeto] = useState('');
@@ -275,6 +312,144 @@ export default function Projetos() {
     incluirRateioAdm,
     usarValorCaixa: true
   }), [data, incluirRateioAdm]);
+
+  // Fonte fixa do painel de NFES: sempre considera o título completo,
+  // independentemente do toggle de rateio administrativo da análise de projetos.
+  const nfBaseData = useMemo(() => consolidateFinancialData(data, {
+    isProjetosPage: true,
+    incluirRateioAdm: true,
+    usarValorCaixa: true
+  }), [data]);
+
+  const nfesAll = useMemo(() => {
+    const notes = new Map();
+
+    nfBaseData.forEach((item, index) => {
+      if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return;
+      const documento = String(item?.documento || '').trim();
+      if (!documento.toUpperCase().includes('NFES')) return;
+
+      const statusText = normalizeNfText(item?.status || item?.statusExibicao);
+      const received = statusText.includes('REALIZADO')
+        || statusText.includes('RECEBIDO')
+        || statusText.includes('EFETIVADO');
+      const receivable = !received && (
+        statusText.includes('A RECEBER')
+        || statusText.includes('A REALIZAR')
+        || statusText.includes('PREVISTO')
+      );
+      if (!received && !receivable) return;
+
+      const key = normalizeNfText(documento)
+        || normalizeNfText(item?.lancamento)
+        || `NFES-ROW-${index}`;
+
+      const linhas = Array.isArray(item?.linhasOriginais) && item.linhasOriginais.length
+        ? item.linhasOriginais
+        : [item];
+
+      const grossCandidates = [
+        item?.valorFaturamentoOriginal,
+        item?.valorFaturamentoTitulo,
+        item?.valorFaturamento,
+        item?.valorTotalTitulo,
+        ...linhas.flatMap((linha) => [
+          linha?.valorFaturamentoOriginal,
+          linha?.valorFaturamentoTitulo,
+          linha?.valorFaturamento,
+          linha?.valorTotalTitulo,
+        ]),
+      ]
+        .map((value) => Math.abs(Number(value) || 0))
+        .filter((value) => value > 0);
+
+      const projectCandidates = linhas
+        .map((linha) => String(linha?.projeto || '').trim())
+        .filter((project) => project && !isGenericFinancialProject(project));
+
+      const financialIdentity = getFinancialRevenueProjectIdentity(item);
+      if (financialIdentity?.projectName && !isGenericFinancialProject(financialIdentity.projectName)) {
+        projectCandidates.push(financialIdentity.projectName);
+      }
+
+      const current = notes.get(key) || {
+        key,
+        documento: documento || item?.lancamento || '-',
+        vencimento: item?.dataVencimento || item?.vencimento || item?.data || '',
+        dataTimestamp: dateToTimestamp(item?.dataVencimento || item?.vencimento || item?.data),
+        status: received ? 'Recebido' : 'A receber',
+        valorBruto: 0,
+        valorLiquido: 0,
+        projects: new Set(),
+      };
+
+      grossCandidates.forEach((value) => {
+        current.valorBruto = Math.max(current.valorBruto, value);
+      });
+      current.valorLiquido += Math.abs(Number(item?.valor) || 0);
+      projectCandidates.forEach((project) => current.projects.add(project));
+      if (received) current.status = 'Recebido';
+
+      const candidateDate = item?.dataVencimento || item?.vencimento || item?.data;
+      const candidateTs = dateToTimestamp(candidateDate);
+      if (!current.vencimento || (!current.dataTimestamp && candidateTs)) {
+        current.vencimento = candidateDate || '';
+        current.dataTimestamp = candidateTs;
+      }
+
+      notes.set(key, current);
+    });
+
+    return [...notes.values()]
+      .map((note) => {
+        const projects = [...note.projects].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        return {
+          ...note,
+          projects,
+          projeto: projects.length ? projects.join(' / ') : 'Não identificado',
+        };
+      })
+      .sort((a, b) => (b.dataTimestamp || 0) - (a.dataTimestamp || 0));
+  }, [nfBaseData]);
+
+  const nfProjectOptions = useMemo(() => [...new Set(nfesAll.flatMap((note) => note.projects))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [nfesAll]);
+
+  const nfesFiltered = useMemo(() => {
+    const dueStart = nfDueStart ? new Date(`${nfDueStart}T00:00:00`).getTime() : 0;
+    const dueEnd = nfDueEnd ? new Date(`${nfDueEnd}T23:59:59`).getTime() : Infinity;
+    const minLiquid = parseMoneyFilter(nfLiquidMin);
+    const maxLiquid = parseMoneyFilter(nfLiquidMax);
+    const documentNeedle = normalizeNfText(nfDocumentFilter);
+
+    return nfesAll.filter((note) => {
+      if (nfProjectFilters.length > 0 && !note.projects.some((project) => nfProjectFilters.includes(project))) return false;
+      if (nfStatusFilters.length > 0 && !nfStatusFilters.includes(note.status)) return false;
+      if (documentNeedle && !normalizeNfText(note.documento).includes(documentNeedle)) return false;
+      if (nfDueStart && (!note.dataTimestamp || note.dataTimestamp < dueStart)) return false;
+      if (nfDueEnd && (!note.dataTimestamp || note.dataTimestamp > dueEnd)) return false;
+      if (minLiquid !== null && note.valorLiquido < minLiquid) return false;
+      if (maxLiquid !== null && note.valorLiquido > maxLiquid) return false;
+      return true;
+    });
+  }, [nfesAll, nfProjectFilters, nfStatusFilters, nfDocumentFilter, nfDueStart, nfDueEnd, nfLiquidMin, nfLiquidMax]);
+
+  const nfTotalReceived = nfesFiltered
+    .filter((note) => note.status === 'Recebido')
+    .reduce((sum, note) => sum + note.valorLiquido, 0);
+  const nfTotalReceivable = nfesFiltered
+    .filter((note) => note.status === 'A receber')
+    .reduce((sum, note) => sum + note.valorLiquido, 0);
+
+  const nfEffectivePageSize = nfPageSize === 'all' ? Math.max(nfesFiltered.length, 1) : Number(nfPageSize) || 10;
+  const nfTotalPages = nfPageSize === 'all' ? 1 : Math.max(1, Math.ceil(nfesFiltered.length / nfEffectivePageSize));
+  const nfCurrentPage = Math.min(nfPage, nfTotalPages);
+  const nfVisibleRows = nfPageSize === 'all'
+    ? nfesFiltered
+    : nfesFiltered.slice((nfCurrentPage - 1) * nfEffectivePageSize, nfCurrentPage * nfEffectivePageSize);
+
+  useEffect(() => {
+    setNfPage(1);
+  }, [nfProjectFilters, nfStatusFilters, nfDocumentFilter, nfDueStart, nfDueEnd, nfLiquidMin, nfLiquidMax]);
 
   const projetosCruzados = useMemo(() => {
     const mapaProjetos = {};
