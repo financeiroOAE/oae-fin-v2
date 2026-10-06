@@ -28,7 +28,8 @@ async function verifyGitHubActionsToken(request) {
 
   if (payload.repository !== EXPECTED_REPOSITORY) throw new Error('Repositorio OIDC nao autorizado');
   if (payload.workflow_ref !== EXPECTED_WORKFLOW_REF) throw new Error('Workflow OIDC nao autorizado');
-  if (String(payload.event_name || '') !== 'push') throw new Error('Evento OIDC nao autorizado');
+  const eventName = String(payload.event_name || '');
+  if (!['push', 'schedule', 'workflow_dispatch'].includes(eventName)) throw new Error('Evento OIDC nao autorizado');
   return payload;
 }
 

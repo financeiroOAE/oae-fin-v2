@@ -4,6 +4,12 @@ export const PROJECT_ADMIN_RATE = 0.20;
 
 const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
+const selectTitleGrossReference = (current, candidate) => {
+  const currentValue = Number(current) || 0;
+  const candidateValue = Number(candidate) || 0;
+  return Math.abs(candidateValue) > Math.abs(currentValue) ? candidateValue : currentValue;
+};
+
 /**
  * Regra oficial de recebimento/faturamento dos projetos:
  * - o plano financeiro NAO define mais a divisao Projeto x Administrativo;
@@ -125,7 +131,7 @@ function enrichWithSystemAllocation(item, value) {
  * Prepara a receita da DRE sem usar a nomenclatura das contas para definir o rateio.
  *
  * Regra:
- * - agrupa todas as linhas de receita do projeto pelo numero do Lancamento;
+ * - agrupa as linhas pela identidade completa do titulo (empresa + lançamento + documento + status + data);
  * - soma a coluna K (valorCaixa) para obter o valor total do titulo;
  * - gera 80% para o projeto e 20% para Administracao;
  * - preserva exatamente 100% do titulo na DRE consolidada.
@@ -143,7 +149,12 @@ export function buildDreRevenueItems(baseData) {
 
     const lancamento = String(item.lancamento || '').trim();
     const empresa = String(item.empresa || '').trim();
-    const key = lancamento ? `${empresa}|${lancamento}` : `SEM_LANCAMENTO|${index}`;
+    const documento = String(item.documento || '').trim().toUpperCase();
+    const status = String(item.status || '').trim().toUpperCase();
+    const dataKey = parseDateToLocalMidnight(item.data, item.dataTimestamp);
+    const key = lancamento
+      ? `${empresa}|${lancamento}|${documento}|${status}|${dataKey}`
+      : `SEM_LANCAMENTO|${documento}|${status}|${dataKey}|${index}`;
 
     if (!groups.has(key)) {
       groups.set(key, {
@@ -312,27 +323,40 @@ export function consolidateFinancialData(baseData, options = {}) {
       // dessas contas: somamos o titulo e rateamos 20% pelo sistema depois.
       consItem.temReceitaProjeto = true;
       consItem.valorReceitaProjetoTotal += value;
-      consItem.valorFaturamentoReceitaTotal += faturamentoLinha;
+      consItem.valorFaturamentoReceitaTotal = selectTitleGrossReference(
+        consItem.valorFaturamentoReceitaTotal,
+        faturamentoLinha
+      );
 
       if (isUsableAllocationProject(item.projeto)) {
         consItem.centroCustoObra = item.projeto;
       }
     } else {
       consItem.valorOutrasEntradas += value;
-      consItem.valorFaturamentoOutrasEntradas += faturamentoLinha;
+      consItem.valorFaturamentoOutrasEntradas = selectTitleGrossReference(
+        consItem.valorFaturamentoOutrasEntradas,
+        faturamentoLinha
+      );
     }
   });
 
   const processedConsolidated = Array.from(consolidatedMap.values()).map(cons => {
     const receiptAllocation = splitProjectReceipt(cons.valorReceitaProjetoTotal);
-    const billingAllocation = splitProjectReceipt(cons.valorFaturamentoReceitaTotal);
+    const faturamentoTituloReferencia = selectTitleGrossReference(
+      cons.valorFaturamentoReceitaTotal,
+      cons.valorFaturamentoOutrasEntradas
+    );
+    const billingAllocation = cons.temReceitaProjeto
+      ? splitProjectReceipt(faturamentoTituloReferencia)
+      : { total: 0, project: 0, administrative: 0 };
 
     cons.valorReceitaProjetoTotal = receiptAllocation.total;
     cons.valorDireto = receiptAllocation.project;
     cons.valorAdministrativo = receiptAllocation.administrative;
     cons.valorFaturamentoDireto = billingAllocation.project;
     cons.valorFaturamentoAdministrativo = billingAllocation.administrative;
-    cons.valorFaturamentoTitulo = roundMoney(billingAllocation.total + cons.valorFaturamentoOutrasEntradas);
+    cons.valorFaturamentoOutrasEntradas = cons.temReceitaProjeto ? 0 : roundMoney(faturamentoTituloReferencia);
+    cons.valorFaturamentoTitulo = roundMoney(faturamentoTituloReferencia);
     cons.valorFaturamento = cons.valorFaturamentoTitulo;
     cons.valorTotalTitulo = cons.valorFaturamentoTitulo;
     cons.rateioAdministrativoPercentual = PROJECT_ADMIN_RATE * 100;
