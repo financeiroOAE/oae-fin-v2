@@ -11,6 +11,7 @@ import ReportAdder from '@/components/report/ReportAdder';
 import InfoTooltip from '@/components/InfoTooltip';
 import DataTable from '@/components/DataTable';
 import MultiSelect from '@/components/MultiSelect';
+import { requestJson } from '@/lib/clientSync';
 import './management.css';
 import './managementExtras.css';
 
@@ -306,7 +307,7 @@ export default function TeamDashboard(){
   const[selectedProjectSummary,setSelectedProjectSummary]=useState(null);
   const[error,setError]=useState('');
 
-  useEffect(()=>{let active=true;fetch('/api/equipe',{cache:'no-store'}).then(async r=>{const result=await r.json();if(!r.ok)throw new Error(result.error||'Não foi possível carregar a equipe.');if(active)setData(result)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[]);
+  useEffect(()=>{let active=true;requestJson('/api/equipe').then(result=>{if(active){setData(result);setError('')}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[]);
 
   const people=useMemo(()=>[...new Set(data.entries.map(e=>e.person).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),[data.entries]);
   const projects=useMemo(()=>[...new Set(data.entries.flatMap(e=>e.project?[e.project]:e.projects||[]).filter(Boolean).filter(p=>norm(p)!=='PROJETOS'))].sort((a,b)=>a.localeCompare(b,'pt-BR')),[data.entries]);

@@ -10,6 +10,7 @@ import ReportAdder from '@/components/report/ReportAdder';
 import InfoTooltip from '@/components/InfoTooltip';
 import DataTable from '@/components/DataTable';
 import MultiSelect from '@/components/MultiSelect';
+import { requestJson } from '@/lib/clientSync';
 import '../equipe/management.css';
 import '../equipe/managementExtras.css';
 
@@ -67,7 +68,7 @@ export default function AdministrativeDashboard(){
   const[partnerView,setPartnerView]=useState('TODOS');
   const[error,setError]=useState('');
 
-  useEffect(()=>{let active=true;fetch('/api/administrativo',{cache:'no-store'}).then(async r=>{const result=await r.json();if(!r.ok)throw new Error(result.error||'Não foi possível carregar o Administrativo.');if(active)setData(result)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[]);
+  useEffect(()=>{let active=true;requestJson('/api/administrativo').then(result=>{if(active){setData(result);setError('')}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[]);
 
   const peopleOptions=useMemo(()=>[...new Set((data.expenses||[]).map(r=>r.nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),[data.expenses]);
   const accountOptions=useMemo(()=>[...new Set((data.expenses||[]).map(accountOption).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),[data.expenses]);
