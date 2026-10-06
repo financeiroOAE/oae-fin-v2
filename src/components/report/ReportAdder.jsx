@@ -9,6 +9,7 @@ export default function ReportAdder({
   title,
   componentName,
   page,
+  scope,
   data,
   dataSets,
   detailMode,
@@ -23,7 +24,7 @@ export default function ReportAdder({
   presetTags = [],
   style = {},
 }) {
-  const { isReportMode, activeReportPage, addReportItem, reportItems, registerSection, unregisterSection } = useReport();
+  const { isReportMode, activeReportPage, activeReportScope, addReportItem, reportItems, registerSection, unregisterSection } = useReport();
   const [isPreparing, setIsPreparing] = useState(false);
   const normalizedKey = sectionKey || `${page}:${title}`;
 
@@ -33,6 +34,7 @@ export default function ReportAdder({
       title,
       componentName,
       page,
+      scope,
       data,
       dataSets,
       detailMode,
@@ -51,6 +53,7 @@ export default function ReportAdder({
       title,
       componentName,
       page,
+      scope,
       data,
       dataSets,
       detailMode,
@@ -77,7 +80,8 @@ export default function ReportAdder({
     return () => unregisterSection?.(normalizedKey);
   }, [normalizedKey, unregisterSection]);
 
-  if (!isReportMode || (activeReportPage && activeReportPage !== page)) {
+  const matchesScope = activeReportScope ? scope === activeReportScope : !scope;
+  if (!isReportMode || (activeReportPage && activeReportPage !== page) || !matchesScope) {
     return <span data-report-section-key={normalizedKey} hidden aria-hidden="true" />;
   }
 

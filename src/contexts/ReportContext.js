@@ -129,6 +129,8 @@ export function ReportProvider({ children }) {
   const [isReportMode, setIsReportMode] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeReportPage, setActiveReportPage] = useState(null);
+  const [activeReportScope, setActiveReportScope] = useState(null);
+  const [activeReportScopeLabel, setActiveReportScopeLabel] = useState("");
   const [reportItems, setReportItems] = useState([]);
   const [reportConfig, setReportConfig] = useState(defaultConfig);
   const [templates, setTemplates] = useState([]);
@@ -181,17 +183,21 @@ export function ReportProvider({ children }) {
     }
   }, [templates]);
 
-  const openReportBuilder = useCallback((page) => {
+  const openReportBuilder = useCallback((page, scope = null, scopeLabel = "") => {
     if (page) setActiveReportPage(page);
+    setActiveReportScope(scope || null);
+    setActiveReportScopeLabel(scopeLabel || "");
     setIsReportMode(true);
     setIsDrawerOpen(true);
   }, []);
 
-  const toggleReportMode = useCallback((page) => {
+  const toggleReportMode = useCallback((page, scope = null, scopeLabel = "") => {
     setIsReportMode((current) => {
       const next = !current;
       if (next) {
         if (page) setActiveReportPage(page);
+        setActiveReportScope(scope || null);
+        setActiveReportScopeLabel(scopeLabel || "");
         setIsDrawerOpen(true);
       }
       return next;
@@ -202,6 +208,8 @@ export function ReportProvider({ children }) {
     setIsReportMode(false);
     setIsDrawerOpen(false);
     setActiveReportPage(null);
+    setActiveReportScope(null);
+    setActiveReportScopeLabel("");
   }, []);
 
   const registerSection = useCallback((section) => {
@@ -293,10 +301,12 @@ export function ReportProvider({ children }) {
     });
   }, []);
 
-  const reorderReportPageItems = useCallback((page, startIndex, endIndex) => {
+  const reorderReportPageItems = useCallback((page, startIndex, endIndex, scope = null) => {
     setReportItems((current) => {
       const pagePositions = current.reduce((positions, item, index) => {
-        if (item.page === page) positions.push(index);
+        const samePage = item.page === page;
+        const sameScope = scope ? item.scope === scope : !item.scope;
+        if (samePage && sameScope) positions.push(index);
         return positions;
       }, []);
       if (
@@ -324,10 +334,14 @@ export function ReportProvider({ children }) {
     setStatusMessage("Seleção do relatório limpa.");
   }, []);
 
-  const clearReportPage = useCallback((page) => {
+  const clearReportPage = useCallback((page, scope = null) => {
     if (!page) return;
-    setReportItems((current) => current.filter((item) => item.page !== page));
-    setStatusMessage(`Seleção de ${page} limpa.`);
+    setReportItems((current) => current.filter((item) => {
+      if (item.page !== page) return true;
+      if (scope) return item.scope !== scope;
+      return Boolean(item.scope);
+    }));
+    setStatusMessage(scope ? "Seleção desta janela limpa." : `Seleção de ${page} limpa.`);
   }, []);
 
   const applyPreset = useCallback(
@@ -441,6 +455,10 @@ export function ReportProvider({ children }) {
         setIsReportMode,
         activeReportPage,
         setActiveReportPage,
+        activeReportScope,
+        setActiveReportScope,
+        activeReportScopeLabel,
+        setActiveReportScopeLabel,
         toggleReportMode,
         openReportBuilder,
         exitReportMode,
