@@ -108,9 +108,9 @@ export function revenueTitles(snapshot) {
   return [...groups.values()].map((item) => {
     const totalValue = Math.round(item.value * 100) / 100;
     const expectedAdminValue = Math.round(totalValue * 0.20 * 100) / 100;
-    const actualAdminValue = Math.round(item.adminValue * 100) / 100;
-    const adminValue = item.adminRows > 0 ? actualAdminValue : expectedAdminValue;
-    const adminValueDelta = Math.round((adminValue - expectedAdminValue) * 100) / 100;
+    const sourceAdminValue = Math.round(item.adminValue * 100) / 100;
+    const adminValue = expectedAdminValue;
+    const adminValueDelta = Math.round((sourceAdminValue - expectedAdminValue) * 100) / 100;
 
     return {
       key: item.key,
@@ -123,7 +123,9 @@ export function revenueTitles(snapshot) {
       adminValue,
       adminValueExpected: expectedAdminValue,
       adminValueDelta,
-      adminValueSource: item.adminRows > 0 ? 'CR_GERAL_1010107_COLUNA_K' : 'SISTEMA_20_PERCENT_FALLBACK',
+      adminValueSource: 'SISTEMA_20_PERCENT_COLUNA_K_TOTAL',
+      sourceAdminValue,
+      sourceAdminValueSource: item.adminRows > 0 ? 'CR_GERAL_1010107_COLUNA_K' : 'SEM_LINHA_1010107',
       grossValue: Math.round(item.grossValue * 100) / 100,
       project: item.projectCandidates.size === 1 ? [...item.projectCandidates][0] : null,
       review: item.projectCandidates.size !== 1 || item.adminRows === 0 || Math.abs(adminValueDelta) > 0.02,

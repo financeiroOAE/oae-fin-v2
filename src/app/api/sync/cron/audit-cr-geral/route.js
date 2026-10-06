@@ -263,6 +263,15 @@ export async function POST(request) {
     const comAdm = summarizeAllocation(baseComAdm, activeProjects);
     const processedBreakdown = processedTargetBreakdown(processed, activeProjects);
 
+    const rawRealizedTotalYtd = roundMoney(
+      raw['1010101'].realizedYtdK + raw['1010107'].realizedYtdK
+    );
+    const expectedProject80 = roundMoney(rawRealizedTotalYtd * 0.80);
+    const expectedAdmin20 = roundMoney(rawRealizedTotalYtd - expectedProject80);
+    const semAdmConserved = roundMoney(semAdm.allocated + semAdm.unallocated);
+    const comAdmConserved = roundMoney(comAdm.allocated + comAdm.unallocated);
+    const derivedAdminConserved = roundMoney(comAdmConserved - semAdmConserved);
+
     return NextResponse.json({
       success: true,
       generatedAt: new Date().toISOString(),
@@ -272,17 +281,24 @@ export async function POST(request) {
       panelSimulation: {
         semAdm,
         comAdm,
-        expectedFromRawRealizedYtd: {
+        sourceAccountRealizedYtd: {
           projetos1010101: raw['1010101'].realizedYtdK,
           adm1010107: raw['1010107'].realizedYtdK,
-          comAdm: roundMoney(raw['1010101'].realizedYtdK + raw['1010107'].realizedYtdK),
+          total: rawRealizedTotalYtd,
+        },
+        expectedFromBusinessRule: {
+          projeto80: expectedProject80,
+          administrativo20: expectedAdmin20,
+          total: rawRealizedTotalYtd,
+        },
+        sourceAccountDelta: {
+          projetoVs80: roundMoney(raw['1010101'].realizedYtdK - expectedProject80),
+          administrativoVs20: roundMoney(raw['1010107'].realizedYtdK - expectedAdmin20),
         },
         delta: {
-          semAdm: roundMoney(raw['1010101'].realizedYtdK - semAdm.allocated),
-          adm: roundMoney(raw['1010107'].realizedYtdK - (comAdm.allocated - semAdm.allocated)),
-          comAdm: roundMoney(
-            raw['1010101'].realizedYtdK + raw['1010107'].realizedYtdK - comAdm.allocated
-          ),
+          semAdm: roundMoney(expectedProject80 - semAdmConserved),
+          adm: roundMoney(expectedAdmin20 - derivedAdminConserved),
+          comAdm: roundMoney(rawRealizedTotalYtd - comAdmConserved),
         },
       },
     });
