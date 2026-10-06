@@ -1464,7 +1464,7 @@ export default function Projetos() {
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
           <div style={{ padding: '0.9rem 1rem', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: '8px' }}>
             <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Recebido</span>
             <strong style={{ display: 'block', marginTop: '0.35rem', color: 'var(--success)', fontSize: '18px' }}>{formatCurrency(nfTotalReceived)}</strong>
@@ -1479,7 +1479,7 @@ export default function Projetos() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr 1fr 1fr 0.8fr 0.8fr auto', gap: '0.75rem', alignItems: 'end', marginBottom: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '0.75rem', alignItems: 'end', marginBottom: '1rem' }}>
           <div style={{ minWidth: 0 }}>
             <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Projeto</label>
             <MultiSelect options={nfProjectOptions} selected={nfProjectFilters} onChange={setNfProjectFilters} placeholder="Todos os projetos" />
