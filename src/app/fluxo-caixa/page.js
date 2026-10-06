@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   RefreshCw, AlertCircle, Activity, FilterX,
   Landmark, ArrowDownCircle, ArrowUpCircle, Wallet, Calendar, Banknote,
-  ChevronDown, ChevronRight, FileText
+  ChevronDown, ChevronRight, FileText, FileSpreadsheet
 } from "lucide-react";
 import MultiSelect from "@/components/MultiSelect";
 import DataTable from "@/components/DataTable";
@@ -830,39 +830,58 @@ export default function FluxoDeCaixa() {
             </div>
           </div>
 
-          <div data-report-section className="card fluxo-billing-card" style={{ padding: '1.5rem' }}>
-            <ReportAdder
-              sectionKey="fluxo:faturamento-nfes"
-              title="Painel de Faturamento (NFES)"
-              componentName="Tabela de Faturamentos"
-              page="Fluxo de Caixa"
-              type="TABLE"
-              data={reportFaturamentosNfesRows}
-              dataSets={{ all: reportFaturamentosNfesRows, summary: reportFaturamentosNfesSummary }}
-              detailMode="all"
-              detailOptions={["all", "summary"]}
-              filters={{ Tipo: "NFES", Situação: "A receber / A realizar" }}
-              explanation="Relação de notas fiscais faturadas com soma total do valor bruto e do valor líquido."
-              style={{ float: 'right' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-              <ChartHeader
-                title="Painel de Faturamento (NFES)"
-                infoTitle="Faturamento"
-                infoContent="Relação de notas NFES pendentes na CR_GERAL com status A receber ou A realizar."
-              />
-              <select
-                value={filtroFaturamento}
-                onChange={(e) => setFiltroFaturamento(e.target.value)}
-                style={{ minWidth: '220px' }}
-                aria-label="Filtro do Painel de Faturamento"
-              >
-                <option value="MES_ATUAL">Vencimento no mês atual</option>
-                <option value="TODOS">Todos emitidos</option>
-              </select>
+          <div data-report-section className="card fluxo-billing-card" style={{ padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <FileSpreadsheet size={16} color="var(--primary)" />
+                  <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>Painel de Faturamento · Notas Fiscais</h2>
+                </div>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>NFES pendentes, consolidadas em uma única linha por nota.</p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  value={filtroFaturamento}
+                  onChange={(e) => setFiltroFaturamento(e.target.value)}
+                  style={{ minWidth: '190px', height: '34px', fontSize: '11px' }}
+                  aria-label="Filtro do Painel de Faturamento"
+                >
+                  <option value="MES_ATUAL">Vencimento no mês atual</option>
+                  <option value="TODOS">Todos emitidos</option>
+                </select>
+                <ReportAdder
+                  sectionKey="fluxo:faturamento-nfes"
+                  title="Painel de Faturamento (NFES)"
+                  componentName="Tabela de Faturamentos"
+                  page="Fluxo de Caixa"
+                  type="TABLE"
+                  data={reportFaturamentosNfesRows}
+                  dataSets={{ all: reportFaturamentosNfesRows, summary: reportFaturamentosNfesSummary }}
+                  detailMode="all"
+                  detailOptions={["all", "summary"]}
+                  filters={{ Tipo: "NFES", Situação: "A receber / A realizar" }}
+                  explanation="Relação de notas fiscais faturadas com soma total do valor bruto e do valor líquido."
+                />
+              </div>
             </div>
-            <div className="table-container" style={{ marginTop: '1rem', maxHeight: '360px', overflowY: 'auto' }}>
-              <table style={{ fontSize: '12px', minWidth: '760px' }}>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <div style={{ padding: '0.65rem 0.75rem', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '7px' }}>
+                <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Valor bruto</span>
+                <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--text-main)', fontSize: '15px' }}>{formatCurrency(totalValorRealNfes)}</strong>
+              </div>
+              <div style={{ padding: '0.65rem 0.75rem', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: '7px' }}>
+                <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Valor líquido</span>
+                <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--success)', fontSize: '15px' }}>{formatCurrency(totalFaturamentosNfes)}</strong>
+              </div>
+              <div style={{ padding: '0.65rem 0.75rem', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '7px' }}>
+                <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Notas exibidas</span>
+                <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--text-main)', fontSize: '15px' }}>{faturamentosNfesFiltrados.length}</strong>
+              </div>
+            </div>
+
+            <div className="table-container" style={{ marginTop: '0.5rem', maxHeight: '310px', overflowY: 'auto' }}>
+              <table style={{ fontSize: '11px', minWidth: '760px' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr>
                     <th>Documento</th>
@@ -888,9 +907,9 @@ export default function FluxoDeCaixa() {
                 {faturamentosNfesFiltrados.length > 0 && (
                   <tfoot style={{ position: 'sticky', bottom: 0, background: 'var(--bg-elevated)', zIndex: 10, boxShadow: '0 -2px 10px rgba(0,0,0,0.1)' }}>
                     <tr>
-                      <td colSpan="3" style={{ fontWeight: '600', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>Total:</td>
-                      <td style={{ fontWeight: '700', color: 'var(--text-main)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>{formatCurrency(totalValorRealNfes)}</td>
-                      <td style={{ fontWeight: '700', color: 'var(--success)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.5rem' }}>{formatCurrency(totalFaturamentosNfes)}</td>
+                      <td colSpan="3" style={{ fontWeight: '600', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.45rem' }}>Total:</td>
+                      <td style={{ fontWeight: '700', color: 'var(--text-main)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.45rem' }}>{formatCurrency(totalValorRealNfes)}</td>
+                      <td style={{ fontWeight: '700', color: 'var(--success)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.45rem' }}>{formatCurrency(totalFaturamentosNfes)}</td>
                     </tr>
                   </tfoot>
                 )}
