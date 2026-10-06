@@ -17,16 +17,87 @@ export function getReportRows(item) {
   return [];
 }
 
+const MOVEMENT_NAME_KEY = "__movementName";
+const MOVEMENT_NAME_ALIASES = [
+  "nome / pessoa / fornecedor",
+  "nome / fornecedor",
+  "fornecedor / nome",
+  "cliente / nome",
+  "pessoa / empresa",
+  "pessoa",
+  "fornecedor",
+  "cliente",
+  "nome",
+];
+
+function normalizedColumnName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isMovementReport(item) {
+  const haystack = normalizedColumnName(
+    [item?.title, item?.componentName, item?.sectionKey].filter(Boolean).join(" ")
+  );
+  return haystack.includes("moviment");
+}
+
+function movementNameValue(row) {
+  if (!row || typeof row !== "object") return undefined;
+
+  for (const alias of MOVEMENT_NAME_ALIASES) {
+    const key = Object.keys(row).find((candidate) => normalizedColumnName(candidate) === alias);
+    if (key && row[key] !== undefined && row[key] !== null && row[key] !== "") return row[key];
+  }
+
+  const fallback = Object.keys(row).find((candidate) => {
+    const normalized = normalizedColumnName(candidate);
+    return normalized === "nome" || normalized.includes("fornecedor") || normalized.includes("pessoa");
+  });
+  return fallback ? row[fallback] : undefined;
+}
+
+function columnValue(row, column) {
+  if (column?.key === MOVEMENT_NAME_KEY) return movementNameValue(row);
+  return row?.[column?.key];
+}
+
 export function getReportColumns(item, rows = getReportRows(item)) {
+  let columns;
   if (Array.isArray(item?.columns) && item.columns.length > 0) {
-    return item.columns.map((column) =>
+    columns = item.columns.map((column) =>
       typeof column === "string" ? { key: column, label: column } : column
     );
+  } else {
+    const first = rows.find((row) => row && typeof row === "object");
+    columns = first
+      ? Object.keys(first).map((key) => ({ key, label: key }))
+      : [];
   }
-  const first = rows.find((row) => row && typeof row === "object");
-  return first
-    ? Object.keys(first).map((key) => ({ key, label: key }))
-    : [];
+
+  if (!isMovementReport(item) || rows.length === 0) return columns;
+
+  const hasMovementName = rows.some((row) => movementNameValue(row) !== undefined);
+  if (!hasMovementName) return columns;
+
+  const withoutNameAliases = columns.filter((column) => {
+    const normalized = normalizedColumnName(column?.key || column?.label);
+    return !MOVEMENT_NAME_ALIASES.includes(normalized);
+  });
+
+  const dataIndex = withoutNameAliases.findIndex((column) =>
+    normalizedColumnName(column?.key || column?.label).includes("data")
+  );
+  const insertAt = dataIndex >= 0 ? dataIndex + 1 : 0;
+
+  return [
+    ...withoutNameAliases.slice(0, insertAt),
+    { key: MOVEMENT_NAME_KEY, label: "Nome / Pessoa / Fornecedor", format: "text" },
+    ...withoutNameAliases.slice(insertAt),
+  ];
 }
 
 function normalizeFormat(format) {
@@ -231,8 +302,8 @@ export async function exportReportToPdf(items, config) {
       columns.forEach((column, index) => {
         const explicit = column.format || item.columnFormats?.[column.key];
         const format = inferReportFormat(column.key, explicit);
-        const value = formatReportValue(row?.[column.key], format);
-        const align = format === "currency" || format === "percent" || typeof row?.[column.key] === "number" ? "right" : "left";
+        const value = formatReportValue(columnValue(row, column), format);
+        const align = format === "currency" || format === "percent" || typeof columnValue(row, column) === "number" ? "right" : "left";
         const textX = align === "right" ? x + widths[index] - 1 : x + 1;
         pdf.text(truncateText(pdf, value, widths[index] - 2), textX, y + 4.3, { align });
         x += widths[index];
@@ -308,12 +379,12 @@ function createWorksheet(XLSX, item, rows) {
   rows.forEach((row) => {
     aoa.push(columns.map((column) => {
       const format = inferReportFormat(column.key, column.format || item.columnFormats?.[column.key]);
-      return excelCellValue(row?.[column.key], format);
+      return excelCellValue(columnValue(row, column), format);
     }));
   });
   const worksheet = XLSX.utils.aoa_to_sheet(aoa);
   worksheet["!cols"] = columns.map((column, columnIndex) => {
-    const values = [column.label || column.key, ...rows.slice(0, 100).map((row) => String(row?.[column.key] ?? ""))];
+    const values = [column.label || column.key, ...rows.slice(0, 100).map((row) => String(columnValue(row, column) ?? ""))];
     return { wch: Math.min(42, Math.max(12, ...values.map((value) => value.length + 2))) };
   });
   if (rows.length > 0 && columns.length > 0) {

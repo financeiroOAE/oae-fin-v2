@@ -931,7 +931,33 @@ export default function FluxoDeCaixa() {
 
       {/* Tabela de Movimentações */}
       <div id="tabela-movimentacoes" data-report-section style={{ marginBottom: '2rem' }}>
-        <ReportAdder sectionKey="fluxo:movimentacoes" title="Movimentações Financeiras" componentName="Tabela de Movimentações" page="Fluxo de Caixa" type="TABLE" data={reportMovementRows} dataSets={{ summary: [{ "Quantidade de lançamentos": reportMovementRows.length, "Valor total": filteredData.reduce((sum, item) => sum + (item.valor || 0), 0) }], visible: reportMovementRows.slice(0, 15), all: reportMovementRows }} detailMode="visible" detailOptions={["summary", "visible", "all"]} filters={reportFilters} presetTags={["executive-financial"]} style={{ float: 'right' }} />
+        <ReportAdder
+          sectionKey="fluxo:movimentacoes"
+          title="Movimentações Financeiras"
+          componentName="Tabela de Movimentações"
+          page="Fluxo de Caixa"
+          type="TABLE"
+          data={reportMovementRows}
+          dataSets={{
+            summary: [{ "Quantidade de lançamentos": reportMovementRows.length, "Valor total": filteredData.reduce((sum, item) => sum + (item.valor || 0), 0) }],
+            visible: reportMovementRows.slice(0, 15),
+            all: reportMovementRows
+          }}
+          detailMode="visible"
+          detailOptions={["summary", "visible", "all"]}
+          columns={[
+            { key: "Data", label: "Data", format: "date" },
+            { key: "Nome", label: "Nome / Pessoa / Fornecedor", format: "text" },
+            { key: "Projeto", label: "Projeto / Obra", format: "text" },
+            { key: "Conta", label: "Conta / Plano", format: "text" },
+            { key: "Situação", label: "Situação", format: "text" },
+            { key: "Natureza", label: "Natureza", format: "text" },
+            { key: "Valor", label: "Valor", format: "currency" }
+          ]}
+          filters={reportFilters}
+          presetTags={["executive-financial"]}
+          style={{ float: 'right' }}
+        />
         <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '1rem' }}>Movimentações Financeiras</h2>
         <DataTable data={filteredData} />
       </div>
