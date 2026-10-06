@@ -119,7 +119,7 @@ export async function GET() {
     monthly,
     snapshotAt: snapshot?.updatedAt || null,
     rules: {
-      revenueAdministrative: '20% da soma da coluna K por título; a conta 1010107 é usada como referência de auditoria da base',
+      revenueAdministrative: '20% da coluna K para receitas de projeto; receitas avulsas sem projeto e com centro de custo ADMINISTRAÇÃO entram 100% no Administrativo',
       expenseScope: 'Centro de custo ADMINISTRAÇÃO',
       partnerScope: 'Francielle/Paulo: plano 2010302 em todo o CP_GERAL + retiradas 2010522',
     },
