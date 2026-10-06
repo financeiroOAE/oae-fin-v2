@@ -13,6 +13,7 @@ import { classifyFinancialEntry, normalizeAccountCode } from "@/lib/financialCla
 import { getActiveProjectNames } from "@/lib/projectRules";
 import { buildDreRevenueItems } from "@/lib/consolidation";
 import { loadFinancialData } from "@/lib/clientSync";
+import FinancialRefreshButton from "@/components/FinancialRefreshButton";
 import {
   DRE_ORDER, buildMeses, buildDreStructure, tagItemsWithMesKey
 } from "@/lib/dreEngine";
@@ -876,14 +877,7 @@ export default function Dre() {
               <FilterX size={14} /> Limpar filtros
             </button>
           )}
-          <button
-            onClick={() => fetchDados(true, true)}
-            disabled={isSyncing}
-            style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1.25rem", background: "var(--primary)", borderRadius: "8px", border: "none", color: "#fff", fontSize: "13px", fontWeight: "600", cursor: isSyncing ? "not-allowed" : "pointer", opacity: isSyncing ? 0.7 : 1 }}
-          >
-            <RefreshCw size={14} style={{ animation: isSyncing ? "spin 1s linear infinite" : "none" }} />
-            {isSyncing ? "Sincronizando..." : "Sincronizar"}
-          </button>
+          <FinancialRefreshButton onUpdated={()=>fetchDados(false,false,false)} onError={setError} label="Sincronizar"/>
         </div>
       </div>
 
