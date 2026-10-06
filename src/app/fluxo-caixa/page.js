@@ -13,7 +13,7 @@ import IncomeExpenseChart from "@/components/charts/IncomeExpenseChart";
 import AnnualFlowChart from "@/components/charts/AnnualFlowChart";
 import CustomTooltip from "@/components/charts/CustomTooltip";
 import { consolidateFinancialData } from "@/lib/consolidation";
-import { getFinancialDisplayStatus, isForecastOnlyReceivableDocument } from "@/lib/financialClassification";
+import { getFinancialDisplayStatus, isForecastOnlyReceivableDocument, isProjectRevenue } from "@/lib/financialClassification";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { getRolling30DayRange } from "@/lib/dateRange";
@@ -237,89 +237,83 @@ export default function FluxoDeCaixa() {
 
   // Novos blocos analíticos (Dia e Faturamento)
   const faturamentosNfes = useMemo(() => {
-    const rawList = baseData.filter(item => {
+    // Este painel precisa trabalhar com as linhas originais do CR_GERAL.
+    // A base consolidada é adequada para o fluxo geral, mas pode somar o valor
+    // do título repetido nas linhas de rateio antes de chegar ao painel de NFES.
+    const rawList = rawBaseData.filter(item => {
       const situacao = String(item.statusExibicao || '').trim();
       return item.natureza === 'Entrada'
         && (situacao === 'A receber' || situacao === 'Recebido')
-        && String(item.documento || '').toUpperCase().includes('NFES');
+        && String(item.documento || '').toUpperCase().includes('NFES')
+        && isProjectRevenue(item);
     });
 
-    // A NF pode vir dividida entre Faturamento e Administrativo.
-    // A coluna J ("Valor total título") se repete nas linhas de rateio:
-    // para o bruto usamos uma única ocorrência do título; para o líquido,
-    // somamos a coluna K ("Valor") das linhas originais.
-    const map = {};
+    const map = new Map();
+
     rawList.forEach(item => {
-      const key = String(item.lancamento || 'SEM-LANCAMENTO') + '|' + String(item.documento || item.nome || 'SEM-DOCUMENTO');
-      const linhas = Array.isArray(item.linhasOriginais) && item.linhasOriginais.length
-        ? item.linhasOriginais
-        : [item];
+      const situacao = item.statusExibicao === 'Recebido' ? 'Recebido' : 'A receber';
+      const key = [
+        String(item.lancamento || 'SEM-LANCAMENTO').trim().toUpperCase(),
+        String(item.documento || item.nome || 'SEM-DOCUMENTO').trim().toUpperCase(),
+        situacao,
+        String(item.data || '').trim(),
+      ].join('|');
 
-      const valoresBrutosOriginais = linhas
-        .flatMap(linha => [
-          linha.valorFaturamentoOriginal,
-          linha.valorFaturamento,
-          linha.valorTotalTitulo,
-          linha.valorBruto,
-        ])
-        .map(Number)
-        .filter(valor => Number.isFinite(valor) && valor !== 0);
+      if (!map.has(key)) {
+        map.set(key, {
+          ...item,
+          situacao,
+          linhasOriginais: [],
+        });
+      }
 
-      const faturamentoConsolidado = Number(
-        item.valorFaturamentoTitulo
-        ?? item.valorFaturamento
-        ?? item.valorTotalTitulo
-        ?? item.valorBruto
-      ) || 0;
+      map.get(key).linhasOriginais.push(item);
+    });
 
-      const valorRealNota = valoresBrutosOriginais.length > 0
-        ? Math.max(...valoresBrutosOriginais.map(Math.abs))
-        : Math.abs(faturamentoConsolidado);
+    return [...map.values()].map(group => {
+      const linhas = group.linhasOriginais;
 
-      const valorLiquidoNota = linhas.reduce((acc, linha) => {
-        const valor = Number(linha.valorCaixa ?? linha.valor) || 0;
-        return acc + valor;
-      }, 0) || (Number(item.valor) || 0);
+      // Coluna J: "Valor total título". Nos rateios ela se repete, então a NF
+      // usa uma única ocorrência. Para previsões, o sync preserva o J original
+      // em valorFaturamentoOriginal antes de normalizar os demais aliases.
+      const valoresBrutos = linhas
+        .map(linha => Number(
+          linha.valorFaturamentoOriginal
+          ?? linha.valorFaturamento
+          ?? linha.valorTotalTitulo
+          ?? linha.valorBruto
+        ) || 0)
+        .filter(valor => valor !== 0);
+
+      const valorRealNota = valoresBrutos.length
+        ? Math.max(...valoresBrutos.map(Math.abs))
+        : 0;
+
+      // Coluna K: "Valor". Soma apenas as linhas de receita do projeto
+      // (REC. FATURAMENTO + REC. ADMINISTRATIVO) do mesmo título.
+      const valorLiquidoNota = linhas.reduce((acc, linha) => (
+        acc + (Number(linha.valorCaixa ?? linha.valor) || 0)
+      ), 0);
 
       const projetoObra = linhas
         .map(linha => String(linha.projeto || '').trim())
         .find(projeto => {
           const upper = projeto.toUpperCase();
-          return projeto && !upper.includes('ADMINISTRA') && upper !== 'GRUPO OAE' && upper !== 'SEM PROJETO';
-        }) || item.projeto;
+          return projeto
+            && !upper.includes('ADMINISTRA')
+            && upper !== 'GRUPO OAE'
+            && upper !== 'SEM PROJETO';
+        }) || group.projeto;
 
-      const situacao = item.statusExibicao === 'Recebido' ? 'Recebido' : 'A receber';
-
-      if (!map[key]) {
-        map[key] = {
-          ...item,
-          projeto: projetoObra,
-          situacao,
-          valor: valorLiquidoNota,
-          valorRealNota,
-        };
-        return;
-      }
-
-      const atual = map[key];
-      const priorizarAtual = situacao === 'Recebido' && atual.situacao !== 'Recebido';
-
-      map[key] = {
-        ...(priorizarAtual ? { ...atual, ...item } : atual),
-        projeto: (!atual.projeto || String(atual.projeto).toUpperCase().includes('ADMINISTRA'))
-          ? projetoObra
-          : atual.projeto,
-        situacao: priorizarAtual ? situacao : atual.situacao,
-        valor: Math.max(Math.abs(Number(atual.valor) || 0), Math.abs(Number(valorLiquidoNota) || 0)),
-        valorRealNota: Math.max(
-          Math.abs(Number(atual.valorRealNota) || 0),
-          Math.abs(Number(valorRealNota) || 0)
-        ),
+      return {
+        ...group,
+        projeto: projetoObra,
+        valor: Math.round(valorLiquidoNota * 100) / 100,
+        valorRealNota: Math.round(valorRealNota * 100) / 100,
+        dataTimestamp: group.dataTimestamp || 0,
       };
-    });
-
-    return Object.values(map).sort((a, b) => b.dataTimestamp - a.dataTimestamp);
-  }, [baseData]);
+    }).sort((a, b) => b.dataTimestamp - a.dataTimestamp);
+  }, [rawBaseData]);
 
   const [filtroFaturamento, setFiltroFaturamento] = useState('MES_ATUAL');
   const [filtroFaturamentoStatus, setFiltroFaturamentoStatus] = useState('TODOS');
