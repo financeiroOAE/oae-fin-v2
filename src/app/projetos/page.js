@@ -21,6 +21,7 @@ import { exportReportToPdf } from "@/lib/reportExport";
 import { isRevenueTax, getRevenueTaxLabel, classifyFinancialEntry, isTeamExpense } from "@/lib/financialClassification";
 import { getProjectKey, isGeneralProjectsBucket } from "@/lib/projectRules";
 import { loadFinancialData } from "@/lib/clientSync";
+import { buildNfesSummary } from "@/lib/nfesReporting";
 
 const TABLE_PAGE_SIZE = 15;
 
@@ -313,104 +314,10 @@ export default function Projetos() {
     usarValorCaixa: true
   }), [data, incluirRateioAdm]);
 
-  // Fonte fixa do painel de NFES: sempre considera o título completo,
-  // independentemente do toggle de rateio administrativo da análise de projetos.
-  const nfBaseData = useMemo(() => consolidateFinancialData(data, {
-    isProjetosPage: true,
-    incluirRateioAdm: true,
-    usarValorCaixa: true
-  }), [data]);
-
-  const nfesAll = useMemo(() => {
-    const notes = new Map();
-
-    nfBaseData.forEach((item, index) => {
-      if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return;
-      const documento = String(item?.documento || '').trim();
-      if (!documento.toUpperCase().includes('NFES')) return;
-
-      const statusText = normalizeNfText(item?.status || item?.statusExibicao);
-      const received = statusText.includes('REALIZADO')
-        || statusText.includes('RECEBIDO')
-        || statusText.includes('EFETIVADO');
-      const receivable = !received && (
-        statusText.includes('A RECEBER')
-        || statusText.includes('A REALIZAR')
-        || statusText.includes('PREVISTO')
-      );
-      if (!received && !receivable) return;
-
-      const key = normalizeNfText(documento)
-        || normalizeNfText(item?.lancamento)
-        || `NFES-ROW-${index}`;
-
-      const linhas = Array.isArray(item?.linhasOriginais) && item.linhasOriginais.length
-        ? item.linhasOriginais
-        : [item];
-
-      const grossCandidates = [
-        item?.valorFaturamentoOriginal,
-        item?.valorFaturamentoTitulo,
-        item?.valorFaturamento,
-        item?.valorTotalTitulo,
-        ...linhas.flatMap((linha) => [
-          linha?.valorFaturamentoOriginal,
-          linha?.valorFaturamentoTitulo,
-          linha?.valorFaturamento,
-          linha?.valorTotalTitulo,
-        ]),
-      ]
-        .map((value) => Math.abs(Number(value) || 0))
-        .filter((value) => value > 0);
-
-      const projectCandidates = linhas
-        .map((linha) => String(linha?.projeto || '').trim())
-        .filter((project) => project && !isGenericFinancialProject(project));
-
-      const financialIdentity = getFinancialRevenueProjectIdentity(item);
-      if (financialIdentity?.projectName && !isGenericFinancialProject(financialIdentity.projectName)) {
-        projectCandidates.push(financialIdentity.projectName);
-      }
-
-      const current = notes.get(key) || {
-        key,
-        documento: documento || item?.lancamento || '-',
-        vencimento: item?.dataVencimento || item?.vencimento || item?.data || '',
-        dataTimestamp: dateToTimestamp(item?.dataVencimento || item?.vencimento || item?.data),
-        status: received ? 'Recebido' : 'A receber',
-        valorBruto: 0,
-        valorLiquido: 0,
-        projects: new Set(),
-      };
-
-      grossCandidates.forEach((value) => {
-        current.valorBruto = Math.max(current.valorBruto, value);
-      });
-      current.valorLiquido += Math.abs(Number(item?.valor) || 0);
-      projectCandidates.forEach((project) => current.projects.add(project));
-      if (received) current.status = 'Recebido';
-
-      const candidateDate = item?.dataVencimento || item?.vencimento || item?.data;
-      const candidateTs = dateToTimestamp(candidateDate);
-      if (!current.vencimento || (!current.dataTimestamp && candidateTs)) {
-        current.vencimento = candidateDate || '';
-        current.dataTimestamp = candidateTs;
-      }
-
-      notes.set(key, current);
-    });
-
-    return [...notes.values()]
-      .map((note) => {
-        const projects = [...note.projects].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-        return {
-          ...note,
-          projects,
-          projeto: projects.length ? projects.join(' / ') : 'Não identificado',
-        };
-      })
-      .sort((a, b) => (b.dataTimestamp || 0) - (a.dataTimestamp || 0));
-  }, [nfBaseData]);
+  // O painel de NFES usa a base CR original e consolida por documento.
+  // A coluna K (valor líquido operacional) forma o valor da nota, o recebido e o saldo.
+  // A coluna J fica apenas como referência de auditoria e nunca é somada entre parcelas/rateios.
+  const nfesAll = useMemo(() => buildNfesSummary(data), [data]);
 
   const nfProjectOptions = useMemo(() => [...new Set(nfesAll.flatMap((note) => note.projects))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [nfesAll]);
 
@@ -433,12 +340,8 @@ export default function Projetos() {
     });
   }, [nfesAll, nfProjectFilters, nfStatusFilters, nfDocumentFilter, nfDueStart, nfDueEnd, nfLiquidMin, nfLiquidMax]);
 
-  const nfTotalReceived = nfesFiltered
-    .filter((note) => note.status === 'Recebido')
-    .reduce((sum, note) => sum + note.valorLiquido, 0);
-  const nfTotalReceivable = nfesFiltered
-    .filter((note) => note.status === 'A receber')
-    .reduce((sum, note) => sum + note.valorLiquido, 0);
+  const nfTotalReceived = nfesFiltered.reduce((sum, note) => sum + Number(note.valorRecebido || 0), 0);
+  const nfTotalReceivable = nfesFiltered.reduce((sum, note) => sum + Number(note.saldoAReceber || 0), 0);
 
   const nfEffectivePageSize = nfPageSize === 'all' ? Math.max(nfesFiltered.length, 1) : Number(nfPageSize) || 10;
   const nfTotalPages = nfPageSize === 'all' ? 1 : Math.max(1, Math.ceil(nfesFiltered.length / nfEffectivePageSize));
@@ -456,8 +359,9 @@ export default function Projetos() {
     Projeto: note.projeto,
     Vencimento: note.vencimento || '-',
     Situação: note.status,
-    'Valor Bruto': note.valorBruto,
-    'Valor Líquido': note.valorLiquido,
+    'Valor da Nota': note.valorNota,
+    Recebido: note.valorRecebido,
+    'Saldo a Receber': note.saldoAReceber,
   })), [nfesFiltered]);
 
   const clearNfFilters = () => {
@@ -1682,7 +1586,7 @@ export default function Projetos() {
               <FileSpreadsheet size={16} color="var(--primary)" />
               <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>Painel de Faturamento · Notas Fiscais</h2>
             </div>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Uma linha por NFES, com recebidas e a receber.</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Uma linha por NFES, com valor da nota, recebido e saldo a receber.</p>
           </div>
           <ReportAdder
             sectionKey="projetos:painel-nfes"
@@ -1703,8 +1607,9 @@ export default function Projetos() {
                 Projeto: note.projeto,
                 Vencimento: note.vencimento || '-',
                 Situação: note.status,
-                'Valor Bruto': note.valorBruto,
-                'Valor Líquido': note.valorLiquido,
+                'Valor da Nota': note.valorNota,
+                Recebido: note.valorRecebido,
+                'Saldo a Receber': note.saldoAReceber,
               })),
               all: nfReportRows,
             }}
@@ -1756,7 +1661,7 @@ export default function Projetos() {
           </div>
           <div style={{ minWidth: 0 }}>
             <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Situação</label>
-            <MultiSelect options={['Recebido','A receber']} selected={nfStatusFilters} onChange={setNfStatusFilters} placeholder="Todas" />
+            <MultiSelect options={['Recebido','A receber','Parcial']} selected={nfStatusFilters} onChange={setNfStatusFilters} placeholder="Todas" />
           </div>
           <div>
             <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Líquido mín.</label>
@@ -1777,8 +1682,9 @@ export default function Projetos() {
                 <th>Projeto</th>
                 <th>Vencimento</th>
                 <th>Situação</th>
-                <th style={{ textAlign: 'right' }}>Valor Bruto</th>
-                <th style={{ textAlign: 'right' }}>Valor Líquido</th>
+                <th style={{ textAlign: 'right' }}>Valor da Nota</th>
+                <th style={{ textAlign: 'right' }}>Recebido</th>
+                <th style={{ textAlign: 'right' }}>Saldo a Receber</th>
               </tr>
             </thead>
             <tbody>
@@ -1787,12 +1693,13 @@ export default function Projetos() {
                   <td style={{ fontWeight: 600 }}>{note.documento}</td>
                   <td>{note.projeto}</td>
                   <td>{note.vencimento || '-'}</td>
-                  <td><span className={note.status === 'Recebido' ? 'badge badge-success' : 'badge badge-warning'}>{note.status}</span></td>
-                  <td style={{ textAlign: 'right' }}>{formatCurrency(note.valorBruto)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: note.status === 'Recebido' ? 'var(--success)' : 'var(--warning)' }}>{formatCurrency(note.valorLiquido)}</td>
+                  <td><span className={note.status === 'Recebido' ? 'badge badge-success' : note.status === 'Parcial' ? 'badge badge-info' : 'badge badge-warning'}>{note.status}</span></td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(note.valorNota)}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--success)' }}>{formatCurrency(note.valorRecebido)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700, color: note.saldoAReceber > 0 ? 'var(--warning)' : 'var(--success)' }}>{formatCurrency(note.saldoAReceber)}</td>
                 </tr>
               )) : (
-                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhuma nota fiscal encontrada para os filtros selecionados.</td></tr>
+                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhuma nota fiscal encontrada para os filtros selecionados.</td></tr>
               )}
             </tbody>
           </table>
