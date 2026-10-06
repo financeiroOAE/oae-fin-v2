@@ -45,13 +45,13 @@ async function verifyGitHubActionsToken(request) {
 export async function POST(request) {
   try {
     const oidc = await verifyGitHubActionsToken(request);
-    const payload = await refreshFinancialSnapshot('AUTO_05:00');
+    const payload = await refreshFinancialSnapshot('AUTO_17:00');
 
     return NextResponse.json({
       success: true,
       syncedAt: payload.syncedAt,
       recordsCount: payload.recordsCount,
-      triggeredBy: 'AUTO_05:00',
+      triggeredBy: 'AUTO_17:00',
       githubRunId: oidc.run_id || null,
     });
   } catch (error) {
@@ -60,7 +60,7 @@ export async function POST(request) {
     );
 
     if (!isAuthError) {
-      await registerSyncError('AUTO_05:00', error);
+      await registerSyncError('AUTO_17:00', error);
     }
 
     return NextResponse.json(

@@ -1,9 +1,9 @@
-name: Sincronizacao Financeira 05h00
+name: Sincronizacao Financeira 17h00
 
 on:
   schedule:
-    # 08h UTC corresponde a 05h no horario de Brasilia (UTC-3).
-    - cron: '0 8 * * *'
+    # 20h UTC corresponde a 17h no horario de Brasilia (UTC-3).
+    - cron: '0 20 * * *'
   workflow_dispatch:
 
 permissions:

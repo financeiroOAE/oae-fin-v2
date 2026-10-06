@@ -94,6 +94,10 @@ function normalizeProjectAllocationText(value) {
     .toUpperCase();
 }
 
+function isAdministrativeAllocationProject(value) {
+  return normalizeProjectAllocationText(value).includes('ADMINISTRA');
+}
+
 function isUsableAllocationProject(value) {
   const normalized = normalizeProjectAllocationText(value);
   if (!normalized) return false;
@@ -116,14 +120,17 @@ function enrichWithSystemAllocation(item, value) {
   const classification = classifyFinancialEntry(item);
   if (!isProjectRevenueClassification(classification)) return null;
 
-  const allocation = splitProjectReceipt(value);
+  const standaloneAdministrative = isAdministrativeAllocationProject(item.projeto);
+  const allocation = standaloneAdministrative
+    ? { total: roundMoney(value), project: 0, administrative: roundMoney(value) }
+    : splitProjectReceipt(value);
   return {
     ...item,
     valorReceitaProjetoTotal: allocation.total,
     valorDireto: allocation.project,
     valorAdministrativo: allocation.administrative,
-    rateioAdministrativoPercentual: PROJECT_ADMIN_RATE * 100,
-    rateioAdministrativoFonte: 'SISTEMA_20_PERCENT',
+    rateioAdministrativoPercentual: standaloneAdministrative ? 100 : PROJECT_ADMIN_RATE * 100,
+    rateioAdministrativoFonte: standaloneAdministrative ? 'ADMINISTRATIVO_AVULSO_100_PERCENT' : 'SISTEMA_20_PERCENT',
   };
 }
 
@@ -162,6 +169,7 @@ export function buildDreRevenueItems(baseData) {
         totalColunaK: 0,
         linhasOriginais: [],
         projeto: null,
+        temProjetoAdministrativo: false,
       });
     }
 
@@ -172,11 +180,16 @@ export function buildDreRevenueItems(baseData) {
 
     if (isUsableAllocationProject(item.projeto)) {
       group.projeto = item.projeto;
+    } else if (isAdministrativeAllocationProject(item.projeto)) {
+      group.temProjetoAdministrativo = true;
     }
   });
 
   const allocatedEntries = Array.from(groups.values()).flatMap((group) => {
-    const allocation = splitProjectReceipt(group.totalColunaK);
+    const standaloneAdministrative = !group.projeto && group.temProjetoAdministrativo;
+    const allocation = standaloneAdministrative
+      ? { total: roundMoney(group.totalColunaK), project: 0, administrative: roundMoney(group.totalColunaK) }
+      : splitProjectReceipt(group.totalColunaK);
     const projeto = group.projeto
       || group.linhasOriginais.find((row) => isUsableAllocationProject(row.projeto))?.projeto
       || 'SEM PROJETO';
@@ -187,10 +200,26 @@ export function buildDreRevenueItems(baseData) {
       valorReceitaProjetoTotal: allocation.total,
       valorDireto: allocation.project,
       valorAdministrativo: allocation.administrative,
-      rateioAdministrativoPercentual: PROJECT_ADMIN_RATE * 100,
-      rateioAdministrativoFonte: 'SISTEMA_20_PERCENT_COLUNA_K',
+      rateioAdministrativoPercentual: standaloneAdministrative ? 100 : PROJECT_ADMIN_RATE * 100,
+      rateioAdministrativoFonte: standaloneAdministrative ? 'ADMINISTRATIVO_AVULSO_100_PERCENT' : 'SISTEMA_20_PERCENT_COLUNA_K',
       isDreRevenueAllocation: true,
     };
+
+    if (standaloneAdministrative) {
+      return [{
+        ...common,
+        valor: allocation.administrative,
+        valorCaixa: allocation.administrative,
+        valorFaturamento: allocation.administrative,
+        valorFaturamentoOriginal: allocation.administrative,
+        valorTotalTitulo: allocation.administrative,
+        contaCodigo: '1010107',
+        contaNome: 'REC. ADMINISTRATIVO (100%)',
+        contaDescricao: 'REC. ADMINISTRATIVO (100%)',
+        projeto: 'ADMINISTRAÇÃO',
+        parcelaRateio: 'ADMINISTRACAO_100',
+      }];
+    }
 
     return [
       {
@@ -304,6 +333,7 @@ export function consolidateFinancialData(baseData, options = {}) {
         linhasOriginais: [],
         centroCustoObra: null,
         temReceitaProjeto: false,
+        temProjetoAdministrativo: false,
       });
     }
 
@@ -330,6 +360,8 @@ export function consolidateFinancialData(baseData, options = {}) {
 
       if (isUsableAllocationProject(item.projeto)) {
         consItem.centroCustoObra = item.projeto;
+      } else if (isAdministrativeAllocationProject(item.projeto)) {
+        consItem.temProjetoAdministrativo = true;
       }
     } else {
       consItem.valorOutrasEntradas += value;
@@ -341,13 +373,24 @@ export function consolidateFinancialData(baseData, options = {}) {
   });
 
   const processedConsolidated = Array.from(consolidatedMap.values()).map(cons => {
-    const receiptAllocation = splitProjectReceipt(cons.valorReceitaProjetoTotal);
+    const standaloneAdministrative = cons.temReceitaProjeto
+      && !cons.centroCustoObra
+      && cons.temProjetoAdministrativo;
+    const receiptAllocation = standaloneAdministrative
+      ? {
+          total: roundMoney(cons.valorReceitaProjetoTotal),
+          project: 0,
+          administrative: roundMoney(cons.valorReceitaProjetoTotal),
+        }
+      : splitProjectReceipt(cons.valorReceitaProjetoTotal);
     const faturamentoTituloReferencia = selectTitleGrossReference(
       cons.valorFaturamentoReceitaTotal,
       cons.valorFaturamentoOutrasEntradas
     );
     const billingAllocation = cons.temReceitaProjeto
-      ? splitProjectReceipt(faturamentoTituloReferencia)
+      ? (standaloneAdministrative
+          ? { total: roundMoney(faturamentoTituloReferencia), project: 0, administrative: roundMoney(faturamentoTituloReferencia) }
+          : splitProjectReceipt(faturamentoTituloReferencia))
       : { total: 0, project: 0, administrative: 0 };
 
     cons.valorReceitaProjetoTotal = receiptAllocation.total;
@@ -359,8 +402,12 @@ export function consolidateFinancialData(baseData, options = {}) {
     cons.valorFaturamentoTitulo = roundMoney(faturamentoTituloReferencia);
     cons.valorFaturamento = cons.valorFaturamentoTitulo;
     cons.valorTotalTitulo = cons.valorFaturamentoTitulo;
-    cons.rateioAdministrativoPercentual = PROJECT_ADMIN_RATE * 100;
-    cons.rateioAdministrativoFonte = cons.temReceitaProjeto ? 'SISTEMA_20_PERCENT' : null;
+    cons.rateioAdministrativoPercentual = cons.temReceitaProjeto
+      ? (standaloneAdministrative ? 100 : PROJECT_ADMIN_RATE * 100)
+      : 0;
+    cons.rateioAdministrativoFonte = cons.temReceitaProjeto
+      ? (standaloneAdministrative ? 'ADMINISTRATIVO_AVULSO_100_PERCENT' : 'SISTEMA_20_PERCENT')
+      : null;
 
     const projectFromRows = cons.linhasOriginais.find((row) => isUsableAllocationProject(row.projeto))?.projeto;
     const ccFinal = cons.centroCustoObra || projectFromRows || cons.projeto || 'ADMINISTRAÇÃO';

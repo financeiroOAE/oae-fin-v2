@@ -66,7 +66,7 @@ export default function AtualizacaoDados() {
             Atualização de Dados
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-            O painel carrega o último snapshot salvo. A atualização automática ocorre diariamente às 05h e a atualização manual fica disponível a cada 2 horas.
+            O painel carrega o último snapshot salvo. A atualização automática ocorre diariamente às 17h. Atualizações manuais seguem as regras internas de acesso do sistema.
           </p>
         </div>
         <FinancialRefreshButton

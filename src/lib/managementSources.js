@@ -76,6 +76,7 @@ export function revenueTitles(snapshot) {
         grossValue: 0,
         projectRows: 0,
         adminRows: 0,
+        administrativeProjectRows: 0,
         projectCandidates: new Set(),
         dateSource: row.dataEmissao ? 'EMISSAO' : 'DATA',
       });
@@ -83,7 +84,10 @@ export function revenueTitles(snapshot) {
 
     const item = groups.get(key);
     const project = projectsByCode.get(norm(row.projetoCodigoValidado)) || String(row.projeto || '').trim();
-    if (project && !['ADMINISTRACAO', 'PROJETOS', 'GRUPO OAE', 'SEM PROJETO'].includes(norm(project))) {
+    const projectNorm = norm(project);
+    if (projectNorm.includes('ADMINISTR')) {
+      item.administrativeProjectRows += 1;
+    } else if (project && !['PROJETOS', 'GRUPO OAE', 'SEM PROJETO'].includes(projectNorm)) {
       item.projectCandidates.add(project);
     }
 
@@ -107,7 +111,11 @@ export function revenueTitles(snapshot) {
 
   return [...groups.values()].map((item) => {
     const totalValue = Math.round(item.value * 100) / 100;
-    const expectedAdminValue = Math.round(totalValue * 0.20 * 100) / 100;
+    const standaloneAdministrative = item.projectCandidates.size === 0 && item.administrativeProjectRows > 0;
+    const expectedAdminValue = standaloneAdministrative
+      ? totalValue
+      : Math.round(totalValue * 0.20 * 100) / 100;
+    const expectedProjectValue = Math.round((totalValue - expectedAdminValue) * 100) / 100;
     const sourceAdminValue = Math.round(item.adminValue * 100) / 100;
     const adminValue = expectedAdminValue;
     const adminValueDelta = Math.round((sourceAdminValue - expectedAdminValue) * 100) / 100;
@@ -119,16 +127,20 @@ export function revenueTitles(snapshot) {
       forecast: item.forecast,
       realized: item.realized,
       value: totalValue,
-      projectValue: Math.round(item.projectValue * 100) / 100,
+      projectValue: expectedProjectValue,
+      sourceProjectValue: Math.round(item.projectValue * 100) / 100,
       adminValue,
       adminValueExpected: expectedAdminValue,
       adminValueDelta,
-      adminValueSource: 'SISTEMA_20_PERCENT_COLUNA_K_TOTAL',
+      adminValueSource: standaloneAdministrative ? 'ADMINISTRATIVO_AVULSO_100_PERCENT' : 'SISTEMA_20_PERCENT_COLUNA_K_TOTAL',
+      standaloneAdministrative,
       sourceAdminValue,
       sourceAdminValueSource: item.adminRows > 0 ? 'CR_GERAL_1010107_COLUNA_K' : 'SEM_LINHA_1010107',
       grossValue: Math.round(item.grossValue * 100) / 100,
       project: item.projectCandidates.size === 1 ? [...item.projectCandidates][0] : null,
-      review: item.projectCandidates.size !== 1 || item.adminRows === 0 || Math.abs(adminValueDelta) > 0.02,
+      review: standaloneAdministrative
+        ? false
+        : item.projectCandidates.size !== 1 || item.adminRows === 0 || Math.abs(adminValueDelta) > 0.02,
       dateSource: item.dateSource,
     };
   });
