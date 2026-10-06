@@ -18,7 +18,7 @@ import { consolidateFinancialData } from "@/lib/consolidation";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
 import { exportReportToPdf } from "@/lib/reportExport";
-import { isRevenueTax, getRevenueTaxLabel, classifyFinancialEntry, isTeamExpense } from "@/lib/financialClassification";
+import { isRevenueTax, getRevenueTaxLabel, classifyFinancialEntry, isTeamExpense, isProjectRevenue, getFinancialDisplayStatus } from "@/lib/financialClassification";
 import { getProjectKey, isGeneralProjectsBucket } from "@/lib/projectRules";
 import { loadFinancialData } from "@/lib/clientSync";
 
@@ -313,104 +313,87 @@ export default function Projetos() {
     usarValorCaixa: true
   }), [data, incluirRateioAdm]);
 
-  // Fonte fixa do painel de NFES: sempre considera o título completo,
-  // independentemente do toggle de rateio administrativo da análise de projetos.
-  const nfBaseData = useMemo(() => consolidateFinancialData(data, {
-    isProjetosPage: true,
-    incluirRateioAdm: true,
-    usarValorCaixa: true
-  }), [data]);
-
+  // Painel de NFES: usa diretamente as linhas originais do CR_GERAL.
+  // Não usa a consolidação geral, porque a coluna J ("Valor total título")
+  // pode se repetir nas linhas de rateio do mesmo título.
   const nfesAll = useMemo(() => {
     const notes = new Map();
 
-    nfBaseData.forEach((item, index) => {
+    data.forEach((item, index) => {
       if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return;
       const documento = String(item?.documento || '').trim();
       if (!documento.toUpperCase().includes('NFES')) return;
+      if (!isProjectRevenue(item)) return;
 
-      const statusText = normalizeNfText(item?.status || item?.statusExibicao);
-      const received = statusText.includes('REALIZADO')
-        || statusText.includes('RECEBIDO')
-        || statusText.includes('EFETIVADO');
-      const receivable = !received && (
-        statusText.includes('A RECEBER')
-        || statusText.includes('A REALIZAR')
-        || statusText.includes('PREVISTO')
-      );
-      if (!received && !receivable) return;
+      const status = getFinancialDisplayStatus(item);
+      if (status !== 'Recebido' && status !== 'A receber') return;
 
-      const key = normalizeNfText(documento)
-        || normalizeNfText(item?.lancamento)
-        || `NFES-ROW-${index}`;
+      const vencimento = item?.dataVencimento || item?.vencimento || item?.data || '';
+      const key = [
+        normalizeNfText(item?.lancamento || 'SEM-LANCAMENTO'),
+        normalizeNfText(documento || item?.nome || `NFES-ROW-${index}`),
+        status,
+        String(vencimento).trim(),
+      ].join('|');
 
-      const linhas = Array.isArray(item?.linhasOriginais) && item.linhasOriginais.length
-        ? item.linhasOriginais
-        : [item];
-
-      const grossCandidates = [
-        item?.valorFaturamentoOriginal,
-        item?.valorFaturamentoTitulo,
-        item?.valorFaturamento,
-        item?.valorTotalTitulo,
-        ...linhas.flatMap((linha) => [
-          linha?.valorFaturamentoOriginal,
-          linha?.valorFaturamentoTitulo,
-          linha?.valorFaturamento,
-          linha?.valorTotalTitulo,
-        ]),
-      ]
-        .map((value) => Math.abs(Number(value) || 0))
-        .filter((value) => value > 0);
-
-      const projectCandidates = linhas
-        .map((linha) => String(linha?.projeto || '').trim())
-        .filter((project) => project && !isGenericFinancialProject(project));
-
-      const financialIdentity = getFinancialRevenueProjectIdentity(item);
-      if (financialIdentity?.projectName && !isGenericFinancialProject(financialIdentity.projectName)) {
-        projectCandidates.push(financialIdentity.projectName);
+      if (!notes.has(key)) {
+        notes.set(key, {
+          key,
+          documento: documento || item?.lancamento || '-',
+          vencimento,
+          dataTimestamp: dateToTimestamp(vencimento),
+          status,
+          valorBruto: 0,
+          valorLiquido: 0,
+          sourceProjects: new Set(),
+          fallbackProjects: new Set(),
+        });
       }
 
-      const current = notes.get(key) || {
-        key,
-        documento: documento || item?.lancamento || '-',
-        vencimento: item?.dataVencimento || item?.vencimento || item?.data || '',
-        dataTimestamp: dateToTimestamp(item?.dataVencimento || item?.vencimento || item?.data),
-        status: received ? 'Recebido' : 'A receber',
-        valorBruto: 0,
-        valorLiquido: 0,
-        projects: new Set(),
-      };
+      const current = notes.get(key);
 
-      grossCandidates.forEach((value) => {
-        current.valorBruto = Math.max(current.valorBruto, value);
-      });
-      current.valorLiquido += Math.abs(Number(item?.valor) || 0);
-      projectCandidates.forEach((project) => current.projects.add(project));
-      if (received) current.status = 'Recebido';
+      // Coluna J: uma ocorrência do valor total do título.
+      // Em previsões, o sync preserva o J original em valorFaturamentoOriginal.
+      const gross = Math.abs(Number(
+        item?.valorFaturamentoOriginal
+        ?? item?.valorFaturamento
+        ?? item?.valorTotalTitulo
+        ?? item?.valorBruto
+      ) || 0);
+      current.valorBruto = Math.max(current.valorBruto, gross);
 
-      const candidateDate = item?.dataVencimento || item?.vencimento || item?.data;
-      const candidateTs = dateToTimestamp(candidateDate);
-      if (!current.vencimento || (!current.dataTimestamp && candidateTs)) {
-        current.vencimento = candidateDate || '';
-        current.dataTimestamp = candidateTs;
+      // Coluna K: soma dos rateios REC. FATURAMENTO + REC. ADMINISTRATIVO.
+      current.valorLiquido += Math.abs(Number(item?.valorCaixa ?? item?.valor) || 0);
+
+      const rawProject = String(item?.projeto || '').trim();
+      if (rawProject && !isGenericFinancialProject(rawProject)) {
+        current.sourceProjects.add(rawProject.replace(/[.\s]+$/g, ''));
+      } else {
+        const identity = getFinancialRevenueProjectIdentity(item);
+        if (identity?.projectName && !isGenericFinancialProject(identity.projectName)) {
+          current.fallbackProjects.add(identity.projectName);
+        }
       }
-
-      notes.set(key, current);
     });
 
     return [...notes.values()]
       .map((note) => {
-        const projects = [...note.projects].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        // A obra informada diretamente na linha financeira tem prioridade.
+        // Só usa a identidade extraída de lançamento/documento se a fonte vier genérica.
+        const projects = [
+          ...(note.sourceProjects.size ? note.sourceProjects : note.fallbackProjects)
+        ].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
         return {
           ...note,
+          valorBruto: Math.round(note.valorBruto * 100) / 100,
+          valorLiquido: Math.round(note.valorLiquido * 100) / 100,
           projects,
           projeto: projects.length ? projects.join(' / ') : 'Não identificado',
         };
       })
       .sort((a, b) => (b.dataTimestamp || 0) - (a.dataTimestamp || 0));
-  }, [nfBaseData]);
+  }, [data]);
 
   const nfProjectOptions = useMemo(() => [...new Set(nfesAll.flatMap((note) => note.projects))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [nfesAll]);
 
