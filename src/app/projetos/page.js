@@ -1443,7 +1443,7 @@ export default function Projetos() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--success)' }}>
           <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-            <ArrowDownCircle size={14} color="var(--success)" /> Recebido Líquido no período
+            <ArrowDownCircle size={14} color="var(--success)" /> Recebido no período
             <InfoTooltip
               title="Receita Líquida Recebida"
               content={`Receita líquida recebida: ${formatCurrency(receitaLiquidaProjetos)}. É o valor que efetivamente entrou no caixa no período selecionado.`}
