@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Wallet, CircleDollarSign, Clock3, UsersRound, BriefcaseBusiness, Building2 } from 'lucide-react';
+import { FileText, FileDown, FileSpreadsheet, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Wallet, CircleDollarSign, Clock3, UsersRound, BriefcaseBusiness, Building2 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   BarChart, Bar
@@ -12,6 +12,8 @@ import InfoTooltip from '@/components/InfoTooltip';
 import DataTable from '@/components/DataTable';
 import MultiSelect from '@/components/MultiSelect';
 import { requestJson } from '@/lib/clientSync';
+import FinancialRefreshButton from '@/components/FinancialRefreshButton';
+import { exportReportToExcel, exportReportToPdf } from '@/lib/reportExport';
 import './management.css';
 import './managementExtras.css';
 
@@ -72,6 +74,22 @@ const toFinancialRows = (rows, personName) => (rows||[]).map((row)=>({
   projeto:row.projeto || '',
 }));
 
+const reportMovementRows = (rows, personName) => (rows||[]).map((r)=>({
+  Data:r.data||'',
+  'Pessoa / empresa':personName || r.rosterPerson || r.nome || '',
+  Documento:r.documento||r.titulo||'',
+  Obra:r.projeto||'',
+  Plano:planLabel(r.contaNome||r.contaCodigo),
+  Situação:r.paid?'Pago':'A pagar',
+  Valor:Number(r.valor||0),
+}));
+
+const exportDirectReport = async (items, title, format='pdf') => {
+  const config={title,orientation:'auto',includeExplanations:true};
+  if(format==='xlsx') return exportReportToExcel(items,config);
+  return exportReportToPdf(items,config);
+};
+
 function MetricCard({ icon: Icon, label, value, info, tone = 'primary', currency = true }) {
   return <div className={`mgmt-metric-card tone-${tone}`} data-report-section>
     <div className="mgmt-metric-top">
@@ -129,6 +147,55 @@ function PersonModal({ person, onClose }) {
     return map;
   },new Map()).values()].sort((a,b)=>(b.paid+b.open)-(a.paid+a.open));
 
+  const personReportItems=[
+    {
+      sectionKey:`equipe:export:ficha:${person.key}:resumo`,
+      title:'Resumo financeiro',
+      componentName:'Resumo da ficha financeira',
+      page:'Equipe',
+      type:'TABLE',
+      filters:{Pessoa:person.name,Escopo:person.thirdParty?'2026 + A pagar futuro':'2026'},
+      data:[{
+        'Pessoa / empresa':person.name,
+        'Cargo / função':person.roles.join(' · ')||'—',
+        Tipo:person.thirdParty?'Terceiro':person.fixedMonthly?'Mensal / fixo':'Equipe',
+        Projetos:person.projects.length,
+        'Plano(s)':displayPlans.join(' · ')||'Não identificado',
+        Pago:paid,
+        'A pagar':open,
+        Total:paid+open,
+        Lançamentos:rows.length,
+      }],
+    },
+    {
+      sectionKey:`equipe:export:ficha:${person.key}:mensal`,
+      title:'Evolução mensal',
+      componentName:'Evolução mensal da pessoa',
+      page:'Equipe',
+      type:'TABLE',
+      filters:{Pessoa:person.name,Ano:2026},
+      data:months,
+    },
+    {
+      sectionKey:`equipe:export:ficha:${person.key}:obras`,
+      title:'Resumo por projeto',
+      componentName:'Resumo da pessoa por projeto',
+      page:'Equipe',
+      type:'TABLE',
+      filters:{Pessoa:person.name},
+      data:byProject.map(item=>({Projeto:item.name,Pago:item.paid,'A pagar':item.open,Total:item.paid+item.open,Lançamentos:item.rows.length})),
+    },
+    {
+      sectionKey:`equipe:export:ficha:${person.key}:movimentos`,
+      title:'Movimentações financeiras',
+      componentName:'Movimentações da ficha financeira',
+      page:'Equipe',
+      type:'TABLE',
+      filters:{Pessoa:person.name,Escopo:person.thirdParty?'2026 + A pagar futuro':'2026'},
+      data:reportMovementRows(rows,person.name),
+    },
+  ];
+
   return <div className="mgmt-overlay mgmt-overlay-center" onMouseDown={onClose}>
     <div className="mgmt-modal-center" onMouseDown={(e)=>e.stopPropagation()}>
       <div className="mgmt-panel-head">
@@ -138,7 +205,9 @@ function PersonModal({ person, onClose }) {
           <p>{person.roles.join(' · ')||'Sem função informada'}</p>
         </div>
         <div className="mgmt-actions">
-          <ReportAdder sectionKey={`equipe:ficha:${person.key}`} title={`Ficha Financeira — ${person.name}`} componentName="Ficha Financeira da Equipe" page="Equipe" type="TABLE" data={rows.map(r=>({Data:r.data,Documento:r.documento||r.titulo,Obra:r.projeto,Plano:planLabel(r.contaNome||r.contaCodigo),Situação:r.paid?'Pago':'A pagar',Valor:r.valor}))} filters={{Ano:2026}} />
+          <button className="btn" onClick={()=>exportDirectReport(personReportItems,`Ficha Financeira — ${person.name}`,'pdf')}><FileDown size={15}/> PDF</button>
+          <button className="btn" onClick={()=>exportDirectReport(personReportItems,`Ficha Financeira — ${person.name}`,'xlsx')}><FileSpreadsheet size={15}/> Excel</button>
+          <ReportAdder sectionKey={`equipe:ficha:${person.key}`} title={`Ficha Financeira — ${person.name}`} componentName="Ficha Financeira da Equipe" page="Equipe" type="TABLE" data={reportMovementRows(rows,person.name)} filters={{Ano:2026}} />
           <button className="btn" onClick={onClose}><X size={16}/> Fechar</button>
         </div>
       </div>
@@ -193,7 +262,38 @@ function PersonModal({ person, onClose }) {
         <div className="mgmt-panel-head">
           <div><span className="mgmt-eyebrow">MOVIMENTOS DA OBRA · 2026</span><h2>{selectedProject.name}</h2><p>{person.name} · {selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div>
           <div className="mgmt-actions">
-            <ReportAdder sectionKey={`equipe:obra:${person.key}:${projectCodeLabel(selectedProject.name)}`} title={`Movimentos — ${person.name} — ${selectedProject.name}`} componentName="Movimentos da Pessoa por Obra" page="Equipe" type="TABLE" data={selectedProject.rows.map(r=>({Data:r.data,Documento:r.documento||r.titulo,Obra:r.projeto,Plano:planLabel(r.contaNome||r.contaCodigo),Situação:r.paid?'Pago':'A pagar',Valor:r.valor}))} filters={{Ano:2026}}/>
+            <button className="btn" onClick={()=>exportDirectReport([
+              {
+                sectionKey:`equipe:export:obra:${person.key}:${projectCodeLabel(selectedProject.name)}:resumo`,
+                title:'Resumo do projeto',
+                componentName:'Resumo da pessoa no projeto',
+                page:'Equipe',
+                type:'TABLE',
+                filters:{Pessoa:person.name,Projeto:selectedProject.name},
+                data:[{Pessoa:person.name,Projeto:selectedProject.name,Pago:selectedProject.paid,'A pagar':selectedProject.open,Total:selectedProject.paid+selectedProject.open,Lançamentos:selectedProject.rows.length}],
+              },
+              {
+                sectionKey:`equipe:export:obra:${person.key}:${projectCodeLabel(selectedProject.name)}:movimentos`,
+                title:'Movimentações no projeto',
+                componentName:'Movimentações da pessoa no projeto',
+                page:'Equipe',
+                type:'TABLE',
+                filters:{Pessoa:person.name,Projeto:selectedProject.name},
+                data:reportMovementRows(selectedProject.rows,person.name),
+              }
+            ],`Movimentos — ${person.name} — ${selectedProject.name}`,'pdf')}><FileDown size={15}/> PDF</button>
+            <button className="btn" onClick={()=>exportDirectReport([
+              {
+                sectionKey:`equipe:export:obra:${person.key}:${projectCodeLabel(selectedProject.name)}:movimentos-xlsx`,
+                title:'Movimentações no projeto',
+                componentName:'Movimentações da pessoa no projeto',
+                page:'Equipe',
+                type:'TABLE',
+                filters:{Pessoa:person.name,Projeto:selectedProject.name},
+                data:reportMovementRows(selectedProject.rows,person.name),
+              }
+            ],`Movimentos — ${person.name} — ${selectedProject.name}`,'xlsx')}><FileSpreadsheet size={15}/> Excel</button>
+            <ReportAdder sectionKey={`equipe:obra:${person.key}:${projectCodeLabel(selectedProject.name)}`} title={`Movimentos — ${person.name} — ${selectedProject.name}`} componentName="Movimentos da Pessoa por Obra" page="Equipe" type="TABLE" data={reportMovementRows(selectedProject.rows,person.name)} filters={{Ano:2026}}/>
             <button className="btn" onClick={()=>setSelectedProject(null)}><X size={16}/> Fechar</button>
           </div>
         </div>
@@ -241,6 +341,46 @@ function ProjectSummaryModal({ project, onClose }) {
           <p>{project.peopleCount} pessoa{project.peopleCount!==1?'s':''} / empresa{project.peopleCount!==1?'s':''} · {rows.length} movimento{rows.length!==1?'s':''}</p>
         </div>
         <div className="mgmt-actions">
+          <button className="btn" onClick={()=>exportDirectReport([
+            {
+              sectionKey:`equipe:export:projeto:${projectCodeLabel(project.name)}:resumo`,
+              title:'Resumo do projeto',
+              componentName:'Resumo financeiro da equipe por projeto',
+              page:'Equipe',
+              type:'TABLE',
+              filters:{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'},
+              data:[{Projeto:project.name,'Pessoas / empresas':project.peopleCount,Pago:project.paid,'A pagar':project.open,Total:project.total,Lançamentos:rows.length}],
+            },
+            {
+              sectionKey:`equipe:export:projeto:${projectCodeLabel(project.name)}:mensal`,
+              title:'Fluxo mensal de pagamentos',
+              componentName:'Fluxo mensal do projeto',
+              page:'Equipe',
+              type:'TABLE',
+              filters:{Projeto:project.name,Ano:2026},
+              data:monthly,
+            },
+            {
+              sectionKey:`equipe:export:projeto:${projectCodeLabel(project.name)}:movimentos`,
+              title:'Movimentações do projeto',
+              componentName:'Movimentações da equipe por projeto',
+              page:'Equipe',
+              type:'TABLE',
+              filters:{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'},
+              data:reportRows,
+            },
+          ],`Equipe do Projeto — ${project.name}`,'pdf')}><FileDown size={15}/> PDF</button>
+          <button className="btn" onClick={()=>exportDirectReport([
+            {
+              sectionKey:`equipe:export:projeto:${projectCodeLabel(project.name)}:movimentos-xlsx`,
+              title:'Movimentações do projeto',
+              componentName:'Movimentações da equipe por projeto',
+              page:'Equipe',
+              type:'TABLE',
+              filters:{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'},
+              data:reportRows,
+            },
+          ],`Equipe do Projeto — ${project.name}`,'xlsx')}><FileSpreadsheet size={15}/> Excel</button>
           <ReportAdder
             sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}`}
             title={`Equipe do Projeto — ${project.name}`}
@@ -306,6 +446,13 @@ export default function TeamDashboard(){
   const[selectedPerson,setSelectedPerson]=useState(null);
   const[selectedProjectSummary,setSelectedProjectSummary]=useState(null);
   const[error,setError]=useState('');
+
+  const reloadTeamData=async()=>{
+    const result=await requestJson('/api/equipe');
+    setData(result);
+    setError('');
+    return result;
+  };
 
   useEffect(()=>{let active=true;requestJson('/api/equipe').then(result=>{if(active){setData(result);setError('')}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[]);
 
@@ -554,7 +701,10 @@ export default function TeamDashboard(){
   return <div className="mgmt">
     <header className="mgmt-header">
       <div><span className="mgmt-eyebrow">EQUIPE · EXERCÍCIO 2026</span><h1>Equipe</h1><p>Cadastro, pagamentos, pendências e custo de equipe por obra.</p></div>
-      <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Equipe')} className={`btn ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do Modo Relatório':'Gerar Relatório'}</button>
+      <div className="mgmt-actions">
+        <FinancialRefreshButton onUpdated={reloadTeamData} onError={setError} label="Atualizar dados"/>
+        <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Equipe')} className={`btn ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do Modo Relatório':'Gerar Relatório'}</button>
+      </div>
     </header>
     {error&&<div className="mgmt-alert">{error}</div>}
 

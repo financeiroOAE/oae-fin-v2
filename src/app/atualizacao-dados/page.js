@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { RefreshCw, Database, CheckCircle, AlertTriangle, Clock, ServerCrash, CheckSquare } from "lucide-react";
 import { loadFinancialData } from "@/lib/clientSync";
+import FinancialRefreshButton from "@/components/FinancialRefreshButton";
 
 export default function AtualizacaoDados() {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -65,12 +66,23 @@ export default function AtualizacaoDados() {
             Atualização de Dados
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-            Ao abrir, o painel carrega o último snapshot salvo. Uma nova leitura da planilha ocorre somente ao clicar em Atualizar Dados.
+            O painel carrega o último snapshot salvo. A atualização automática ocorre diariamente às 05h e a atualização manual fica disponível a cada 2 horas.
           </p>
         </div>
-        <button onClick={() => fetchDados(true, true)} className="btn btn-primary" disabled={isSyncing} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '14px', padding: '0.75rem 1.5rem' }}>
-          <RefreshCw size={16} className={isSyncing ? "spin" : ""} /> {isSyncing ? 'Atualizando Dados...' : 'Atualizar Dados'}
-        </button>
+        <FinancialRefreshButton
+          label="Atualizar Dados"
+          onUpdated={async (result)=>{
+            await fetchDados(false,false,false);
+            setErrorMsg(null);
+            setErrorDetails(null);
+            setStatusMsg(`Sincronização concluída com sucesso! ${result?.recordsCount || 0} registros processados.`);
+          }}
+          onError={(message)=>{
+            setErrorMsg('Atualização manual indisponível.');
+            setErrorDetails(message);
+            setStatusMsg(null);
+          }}
+        />
       </header>
 
       <div className="card" style={{ padding: '2rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

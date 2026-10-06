@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, ChevronDown, ChevronUp, X, Landmark, CircleDollarSign, Clock3, TrendingUp, Gauge, ReceiptText } from 'lucide-react';
+import { FileText, FileDown, FileSpreadsheet, ChevronDown, ChevronUp, X, Landmark, CircleDollarSign, Clock3, TrendingUp, Gauge, ReceiptText } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine
 } from 'recharts';
@@ -11,6 +11,8 @@ import InfoTooltip from '@/components/InfoTooltip';
 import DataTable from '@/components/DataTable';
 import MultiSelect from '@/components/MultiSelect';
 import { requestJson } from '@/lib/clientSync';
+import FinancialRefreshButton from '@/components/FinancialRefreshButton';
+import { exportReportToExcel, exportReportToPdf } from '@/lib/reportExport';
 import '../equipe/management.css';
 import '../equipe/managementExtras.css';
 
@@ -48,8 +50,14 @@ function MovementModal({title,rows,onClose}){
   const tableRows=rows.map(r=>({...r,natureza:'Saída',projeto:r.projeto||'ADMINISTRAÇÃO',contaDescricao:r.contaNome||r.contaCodigo||'',status:r.paid?'Realizado':'A realizar'}));
   const reportRows=rows.map(r=>({Data:r.data,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Nome:r.nome,Conta:r.contaNome||r.contaCodigo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
   const sectionKey=`administrativo:detalhe:${title.replace(/[^a-z0-9]+/gi,'-').toLowerCase()}`;
+  const exportItems=[
+    {sectionKey:`${sectionKey}:resumo`,title:'Resumo',componentName:'Resumo do detalhamento administrativo',page:'Administrativo',type:'TABLE',filters:{Ano:2026},data:[{Descrição:title,Pago:paid,'A pagar':open,Total:paid+open,Lançamentos:rows.length}]},
+    {sectionKey:`${sectionKey}:mensal`,title:'Relação mensal',componentName:'Relação mensal administrativa',page:'Administrativo',type:'TABLE',filters:{Ano:2026},data:monthly},
+    {sectionKey:`${sectionKey}:movimentos`,title:'Lançamentos',componentName:'Detalhamento Administrativo',page:'Administrativo',type:'TABLE',filters:{Ano:2026},data:reportRows},
+  ];
+  const exportConfig={title,orientation:'auto',includeExplanations:true};
   return <div className="mgmt-overlay mgmt-overlay-center" onMouseDown={onClose}><div className="mgmt-modal-center" onMouseDown={e=>e.stopPropagation()}>
-    <div className="mgmt-panel-head"><div><span className="mgmt-eyebrow">DETALHAMENTO · 2026</span><h2>{title}</h2><p>Pago {brl(paid)} · A pagar {brl(open)}</p></div><div className="mgmt-actions"><ReportAdder sectionKey={sectionKey} title={title} componentName="Detalhamento Administrativo" page="Administrativo" type="TABLE" data={reportRows} filters={{Ano:2026}}/><button className="btn" onClick={onClose}><X size={16}/> Fechar</button></div></div>
+    <div className="mgmt-panel-head"><div><span className="mgmt-eyebrow">DETALHAMENTO · 2026</span><h2>{title}</h2><p>Pago {brl(paid)} · A pagar {brl(open)}</p></div><div className="mgmt-actions"><button className="btn" onClick={()=>exportReportToPdf(exportItems,exportConfig)}><FileDown size={15}/> PDF</button><button className="btn" onClick={()=>exportReportToExcel(exportItems,exportConfig)}><FileSpreadsheet size={15}/> Excel</button><ReportAdder sectionKey={sectionKey} title={title} componentName="Detalhamento Administrativo" page="Administrativo" type="TABLE" data={reportRows} filters={{Ano:2026}}/><button className="btn" onClick={onClose}><X size={16}/> Fechar</button></div></div>
     <section className="mgmt-subcard"><h3>Relação mensal</h3><div className="mgmt-chart-sm"><ResponsiveContainer><LineChart data={monthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago" stroke="#22c55e" strokeWidth={2.5}/><Line type="monotone" dataKey="A pagar" stroke={COLORS.open} strokeWidth={2.5}/></LineChart></ResponsiveContainer></div></section>
     <section className="mgmt-subcard" style={{marginTop:14}}><h3>Lançamentos</h3><p className="mgmt-muted">Filtros, 30 por página, 50 ou Todos.</p><DataTable data={tableRows} initialPageSize={30} pageSizeOptions={[30,50,'all']}/></section>
   </div></div>;
@@ -67,6 +75,13 @@ export default function AdministrativeDashboard(){
   const[detail,setDetail]=useState(null);
   const[partnerView,setPartnerView]=useState('TODOS');
   const[error,setError]=useState('');
+
+  const reloadAdministrativeData=async()=>{
+    const result=await requestJson('/api/administrativo');
+    setData(result);
+    setError('');
+    return result;
+  };
 
   useEffect(()=>{let active=true;requestJson('/api/administrativo').then(result=>{if(active){setData(result);setError('')}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[]);
 
@@ -158,7 +173,10 @@ export default function AdministrativeDashboard(){
   return <div className="mgmt mgmt-admin">
     <header className="mgmt-header">
       <div><span className="mgmt-eyebrow">ADMINISTRATIVO · EXERCÍCIO 2026</span><h1>Administrativo</h1><p>Receita administrativa, custos, equipe ADM, sócios e contas a pagar.</p></div>
-      <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Administrativo')} className={`btn ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do Modo Relatório':'Gerar Relatório'}</button>
+      <div className="mgmt-actions">
+        <FinancialRefreshButton onUpdated={reloadAdministrativeData} onError={setError} label="Atualizar dados"/>
+        <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Administrativo')} className={`btn ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do Modo Relatório':'Gerar Relatório'}</button>
+      </div>
     </header>
     {error&&<div className="mgmt-alert">{error}</div>}
 

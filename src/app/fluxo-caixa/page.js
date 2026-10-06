@@ -19,6 +19,7 @@ import ReportAdder from "@/components/report/ReportAdder";
 import { getRolling30DayRange } from "@/lib/dateRange";
 import { getActiveProjectNames } from "@/lib/projectRules";
 import { loadFinancialData } from "@/lib/clientSync";
+import FinancialRefreshButton from "@/components/FinancialRefreshButton";
 import {
   BarChart, Bar, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine, Cell
 } from "recharts";
@@ -561,9 +562,7 @@ export default function FluxoDeCaixa() {
             <FileText size={14} /> {isReportMode ? 'Sair do Modo Relatório' : 'Gerar Relatório'}
           </button>
           {isSyncing && <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Atualizando...</span>}
-          <button onClick={() => fetchDados(true, true)} disabled={isSyncing} className="btn" style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}>
-            <RefreshCw size={16} className={isSyncing ? 'spin' : ''} style={{ marginRight: '0.5rem' }} /> Sincronizar
-          </button>
+          <FinancialRefreshButton onUpdated={()=>fetchDados(false,false,false)} onError={setError} label="Sincronizar" className="btn"/>
         </div>
       </header>
 
