@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, FileDown, FileSpreadsheet, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Wallet, CircleDollarSign, Clock3, UsersRound, BriefcaseBusiness, Building2 } from 'lucide-react';
+import { FileText, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Wallet, CircleDollarSign, Clock3, UsersRound, BriefcaseBusiness, Building2 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   BarChart, Bar
@@ -13,7 +13,6 @@ import DataTable from '@/components/DataTable';
 import MultiSelect from '@/components/MultiSelect';
 import { requestJson } from '@/lib/clientSync';
 import FinancialRefreshButton from '@/components/FinancialRefreshButton';
-import { exportReportToExcel, exportReportToPdf } from '@/lib/reportExport';
 import './management.css';
 import './managementExtras.css';
 
@@ -84,12 +83,6 @@ const reportMovementRows = (rows, personName) => (rows||[]).map((r)=>({
   Valor:Number(r.valor||0),
 }));
 
-const exportDirectReport = async (items, title, format='pdf') => {
-  const config={title,orientation:'auto',includeExplanations:true};
-  if(format==='xlsx') return exportReportToExcel(items,config);
-  return exportReportToPdf(items,config);
-};
-
 function MetricCard({ icon: Icon, label, value, info, tone = 'primary', currency = true }) {
   return <div className={`mgmt-metric-card tone-${tone}`} data-report-section>
     <div className="mgmt-metric-top">
@@ -124,6 +117,7 @@ function Pager({ total, page, setPage, pageSize, setPageSize }) {
 
 function PersonModal({ person, onClose }) {
   const [selectedProject, setSelectedProject] = useState(null);
+  const { openReportBuilder } = useReport();
   if(!person) return null;
   const rows=person.transactions||[];
   const movementPlans=[...new Set(rows.map(r=>planLabel(r.contaNome||r.contaCodigo)).filter(Boolean))];
@@ -150,7 +144,7 @@ function PersonModal({ person, onClose }) {
   const personReportItems=[
     {
       sectionKey:`equipe:export:ficha:${person.key}:resumo`,
-      title:'Resumo financeiro',
+      title:`Resumo financeiro — ${person.name}`,
       componentName:'Resumo da ficha financeira',
       page:'Equipe',
       type:'TABLE',
@@ -169,7 +163,7 @@ function PersonModal({ person, onClose }) {
     },
     {
       sectionKey:`equipe:export:ficha:${person.key}:mensal`,
-      title:'Evolução mensal',
+      title:`Evolução mensal — ${person.name}`,
       componentName:'Evolução mensal da pessoa',
       page:'Equipe',
       type:'TABLE',
@@ -178,7 +172,7 @@ function PersonModal({ person, onClose }) {
     },
     {
       sectionKey:`equipe:export:ficha:${person.key}:obras`,
-      title:'Resumo por projeto',
+      title:`Resumo por projeto — ${person.name}`,
       componentName:'Resumo da pessoa por projeto',
       page:'Equipe',
       type:'TABLE',
@@ -187,7 +181,7 @@ function PersonModal({ person, onClose }) {
     },
     {
       sectionKey:`equipe:export:ficha:${person.key}:movimentos`,
-      title:'Movimentações financeiras',
+      title:`Movimentações financeiras — ${person.name}`,
       componentName:'Movimentações da ficha financeira',
       page:'Equipe',
       type:'TABLE',
@@ -202,14 +196,27 @@ function PersonModal({ person, onClose }) {
         <div>
           <span className="mgmt-eyebrow">CADASTRO FINANCEIRO · 2026</span>
           <h2>{person.name}</h2>
-          <p>{person.roles.join(' · ')||'Sem função informada'}</p>
+          <p>{person.roles.join(' · ')||'Sem função informada'} · relatório configurável por blocos e orientação</p>
         </div>
         <div className="mgmt-actions">
-          <button className="btn" onClick={()=>exportDirectReport(personReportItems,`Ficha Financeira — ${person.name}`,'pdf')}><FileDown size={15}/> PDF</button>
-          <button className="btn" onClick={()=>exportDirectReport(personReportItems,`Ficha Financeira — ${person.name}`,'xlsx')}><FileSpreadsheet size={15}/> Excel</button>
-          <ReportAdder sectionKey={`equipe:ficha:${person.key}`} title={`Ficha Financeira — ${person.name}`} componentName="Ficha Financeira da Equipe" page="Equipe" type="TABLE" data={reportMovementRows(rows,person.name)} filters={{Ano:2026}} />
+          <button className="btn" onClick={()=>openReportBuilder('Equipe')}><FileText size={15}/> Gerar Relatório</button>
           <button className="btn" onClick={onClose}><X size={16}/> Fechar</button>
         </div>
+      </div>
+
+      <div aria-hidden="true" style={{display:'none'}}>
+        {personReportItems.map((item)=>(
+          <ReportAdder
+            key={item.sectionKey}
+            sectionKey={item.sectionKey}
+            title={item.title}
+            componentName={item.componentName}
+            page={item.page}
+            type={item.type}
+            data={item.data}
+            filters={item.filters}
+          />
+        ))}
       </div>
 
       <div className="mgmt-meta-grid">
@@ -262,40 +269,29 @@ function PersonModal({ person, onClose }) {
         <div className="mgmt-panel-head">
           <div><span className="mgmt-eyebrow">MOVIMENTOS DA OBRA · 2026</span><h2>{selectedProject.name}</h2><p>{person.name} · {selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div>
           <div className="mgmt-actions">
-            <button className="btn" onClick={()=>exportDirectReport([
-              {
-                sectionKey:`equipe:export:obra:${person.key}:${projectCodeLabel(selectedProject.name)}:resumo`,
-                title:'Resumo do projeto',
-                componentName:'Resumo da pessoa no projeto',
-                page:'Equipe',
-                type:'TABLE',
-                filters:{Pessoa:person.name,Projeto:selectedProject.name},
-                data:[{Pessoa:person.name,Projeto:selectedProject.name,Pago:selectedProject.paid,'A pagar':selectedProject.open,Total:selectedProject.paid+selectedProject.open,Lançamentos:selectedProject.rows.length}],
-              },
-              {
-                sectionKey:`equipe:export:obra:${person.key}:${projectCodeLabel(selectedProject.name)}:movimentos`,
-                title:'Movimentações no projeto',
-                componentName:'Movimentações da pessoa no projeto',
-                page:'Equipe',
-                type:'TABLE',
-                filters:{Pessoa:person.name,Projeto:selectedProject.name},
-                data:reportMovementRows(selectedProject.rows,person.name),
-              }
-            ],`Movimentos — ${person.name} — ${selectedProject.name}`,'pdf')}><FileDown size={15}/> PDF</button>
-            <button className="btn" onClick={()=>exportDirectReport([
-              {
-                sectionKey:`equipe:export:obra:${person.key}:${projectCodeLabel(selectedProject.name)}:movimentos-xlsx`,
-                title:'Movimentações no projeto',
-                componentName:'Movimentações da pessoa no projeto',
-                page:'Equipe',
-                type:'TABLE',
-                filters:{Pessoa:person.name,Projeto:selectedProject.name},
-                data:reportMovementRows(selectedProject.rows,person.name),
-              }
-            ],`Movimentos — ${person.name} — ${selectedProject.name}`,'xlsx')}><FileSpreadsheet size={15}/> Excel</button>
-            <ReportAdder sectionKey={`equipe:obra:${person.key}:${projectCodeLabel(selectedProject.name)}`} title={`Movimentos — ${person.name} — ${selectedProject.name}`} componentName="Movimentos da Pessoa por Obra" page="Equipe" type="TABLE" data={reportMovementRows(selectedProject.rows,person.name)} filters={{Ano:2026}}/>
+            <button className="btn" onClick={()=>openReportBuilder('Equipe')}><FileText size={15}/> Gerar Relatório</button>
             <button className="btn" onClick={()=>setSelectedProject(null)}><X size={16}/> Fechar</button>
           </div>
+        </div>
+        <div aria-hidden="true" style={{display:'none'}}>
+          <ReportAdder
+            sectionKey={`equipe:pessoa-projeto:${person.key}:${projectCodeLabel(selectedProject.name)}:resumo`}
+            title={`Resumo — ${person.name} — ${selectedProject.name}`}
+            componentName="Resumo da Pessoa por Projeto"
+            page="Equipe"
+            type="SUMMARY"
+            data={[{Pessoa:person.name,Projeto:selectedProject.name,Pago:selectedProject.paid,'A pagar':selectedProject.open,Total:selectedProject.paid+selectedProject.open,Lançamentos:selectedProject.rows.length}]}
+            filters={{Pessoa:person.name,Projeto:selectedProject.name}}
+          />
+          <ReportAdder
+            sectionKey={`equipe:pessoa-projeto:${person.key}:${projectCodeLabel(selectedProject.name)}:movimentos`}
+            title={`Movimentações — ${person.name} — ${selectedProject.name}`}
+            componentName="Movimentações da Pessoa por Projeto"
+            page="Equipe"
+            type="TABLE"
+            data={reportMovementRows(selectedProject.rows,person.name)}
+            filters={{Pessoa:person.name,Projeto:selectedProject.name}}
+          />
         </div>
         <DataTable data={toFinancialRows(selectedProject.rows,person.name)} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
       </div>
@@ -304,6 +300,7 @@ function PersonModal({ person, onClose }) {
 }
 
 function ProjectSummaryModal({ project, onClose }) {
+  const { openReportBuilder } = useReport();
   if(!project) return null;
   const rows=project.rows||[];
   const monthly=Array.from({length:12},(_,i)=>{
@@ -338,60 +335,42 @@ function ProjectSummaryModal({ project, onClose }) {
         <div>
           <span className="mgmt-eyebrow">EQUIPE POR PROJETO · 2026 + PENDÊNCIAS FUTURAS</span>
           <h2>{project.name}</h2>
-          <p>{project.peopleCount} pessoa{project.peopleCount!==1?'s':''} / empresa{project.peopleCount!==1?'s':''} · {rows.length} movimento{rows.length!==1?'s':''}</p>
+          <p>{project.peopleCount} pessoa{project.peopleCount!==1?'s':''} / empresa{project.peopleCount!==1?'s':''} · {rows.length} movimento{rows.length!==1?'s':''} · relatório configurável</p>
         </div>
         <div className="mgmt-actions">
-          <button className="btn" onClick={()=>exportDirectReport([
-            {
-              sectionKey:`equipe:export:projeto:${projectCodeLabel(project.name)}:resumo`,
-              title:'Resumo do projeto',
-              componentName:'Resumo financeiro da equipe por projeto',
-              page:'Equipe',
-              type:'TABLE',
-              filters:{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'},
-              data:[{Projeto:project.name,'Pessoas / empresas':project.peopleCount,Pago:project.paid,'A pagar':project.open,Total:project.total,Lançamentos:rows.length}],
-            },
-            {
-              sectionKey:`equipe:export:projeto:${projectCodeLabel(project.name)}:mensal`,
-              title:'Fluxo mensal de pagamentos',
-              componentName:'Fluxo mensal do projeto',
-              page:'Equipe',
-              type:'TABLE',
-              filters:{Projeto:project.name,Ano:2026},
-              data:monthly,
-            },
-            {
-              sectionKey:`equipe:export:projeto:${projectCodeLabel(project.name)}:movimentos`,
-              title:'Movimentações do projeto',
-              componentName:'Movimentações da equipe por projeto',
-              page:'Equipe',
-              type:'TABLE',
-              filters:{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'},
-              data:reportRows,
-            },
-          ],`Equipe do Projeto — ${project.name}`,'pdf')}><FileDown size={15}/> PDF</button>
-          <button className="btn" onClick={()=>exportDirectReport([
-            {
-              sectionKey:`equipe:export:projeto:${projectCodeLabel(project.name)}:movimentos-xlsx`,
-              title:'Movimentações do projeto',
-              componentName:'Movimentações da equipe por projeto',
-              page:'Equipe',
-              type:'TABLE',
-              filters:{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'},
-              data:reportRows,
-            },
-          ],`Equipe do Projeto — ${project.name}`,'xlsx')}><FileSpreadsheet size={15}/> Excel</button>
-          <ReportAdder
-            sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}`}
-            title={`Equipe do Projeto — ${project.name}`}
-            componentName="Movimentações da Equipe por Projeto"
-            page="Equipe"
-            type="TABLE"
-            data={reportRows}
-            filters={{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'}}
-          />
+          <button className="btn" onClick={()=>openReportBuilder('Equipe')}><FileText size={15}/> Gerar Relatório</button>
           <button className="btn" onClick={onClose}><X size={16}/> Fechar</button>
         </div>
+      </div>
+
+      <div aria-hidden="true" style={{display:'none'}}>
+        <ReportAdder
+          sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}:resumo`}
+          title={`Resumo do projeto — ${project.name}`}
+          componentName="Resumo Financeiro da Equipe por Projeto"
+          page="Equipe"
+          type="SUMMARY"
+          data={[{Projeto:project.name,'Pessoas / empresas':project.peopleCount,Pago:project.paid,'A pagar':project.open,Total:project.total,Lançamentos:rows.length}]}
+          filters={{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'}}
+        />
+        <ReportAdder
+          sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}:mensal`}
+          title={`Fluxo mensal — ${project.name}`}
+          componentName="Fluxo Mensal da Equipe por Projeto"
+          page="Equipe"
+          type="TABLE"
+          data={monthly}
+          filters={{Projeto:project.name,Ano:2026}}
+        />
+        <ReportAdder
+          sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}:movimentos`}
+          title={`Movimentações do projeto — ${project.name}`}
+          componentName="Movimentações da Equipe por Projeto"
+          page="Equipe"
+          type="TABLE"
+          data={reportRows}
+          filters={{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'}}
+        />
       </div>
 
       <section className="mgmt-subcard">
