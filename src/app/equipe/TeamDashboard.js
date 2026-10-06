@@ -294,7 +294,6 @@ export default function TeamDashboard(){
   const[rosterRoleFilters,setRosterRoleFilters]=useState([]);
   const[rosterTypeFilters,setRosterTypeFilters]=useState([]);
   const[rosterProjectFilters,setRosterProjectFilters]=useState([]);
-  const[rosterReferenceFilter,setRosterReferenceFilter]=useState('');
   const[rosterPaidFilter,setRosterPaidFilter]=useState('');
   const[rosterOpenFilter,setRosterOpenFilter]=useState('');
 
@@ -382,7 +381,13 @@ export default function TeamDashboard(){
       });
       map.set(key,item);
     });
-    return[...map.values()].map(item=>({...item,roles:[...item.roles],projects:[...item.projects],accounts:[...item.accounts],transactions:[...item.transactions.values()],referenceValue:item.contractValues.reduce((s,v)=>s+v,0)})).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+    return[...map.values()]
+      .map(item=>({...item,roles:[...item.roles],projects:[...item.projects],accounts:[...item.accounts],transactions:[...item.transactions.values()],referenceValue:item.contractValues.reduce((s,v)=>s+v,0)}))
+      .sort((a,b)=>{
+        const openA=a.transactions.filter(row=>!row.paid).reduce((sum,row)=>sum+Number(row.valor||0),0);
+        const openB=b.transactions.filter(row=>!row.paid).reduce((sum,row)=>sum+Number(row.valor||0),0);
+        return openB-openA || a.name.localeCompare(b.name,'pt-BR');
+      });
   },[relationEntries,startDate,endDate,projectFilters,accountFilters,statusFilters]);
 
   const projectRows=useMemo(()=>{
@@ -428,7 +433,7 @@ export default function TeamDashboard(){
         map.set(name,item);
       });
     });
-    return[...map.values()].map(p=>({...p,peopleCount:p.people.size,total:p.paid+p.open,rows:[...p.rows.values()]})).sort((a,b)=>b.total-a.total);
+    return[...map.values()].map(p=>({...p,peopleCount:p.people.size,total:p.paid+p.open,rows:[...p.rows.values()]})).sort((a,b)=>b.paid-a.paid || b.total-a.total || a.name.localeCompare(b.name,'pt-BR'));
   },[relationEntries,startDate,endDate,projectFilters,accountFilters,statusFilters]);
 
   const evolutionData=useMemo(()=>Array.from({length:12},(_,i)=>{
@@ -461,14 +466,13 @@ export default function TeamDashboard(){
   const reportFilters={'Data inicial':startDate,'Data final':endDate,Pessoa:personFilters.length?personFilters.join(', '):'Todas',Projeto:projectFilters.length?projectFilters.join(', '):'Todos','Conta / Plano':accountFilters.length?accountFilters.join(', '):'Todas',Situação:statusFilters.length?statusFilters.join(', '):'Todas'};
   const relationReportFilters={...reportFilters,'Regra A pagar terceiros':'Sem corte de período; inclui pendências futuras após dez/2026'};
   const projectChart=projectRows.slice(0,10).map(p=>({Projeto:projectCodeLabel(p.name),'Obra completa':p.name,Pago:p.paid,'A pagar':p.open}));
-  const rosterReport=peopleRoster.map(item=>({'Pessoa / empresa':item.name,'Cargo / função':item.roles.join(' · '),'Tipo':item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe','Valor de referência':item.referenceValue,'Projetos':item.projects.length,'Plano(s)':item.accounts.map(planLabel).join(' · '),'Pago':item.transactions.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':item.transactions.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0)}));
+  const rosterReport=peopleRoster.map(item=>({'Pessoa / empresa':item.name,'Cargo / função':item.roles.join(' · '),'Tipo':item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe','Projetos':item.projects.length,'Plano(s)':item.accounts.map(planLabel).join(' · '),'Pago':item.transactions.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':item.transactions.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0)}));
   const detailedRosterReport=peopleRoster.flatMap(item=>{
     const rows=item.transactions;
     const base={
       'Pessoa / empresa':item.name,
       'Cargo / função':item.roles.join(' · '),
       'Tipo':item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe',
-      'Valor de referência':item.referenceValue,
       'Projetos vinculados':item.projects.join(' · '),
       'Plano(s) cadastral(is)':item.accounts.map(planLabel).join(' · '),
     };
@@ -522,11 +526,10 @@ export default function TeamDashboard(){
     if(rosterRoleFilters.length>0&&!item.roles.some(role=>rosterRoleFilters.includes(role)))return false;
     if(rosterTypeFilters.length>0&&!rosterTypeFilters.includes(type))return false;
     if(rosterProjectFilters.length>0&&!item.projects.some(project=>rosterProjectFilters.includes(project)))return false;
-    if(!matchesNumeric(item.referenceValue,rosterReferenceFilter))return false;
     if(!matchesNumeric(rowPaid,rosterPaidFilter))return false;
     if(!matchesNumeric(rowOpen,rosterOpenFilter))return false;
     return true;
-  }),[peopleRoster,startDate,endDate,rosterNameFilters,rosterRoleFilters,rosterTypeFilters,rosterProjectFilters,rosterReferenceFilter,rosterPaidFilter,rosterOpenFilter]);
+  }),[peopleRoster,startDate,endDate,rosterNameFilters,rosterRoleFilters,rosterTypeFilters,rosterProjectFilters,rosterPaidFilter,rosterOpenFilter]);
 
   const projectFiltered=useMemo(()=>projectRelationRows.filter(item=>{
     if(projectNameFilters.length>0&&!projectNameFilters.includes(item.name))return false;
@@ -544,7 +547,7 @@ export default function TeamDashboard(){
   const visibleProjects=projectPageSize==='all'?projectFiltered:projectFiltered.slice((projectPage-1)*projectEffective,projectPage*projectEffective);
 
   useEffect(()=>{setRosterPage(1);setProjectPage(1)},[startDate,endDate,personFilters,projectFilters,accountFilters,statusFilters]);
-  useEffect(()=>{setRosterPage(1)},[rosterNameFilters,rosterRoleFilters,rosterTypeFilters,rosterProjectFilters,rosterReferenceFilter,rosterPaidFilter,rosterOpenFilter]);
+  useEffect(()=>{setRosterPage(1)},[rosterNameFilters,rosterRoleFilters,rosterTypeFilters,rosterProjectFilters,rosterPaidFilter,rosterOpenFilter]);
   useEffect(()=>{setProjectPage(1)},[projectNameFilters,projectPeopleFilter,projectPaidFilter,projectOpenFilter,projectTotalFilter]);
 
   return <div className="mgmt">
@@ -604,18 +607,17 @@ export default function TeamDashboard(){
         filters={relationReportFilters}
         style={{float:'right'}}
       />
-      <div className="mgmt-panel-head"><div><h2>Cadastro da equipe</h2><p>Pago respeita o período. Para terceiros, A pagar inclui também pendências futuras após dez/2026.</p></div></div>
-      <div className="mgmt-table-filters mgmt-table-filters-seven">
+      <div className="mgmt-panel-head"><div><h2>Cadastro da equipe</h2><p>Ordenado pelo maior valor A pagar. Para terceiros, A pagar inclui também pendências futuras após dez/2026.</p></div></div>
+      <div className="mgmt-table-filters mgmt-table-filters-six">
         <label>Pessoa / empresa<MultiSelect options={peopleRoster.map(item=>item.name)} selected={rosterNameFilters} onChange={setRosterNameFilters} placeholder="Todas"/></label>
         <label>Cargo / função<MultiSelect options={rosterRoles} selected={rosterRoleFilters} onChange={setRosterRoleFilters} placeholder="Todos"/></label>
         <label>Tipo<MultiSelect options={rosterTypes} selected={rosterTypeFilters} onChange={setRosterTypeFilters} placeholder="Todos"/></label>
-        <label>Valor de referência<input type="text" value={rosterReferenceFilter} onChange={e=>setRosterReferenceFilter(e.target.value)} placeholder="Valor exato"/></label>
         <label>Projetos<MultiSelect options={rosterProjects} selected={rosterProjectFilters} onChange={setRosterProjectFilters} placeholder="Todos"/></label>
         <label>Pago<input type="text" value={rosterPaidFilter} onChange={e=>setRosterPaidFilter(e.target.value)} placeholder="Valor exato"/></label>
         <label>A pagar<input type="text" value={rosterOpenFilter} onChange={e=>setRosterOpenFilter(e.target.value)} placeholder="Valor exato"/></label>
       </div>
-      <div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Pessoa / empresa</th><th>Cargo / função</th><th>Tipo</th><th>Valor de referência</th><th>Projetos</th><th>Pago</th><th>A pagar</th></tr></thead><tbody>
-        {visibleRoster.map(item=>{const rows=item.transactions;const rowPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const rowOpen=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);return <tr key={item.key} onClick={()=>setSelectedPerson(item)}><td><strong>{item.name}</strong></td><td>{item.roles.join(' · ')||'—'}</td><td>{item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe'}</td><td>{item.fixedMonthly&&!item.referenceValue?'Mensal / fixo':brl(item.referenceValue)}</td><td>{item.projects.length}</td><td className="mgmt-value-paid">{brl(rowPaid)}</td><td className="mgmt-value-open">{brl(rowOpen)}</td></tr>})}
+      <div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Pessoa / empresa</th><th>Cargo / função</th><th>Tipo</th><th>Projetos</th><th>Pago</th><th>A pagar</th></tr></thead><tbody>
+        {visibleRoster.map(item=>{const rows=item.transactions;const rowPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const rowOpen=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);return <tr key={item.key} onClick={()=>setSelectedPerson(item)}><td><strong>{item.name}</strong></td><td>{item.roles.join(' · ')||'—'}</td><td>{item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe'}</td><td>{item.projects.length}</td><td className="mgmt-value-paid">{brl(rowPaid)}</td><td className="mgmt-value-open">{brl(rowOpen)}</td></tr>})}
       </tbody></table></div>
       <Pager total={rosterFiltered.length} page={rosterPage} setPage={setRosterPage} pageSize={rosterPageSize} setPageSize={setRosterPageSize}/>
     </section>
@@ -623,7 +625,7 @@ export default function TeamDashboard(){
     <section className="mgmt-panel" data-report-section>
       <ReportAdder sectionKey="equipe:obras-custos" title="Custos por Obra" componentName="Tabela de Custos por Obra" page="Equipe" type="TABLE" data={projectRelationRows.map(p=>({Projeto:p.name,'Pessoas / terceiros':p.peopleCount,Pago:p.paid,'A pagar':p.open,Total:p.total}))} filters={relationReportFilters} style={{float:'right'}}/>
       <h2>Equipe por projeto</h2>
-      <p>Pago respeita o período. Em terceiros, A pagar mantém também as obrigações futuras registradas após dezembro/2026.</p>
+      <p>Ordenado pelo maior valor Pago. Em terceiros, A pagar mantém também as obrigações futuras registradas após dezembro/2026.</p>
       <div className="mgmt-table-filters mgmt-table-filters-five">
         <label>Projeto<MultiSelect options={projectRelationRows.map(item=>item.name)} selected={projectNameFilters} onChange={setProjectNameFilters} placeholder="Todos"/></label>
         <label>Pessoas / terceiros<input type="number" min="0" value={projectPeopleFilter} onChange={e=>setProjectPeopleFilter(e.target.value)} placeholder="Qtd. exata"/></label>
