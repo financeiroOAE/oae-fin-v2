@@ -13,7 +13,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import { readSession, refreshFinancialData } from '@/lib/clientSync';
+import { readSession, readFinancialMetadata, refreshFinancialData } from '@/lib/clientSync';
 
 export default function Home() {
   const router = useRouter();
@@ -39,14 +39,14 @@ export default function Home() {
       }
 
       try {
-        const result = await refreshFinancialData({ manual: false });
+        const result = await readFinancialMetadata();
         if (active && result?.syncedAt) {
           const time = new Date(result.syncedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-          setMessage(`Base atualizada automaticamente em ${time}.`);
+          setMessage(`Última base válida: ${time}.`);
         }
       } catch (err) {
         if (active) {
-          setError(`${err.message} Os números anteriores continuam disponíveis.`);
+          setError(`${err.message} Os números anteriores permanecem preservados.`);
         }
       } finally {
         if (active) setIsSyncing(false);
