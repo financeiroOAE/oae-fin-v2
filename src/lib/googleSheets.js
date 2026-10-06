@@ -22,7 +22,7 @@ export async function getGoogleSheetsClient() {
 
 const DEFAULT_RANGES = [
   'EMPRESAS!A:J',
-  'PROJETOS_2026!A:L',
+  'PROJETOS_2026!A:Z',
   'CENTROS_CUSTO!A:E',
   'PLANOS_FINANCEIROS!A:E',
   'CP_GERAL!A:L',
@@ -78,6 +78,15 @@ export async function batchReadSheets(ranges = DEFAULT_RANGES) {
       const values = rangeData.values || [];
       const rows = values.length > 0 ? values.slice(1) : [];
       const headers = values.length > 0 ? values[0].map(normalizeHeader) : [];
+      const normalizedHeaderKeys = headers.map((header) => String(header || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, ''));
+      const faturado2026Index = sheetName === 'PROJETOS_2026'
+        ? normalizedHeaderKeys.findIndex((header) => header.includes('FATUR') && header.includes('2026'))
+        : -1;
 
       console.log(`[Google Sheets Diagnostic] Aba: ${sheetName}`);
       console.log(` - Range retornado: ${rangeData.range}`);
@@ -92,10 +101,12 @@ export async function batchReadSheets(ranges = DEFAULT_RANGES) {
             rowData[header] = row[index] ?? '';
           });
 
-          // Coluna L da PROJETOS_2026: faturamento acumulado do ano de 2026.
-          // O alias por posicao evita depender de variacoes no texto do cabecalho da planilha.
+          // Faturamento acumulado de 2026: prioriza o cabeçalho real da planilha.
+          // A coluna L fica apenas como fallback legado para bases antigas.
           if (sheetName === 'PROJETOS_2026') {
-            rowData.FATURADO_2026_COL_L = row[11] ?? '';
+            rowData.FATURADO_2026_COL_L = faturado2026Index >= 0
+              ? (row[faturado2026Index] ?? '')
+              : (row[11] ?? '');
           }
 
           return rowData;
