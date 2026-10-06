@@ -386,18 +386,23 @@ export default function TeamDashboard(){
 
   const evolutionData=useMemo(()=>Array.from({length:12},(_,i)=>{
     const key=`2026-${String(i+1).padStart(2,'0')}`;
-    const map=new Map();
+    const paidMap=new Map();
+    const forecastMap=new Map();
     filteredEntries.forEach(entry=>(entry.transactions||[]).forEach(row=>{
       if(getMonth(row.data)!==key||!inRange(row,startDate,endDate))return;
-      if(!row.paid)return;
       if(projectFilters.length>0&&!projectFilters.includes(row.projeto))return;
       if(accountFilters.length>0&&!accountFilters.includes(rowAccountOption(row)))return;
-      if(statusFilters.length>0&&!statusFilters.includes('Pago'))return;
-      map.set(row.sourceKey,row);
+
+      if(row.paid){
+        if(statusFilters.length===0||statusFilters.includes('Pago')) paidMap.set(row.sourceKey,row);
+      }else if(statusFilters.length===0||statusFilters.includes('A pagar')){
+        forecastMap.set(row.sourceKey,row);
+      }
     }));
     return{
       month:monthLabel(key),
-      'Pago total': [...map.values()].reduce((sum,row)=>sum+Number(row.valor||0),0),
+      'Pago total': [...paidMap.values()].reduce((sum,row)=>sum+Number(row.valor||0),0),
+      'Previsão': [...forecastMap.values()].reduce((sum,row)=>sum+Number(row.valor||0),0),
     };
   }),[filteredEntries,startDate,endDate,projectFilters,accountFilters,statusFilters]);
 
@@ -511,8 +516,8 @@ export default function TeamDashboard(){
     <div className="mgmt-flow mgmt-flow-balanced">
       <section id="report-equipe-evolucao" data-report-section className="mgmt-panel">
         <ReportAdder sectionKey="equipe:evolucao" title="Evolução mensal da Equipe" componentName="Gráfico de Evolução Mensal" page="Equipe" type="CHART" data={evolutionData} filters={reportFilters} captureId="report-equipe-evolucao" style={{float:'right'}}/>
-        <h2>Evolução mensal da equipe</h2><p>Total pago para a equipe em cada mês, somando todos os vínculos e terceiros.</p>
-        <div className="mgmt-chart"><ResponsiveContainer><LineChart data={evolutionData}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago total" stroke={PAID_COLOR} strokeWidth={3} dot={{r:3}} activeDot={{r:5}}/></LineChart></ResponsiveContainer></div>
+        <h2>Evolução mensal da equipe</h2><p>Total pago e previsão de pagamentos da equipe em cada mês.</p>
+        <div className="mgmt-chart"><ResponsiveContainer><LineChart data={evolutionData}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago total" stroke={PAID_COLOR} strokeWidth={3} dot={{r:3}} activeDot={{r:5}}/><Line type="monotone" dataKey="Previsão" stroke={OPEN_COLOR} strokeWidth={2.6} strokeDasharray="6 4" dot={{r:3}} activeDot={{r:5}}/></LineChart></ResponsiveContainer></div>
       </section>
 
       <section id="report-equipe-obras" data-report-section className="mgmt-panel">
