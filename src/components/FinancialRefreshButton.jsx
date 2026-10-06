@@ -12,7 +12,6 @@ export default function FinancialRefreshButton({
 }) {
   const [metadata, setMetadata] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
 
   const loadMetadata = useCallback(async () => {
     try {
@@ -26,17 +25,12 @@ export default function FinancialRefreshButton({
 
   useEffect(() => {
     loadMetadata();
-    const timer = setInterval(() => setNow(Date.now()), 30000);
-    return () => clearInterval(timer);
   }, [loadMetadata]);
 
-  const nextAt = metadata?.nextManualRefreshAt
-    ? new Date(metadata.nextManualRefreshAt).getTime()
-    : 0;
-  const blocked = Boolean(nextAt && nextAt > now);
+  const isAdmin = Boolean(metadata?.canForceRefresh);
 
   const handleRefresh = async () => {
-    if (loading || blocked) return;
+    if (loading) return;
     setLoading(true);
     try {
       const result = await refreshFinancialData({ manual: true });
@@ -44,7 +38,11 @@ export default function FinancialRefreshButton({
       await onUpdated?.(result);
     } catch (error) {
       await loadMetadata();
-      onError?.(error?.message || "Não foi possível atualizar os dados.");
+      if (isAdmin) {
+        onError?.(error?.message || "Não foi possível atualizar os dados.");
+      } else {
+        await onUpdated?.({ ok: true, skipped: true, refreshReason: "PRESERVED_SNAPSHOT" });
+      }
     } finally {
       setLoading(false);
     }
@@ -55,15 +53,15 @@ export default function FinancialRefreshButton({
       type="button"
       className={className}
       onClick={handleRefresh}
-      disabled={loading || blocked}
-      title={blocked ? "Atualização temporariamente bloqueada pelo intervalo de segurança." : "Atualizar a base financeira agora"}
+      disabled={loading}
+      title="Atualizar dados"
       style={{
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
         gap: "0.45rem",
-        opacity: blocked ? 0.62 : 1,
-        cursor: loading || blocked ? "not-allowed" : "pointer",
+        opacity: 1,
+        cursor: loading ? "wait" : "pointer",
         alignSelf: "center",
       }}
     >
