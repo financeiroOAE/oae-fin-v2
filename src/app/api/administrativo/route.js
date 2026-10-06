@@ -119,7 +119,7 @@ export async function GET() {
     monthly,
     snapshotAt: snapshot?.updatedAt || null,
     rules: {
-      revenueAdministrative: 'Parcela 1010107 da coluna K; fallback de 20% apenas quando a linha administrativa não existe',
+      revenueAdministrative: '20% da soma da coluna K por título; a conta 1010107 é usada como referência de auditoria da base',
       expenseScope: 'Centro de custo ADMINISTRAÇÃO',
       partnerScope: 'Francielle/Paulo: plano 2010302 em todo o CP_GERAL + retiradas 2010522',
     },
