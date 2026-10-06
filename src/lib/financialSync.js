@@ -6,13 +6,13 @@ const SNAPSHOT_ID = 'current';
 const REQUIRED_SHEETS = ['EMPRESAS', 'PROJETOS_2026', 'CENTROS_CUSTO', 'PLANOS_FINANCEIROS', 'CP_GERAL', 'CR_GERAL', 'DEPARA', 'EQUIPE'];
 const REFERENCE_RANGES = [
   'EMPRESAS!A:J',
-  'PROJETOS_2026!A:L',
+  'PROJETOS_2026!A:Z',
   'CENTROS_CUSTO!A:E',
   'PLANOS_FINANCEIROS!A:E',
   'DEPARA!A:F',
   'EQUIPE!A:T',
 ];
-const CASH_LOGIC_VERSION = 9;
+const CASH_LOGIC_VERSION = 10;
 
 function memorySnapshot(stage) {
   const usage = process.memoryUsage();
@@ -179,7 +179,16 @@ async function performFullSync(triggeredBy) {
       ...proj,
       CONTRATO: parseBRL(proj.CONTRATO),
       'NF FATURADAS': parseBRL(proj['NF FATURADAS']),
-      FATURADO_2026: parseBRL(proj.FATURADO_2026_COL_L),
+      FATURADO_2026: parseBRL(
+        proj.FATURADO_2026_COL_J
+        ?? proj.FATURADO_2026_HEADER
+        ?? proj.FATURADO_2026
+        ?? proj['FATURADO 2026']
+        ?? proj['FATURADO EM 2026']
+        ?? proj['NF FATURADAS 2026']
+        ?? proj['NF FATURADO 2026']
+        ?? 0
+      ),
       'SALDO CONTRATUAL': parseBRL(proj['SALDO CONTRATUAL']),
     }));
 
