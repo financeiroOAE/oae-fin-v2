@@ -48,33 +48,60 @@ export async function GET() {
   const access = await requireMenuAccess('equipe_gestao');
   if (!access.ok) return fail(access.error, access.status);
 
-  const snapshot = await readCurrentSnapshot();
+  try {
+    const snapshot = await readCurrentSnapshot();
+    if (!snapshot?.payload) {
+      return fail('Base financeira indisponível. Aguarde a próxima sincronização ou use Atualizar dados.', 503);
+    }
   const roster = snapshot?.payload?.equipe || [];
-  const cp = cpRows(snapshot);
+
+  // A aba Equipe é consultada com frequência. Em vez de percorrer o CP_GERAL
+  // completo para cada cadastro, preparamos os lançamentos uma única vez e
+  // indexamos por conta. Isso preserva a regra financeira sem sobrecarregar o servidor.
+  const cp = cpRows(snapshot)
+    .map((row) => {
+      const rowMonth = monthOf(row.data);
+      return {
+        ...row,
+        _accountCode: String(row.contaCodigo || '').replace(/\D/g, ''),
+        _month: rowMonth,
+      };
+    })
+    .filter((row) => {
+      const is2026 = row._month?.startsWith(YEAR);
+      const isFutureOpen = Boolean(!row.paid && row._month && row._month > `${YEAR}-12`);
+      return is2026 || isFutureOpen;
+    });
+
+  const cpByAccount = new Map();
+  const teamAccountRows = [];
+  cp.forEach((row) => {
+    if (row.teamAccount) teamAccountRows.push(row);
+    if (!row._accountCode) return;
+    if (!cpByAccount.has(row._accountCode)) cpByAccount.set(row._accountCode, []);
+    cpByAccount.get(row._accountCode).push(row);
+  });
 
   const entries = roster.map((item, index) => {
     const accountCode = String(item.accountCode || '').replace(/\D/g, '');
-    const transactions = cp.filter((row) => {
-      if (accountCode && String(row.contaCodigo || '').replace(/\D/g, '') !== accountCode) return false;
-      if (!accountCode && !row.teamAccount) return false;
+    const candidates = accountCode ? (cpByAccount.get(accountCode) || []) : teamAccountRows;
+    const transactions = candidates.filter((row) => {
       if (!matchesParty(item.person, row.nome)) return false;
       if (item.thirdParty && !matchesProject(item.departmentProject, row.projeto)) return false;
 
-      const rowMonth = monthOf(row.data);
-      const is2026 = rowMonth?.startsWith(YEAR);
+      const is2026 = row._month?.startsWith(YEAR);
       const isFutureOpenThirdParty = Boolean(
         item.thirdParty
         && !row.paid
-        && rowMonth
-        && rowMonth > `${YEAR}-12`
+        && row._month
+        && row._month > `${YEAR}-12`
       );
 
       // Regra da relação de equipe:
       // - todos permanecem com movimentos de 2026;
-      // - somente terceiros mantêm A PAGAR após dez/2026, pois datas como
-      //   2030/2031 podem representar vencimentos provisórios de obrigações reais.
+      // - somente terceiros mantêm A PAGAR após dez/2026.
       return is2026 || isFutureOpenThirdParty;
-    });
+    }).map(({ _accountCode, _month, ...row }) => row);
 
     const paid = transactions.filter((row) => row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0);
     const open = transactions.filter((row) => !row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0);
@@ -107,16 +134,23 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({
-    year: 2026,
-    entries,
-    monthly,
-    snapshotAt: snapshot?.updatedAt || null,
-    rules: {
-      zeroContractValue: 'MENSAL_FIXO',
-      sourceRoster: 'EQUIPE',
-      sourceFinancial: 'CP_GERAL',
-      futureOpenThirdParty: 'A PAGAR após dez/2026 incluído somente para cadastros TERCEIRO (EQUIP. TÉC. / TERCEIROS)',
-    },
-  }, { headers: { 'Cache-Control': 'private, no-store' } });
+    return NextResponse.json({
+      year: 2026,
+      entries,
+      monthly,
+      snapshotAt: snapshot?.updatedAt || null,
+      rules: {
+        zeroContractValue: 'MENSAL_FIXO',
+        sourceRoster: 'EQUIPE',
+        sourceFinancial: 'CP_GERAL',
+        futureOpenThirdParty: 'A PAGAR após dez/2026 incluído somente para cadastros TERCEIRO (EQUIP. TÉC. / TERCEIROS)',
+      },
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
+  } catch (error) {
+    console.error('[api/equipe] falha ao montar dados', error);
+    return NextResponse.json(
+      { error: 'Não foi possível carregar os dados da Equipe. O último snapshot permanece preservado.' },
+      { status: 500, headers: { 'Cache-Control': 'private, no-store' } }
+    );
+  }
 }
