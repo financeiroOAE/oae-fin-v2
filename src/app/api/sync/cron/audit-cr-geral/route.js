@@ -3,7 +3,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { batchReadSheets } from '@/lib/googleSheets';
 import { processSiengeData, extractAccountCode, parseBRL } from '@/lib/businessRules';
 import { consolidateFinancialData } from '@/lib/consolidation';
-import { getProjectKey, isProjectOngoing } from '@/lib/projectRules';
+import { getProjectKey, isProjectOngoing, isAdministrativeProject } from '@/lib/projectRules';
 
 const GITHUB_ISSUER = 'https://token.actions.githubusercontent.com';
 const GITHUB_JWKS = createRemoteJWKSet(
@@ -14,6 +14,7 @@ const EXPECTED_REPOSITORY = 'financeiroOAE/oae-fin-v2';
 const EXPECTED_WORKFLOW_REF =
   'financeiroOAE/oae-fin-v2/.github/workflows/audit-cr-geral.yml@refs/heads/main';
 const TARGET_CODES = new Set(['1010101', '1010107']);
+const CONFIRMED_HISTORICAL_PROJECT_KEYS = new Set(['438', '499', '443']);
 
 async function verifyGitHubActionsToken(request) {
   const authHeader = request.headers.get('authorization') || '';
@@ -146,8 +147,31 @@ function activeProjectIndex(projetos) {
 
 function summarizeAllocation(baseRows, activeProjects) {
   let allocated = 0;
-  let unallocated = 0;
+  let historicalTotal = 0;
+  let administrativeReviewTotal = 0;
+  let unresolvedTotal = 0;
+  const historical = [];
+  const administrativeReview = [];
   const missing = [];
+
+  const serialize = (item, value) => ({
+    data: item.data,
+    status: item.status,
+    lancamento: item.lancamento,
+    projetoConsolidado: item.projeto,
+    valor: roundMoney(value),
+    valorDireto: roundMoney(item.valorDireto),
+    valorAdministrativo: roundMoney(item.valorAdministrativo),
+    linhas: (item.linhasOriginais || []).map((row) => ({
+      contaCodigo: row.contaCodigo,
+      valorK: roundMoney(row.valorCaixa ?? row.valor),
+      projeto: row.projeto,
+      projetoOriginal: row.projetoNomeOriginal,
+      codigoCentroCusto: row.projetoCodigoOriginal,
+      resolvidoPor: row.projetoResolvidoPor,
+      documento: row.documento,
+    })),
+  });
 
   baseRows.forEach((item) => {
     if (String(item.natureza || '').toUpperCase() !== 'ENTRADA') return;
@@ -155,35 +179,36 @@ function summarizeAllocation(baseRows, activeProjects) {
 
     const value = Number(item.valor) || 0;
     const key = getProjectKey(item.projeto);
+
     if (activeProjects.has(key)) {
       allocated += value;
       return;
     }
 
-    unallocated += value;
-    missing.push({
-      data: item.data,
-      status: item.status,
-      lancamento: item.lancamento,
-      projetoConsolidado: item.projeto,
-      valor: roundMoney(value),
-      valorDireto: roundMoney(item.valorDireto),
-      valorAdministrativo: roundMoney(item.valorAdministrativo),
-      linhas: (item.linhasOriginais || []).map((row) => ({
-        contaCodigo: row.contaCodigo,
-        valorK: roundMoney(row.valorCaixa ?? row.valor),
-        projeto: row.projeto,
-        projetoOriginal: row.projetoNomeOriginal,
-        codigoCentroCusto: row.projetoCodigoOriginal,
-        resolvidoPor: row.projetoResolvidoPor,
-        documento: row.documento,
-      })),
-    });
+    if (CONFIRMED_HISTORICAL_PROJECT_KEYS.has(key)) {
+      historicalTotal += value;
+      historical.push({ ...serialize(item, value), classification: 'PROJETO_FINALIZADO' });
+      return;
+    }
+
+    if (isAdministrativeProject(item.projeto)) {
+      administrativeReviewTotal += value;
+      administrativeReview.push({ ...serialize(item, value), classification: 'ADMINISTRATIVO_REVISAR' });
+      return;
+    }
+
+    unresolvedTotal += value;
+    missing.push({ ...serialize(item, value), classification: 'NAO_IDENTIFICADO' });
   });
 
   return {
     allocated: roundMoney(allocated),
-    unallocated: roundMoney(unallocated),
+    historicalTotal: roundMoney(historicalTotal),
+    administrativeReviewTotal: roundMoney(administrativeReviewTotal),
+    unresolvedTotal: roundMoney(unresolvedTotal),
+    unallocated: roundMoney(historicalTotal + administrativeReviewTotal + unresolvedTotal),
+    historical,
+    administrativeReview,
     missing,
   };
 }
