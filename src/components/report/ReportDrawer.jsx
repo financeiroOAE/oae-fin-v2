@@ -35,6 +35,8 @@ export default function ReportDrawer() {
     setIsDrawerOpen,
     isReportMode,
     activeReportPage,
+    activeReportScope,
+    activeReportScopeLabel,
     exitReportMode,
     reportItems,
     addReportItem,
@@ -54,15 +56,18 @@ export default function ReportDrawer() {
   const [draggedIndex, setDraggedIndex] = useState(null);
 
   const pageItems = useMemo(
-    () => activeReportPage
-      ? reportItems.filter((item) => item.page === activeReportPage)
-      : reportItems,
-    [activeReportPage, reportItems]
+    () => reportItems.filter((item) => {
+      if (activeReportPage && item.page !== activeReportPage) return false;
+      return activeReportScope ? item.scope === activeReportScope : !item.scope;
+    }),
+    [activeReportPage, activeReportScope, reportItems]
   );
   const pageSections = useMemo(
-    () => Object.values(availableSections)
-      .filter((section) => !activeReportPage || section.page === activeReportPage),
-    [activeReportPage, availableSections]
+    () => Object.values(availableSections).filter((section) => {
+      if (activeReportPage && section.page !== activeReportPage) return false;
+      return activeReportScope ? section.scope === activeReportScope : !section.scope;
+    }),
+    [activeReportPage, activeReportScope, availableSections]
   );
 
   const estimatedPages = useMemo(
@@ -127,7 +132,7 @@ export default function ReportDrawer() {
         <header className="report-drawer-header">
           <div className="report-drawer-title">
             <h2><FileText size={20} /> Relatório</h2>
-            <span>Somente: {activeReportPage || "página atual"}</span>
+            <span>Somente: {activeReportScopeLabel || activeReportPage || "página atual"}</span>
           </div>
           <div className="report-drawer-header-actions">
             <button type="button" className="report-exit-button" onClick={exitReportMode}><LogOut size={15} /> Sair</button>
@@ -159,7 +164,7 @@ export default function ReportDrawer() {
 
           <section className="report-builder-section">
             <div className="report-section-heading"><div><span className="report-step">1</span><h3>Escolha os blocos</h3></div></div>
-            <p className="report-help">A lista abaixo mostra somente o conteúdo de {activeReportPage || "esta página"}.</p>
+            <p className="report-help">A lista abaixo mostra somente o conteúdo de {activeReportScopeLabel || activeReportPage || "esta página"}.</p>
             {pageSections.length === 0 ? (
               <div className="report-empty-state">Os blocos desta página ainda estão sendo preparados.</div>
             ) : (
@@ -182,11 +187,11 @@ export default function ReportDrawer() {
           <section className="report-builder-section">
             <div className="report-section-heading">
               <div><span className="report-step">2</span><h3>Ordem do relatório ({pageItems.length})</h3></div>
-              {pageItems.length > 0 && <button type="button" className="report-text-danger" onClick={() => clearReportPage(activeReportPage)}>Limpar página</button>}
+              {pageItems.length > 0 && <button type="button" className="report-text-danger" onClick={() => clearReportPage(activeReportPage, activeReportScope)}>Limpar seleção</button>}
             </div>
 
             {pageItems.length === 0 ? (
-              <div className="report-empty-state">Escolha acima os blocos de {activeReportPage || "esta página"} que devem entrar no relatório.</div>
+              <div className="report-empty-state">Escolha acima os blocos de {activeReportScopeLabel || activeReportPage || "esta página"} que devem entrar no relatório.</div>
             ) : (
               <div className="report-item-list">
                 {pageItems.map((item, index) => {
@@ -199,7 +204,7 @@ export default function ReportDrawer() {
                       onDragStart={() => setDraggedIndex(index)}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={() => {
-                        if (draggedIndex !== null) reorderReportPageItems(activeReportPage, draggedIndex, index);
+                        if (draggedIndex !== null) reorderReportPageItems(activeReportPage, draggedIndex, index, activeReportScope);
                         setDraggedIndex(null);
                       }}
                       onDragEnd={() => setDraggedIndex(null)}
@@ -226,8 +231,8 @@ export default function ReportDrawer() {
                         </label>
                       )}
                       <div className="report-item-actions">
-                        <button type="button" onClick={() => reorderReportPageItems(activeReportPage, index, index - 1)} disabled={index === 0} aria-label="Mover para cima"><ArrowUp size={15} /></button>
-                        <button type="button" onClick={() => reorderReportPageItems(activeReportPage, index, index + 1)} disabled={index === pageItems.length - 1} aria-label="Mover para baixo"><ArrowDown size={15} /></button>
+                        <button type="button" onClick={() => reorderReportPageItems(activeReportPage, index, index - 1, activeReportScope)} disabled={index === 0} aria-label="Mover para cima"><ArrowUp size={15} /></button>
+                        <button type="button" onClick={() => reorderReportPageItems(activeReportPage, index, index + 1, activeReportScope)} disabled={index === pageItems.length - 1} aria-label="Mover para baixo"><ArrowDown size={15} /></button>
                         <button type="button" className="is-danger" onClick={() => removeReportItem(item.id)} aria-label="Remover"><Trash2 size={15} /></button>
                       </div>
                     </article>
@@ -259,7 +264,7 @@ export default function ReportDrawer() {
 
       {isReportMode && !isDrawerOpen && (
         <button type="button" className="report-floating-button" onClick={() => setIsDrawerOpen(true)}>
-          <FileText size={19} /> Relatório: {activeReportPage || "página"} ({pageItems.length})
+          <FileText size={19} /> Relatório: {activeReportScopeLabel || activeReportPage || "página"} ({pageItems.length})
         </button>
       )}
 
