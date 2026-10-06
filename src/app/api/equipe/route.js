@@ -50,7 +50,7 @@ export async function GET() {
 
   const snapshot = await readCurrentSnapshot();
   const roster = snapshot?.payload?.equipe || [];
-  const cp = cpRows(snapshot).filter((row) => monthOf(row.data)?.startsWith(YEAR));
+  const cp = cpRows(snapshot);
 
   const entries = roster.map((item, index) => {
     const accountCode = String(item.accountCode || '').replace(/\D/g, '');
@@ -59,7 +59,21 @@ export async function GET() {
       if (!accountCode && !row.teamAccount) return false;
       if (!matchesParty(item.person, row.nome)) return false;
       if (item.thirdParty && !matchesProject(item.departmentProject, row.projeto)) return false;
-      return true;
+
+      const rowMonth = monthOf(row.data);
+      const is2026 = rowMonth?.startsWith(YEAR);
+      const isFutureOpenThirdParty = Boolean(
+        item.thirdParty
+        && !row.paid
+        && rowMonth
+        && rowMonth > `${YEAR}-12`
+      );
+
+      // Regra da relação de equipe:
+      // - todos permanecem com movimentos de 2026;
+      // - somente terceiros mantêm A PAGAR após dez/2026, pois datas como
+      //   2030/2031 podem representar vencimentos provisórios de obrigações reais.
+      return is2026 || isFutureOpenThirdParty;
     });
 
     const paid = transactions.filter((row) => row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0);
@@ -102,6 +116,7 @@ export async function GET() {
       zeroContractValue: 'MENSAL_FIXO',
       sourceRoster: 'EQUIPE',
       sourceFinancial: 'CP_GERAL',
+      futureOpenThirdParty: 'A PAGAR após dez/2026 incluído somente para cadastros TERCEIRO (EQUIP. TÉC. / TERCEIROS)',
     },
   }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
