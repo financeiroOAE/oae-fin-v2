@@ -37,6 +37,32 @@ const parsePercentFilter = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const parseMoneyFilter = (value) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/R\$/gi, '').replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeNfText = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/\u00a0/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .toUpperCase();
+
+const dateToTimestamp = (value) => {
+  if (!value) return 0;
+  const raw = String(value).trim();
+  let match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (match) return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1])).getTime();
+  match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getTime();
+  return 0;
+};
+
 const FINANCIAL_UNALLOCATED_PROJECT_KEY = '__RECEITA_PROJETO_NAO_ALOCADA__';
 const FINANCIAL_UNALLOCATED_PROJECT_NAME = 'Receita de Projeto não alocada';
 
@@ -220,6 +246,17 @@ export default function Projetos() {
   const [filterEmpresas, setFilterEmpresas] = useState([]);
   const [filterTipos, setFilterTipos] = useState([]);
   const [filterStatusProjeto, setFilterStatusProjeto] = useState('TODOS');
+
+  // Painel de Notas Fiscais (independente dos filtros gerais)
+  const [nfProjectFilters, setNfProjectFilters] = useState([]);
+  const [nfStatusFilters, setNfStatusFilters] = useState([]);
+  const [nfDocumentFilter, setNfDocumentFilter] = useState('');
+  const [nfDueStart, setNfDueStart] = useState('');
+  const [nfDueEnd, setNfDueEnd] = useState('');
+  const [nfLiquidMin, setNfLiquidMin] = useState('');
+  const [nfLiquidMax, setNfLiquidMax] = useState('');
+  const [nfPage, setNfPage] = useState(1);
+  const [nfPageSize, setNfPageSize] = useState(10);
   
   // Filtros Inline da Tabela
   const [colFilterProjeto, setColFilterProjeto] = useState('');
@@ -275,6 +312,164 @@ export default function Projetos() {
     incluirRateioAdm,
     usarValorCaixa: true
   }), [data, incluirRateioAdm]);
+
+  // Fonte fixa do painel de NFES: sempre considera o título completo,
+  // independentemente do toggle de rateio administrativo da análise de projetos.
+  const nfBaseData = useMemo(() => consolidateFinancialData(data, {
+    isProjetosPage: true,
+    incluirRateioAdm: true,
+    usarValorCaixa: true
+  }), [data]);
+
+  const nfesAll = useMemo(() => {
+    const notes = new Map();
+
+    nfBaseData.forEach((item, index) => {
+      if (String(item?.natureza || '').toUpperCase() !== 'ENTRADA') return;
+      const documento = String(item?.documento || '').trim();
+      if (!documento.toUpperCase().includes('NFES')) return;
+
+      const statusText = normalizeNfText(item?.status || item?.statusExibicao);
+      const received = statusText.includes('REALIZADO')
+        || statusText.includes('RECEBIDO')
+        || statusText.includes('EFETIVADO');
+      const receivable = !received && (
+        statusText.includes('A RECEBER')
+        || statusText.includes('A REALIZAR')
+        || statusText.includes('PREVISTO')
+      );
+      if (!received && !receivable) return;
+
+      const key = normalizeNfText(documento)
+        || normalizeNfText(item?.lancamento)
+        || `NFES-ROW-${index}`;
+
+      const linhas = Array.isArray(item?.linhasOriginais) && item.linhasOriginais.length
+        ? item.linhasOriginais
+        : [item];
+
+      const grossCandidates = [
+        item?.valorFaturamentoOriginal,
+        item?.valorFaturamentoTitulo,
+        item?.valorFaturamento,
+        item?.valorTotalTitulo,
+        ...linhas.flatMap((linha) => [
+          linha?.valorFaturamentoOriginal,
+          linha?.valorFaturamentoTitulo,
+          linha?.valorFaturamento,
+          linha?.valorTotalTitulo,
+        ]),
+      ]
+        .map((value) => Math.abs(Number(value) || 0))
+        .filter((value) => value > 0);
+
+      const projectCandidates = linhas
+        .map((linha) => String(linha?.projeto || '').trim())
+        .filter((project) => project && !isGenericFinancialProject(project));
+
+      const financialIdentity = getFinancialRevenueProjectIdentity(item);
+      if (financialIdentity?.projectName && !isGenericFinancialProject(financialIdentity.projectName)) {
+        projectCandidates.push(financialIdentity.projectName);
+      }
+
+      const current = notes.get(key) || {
+        key,
+        documento: documento || item?.lancamento || '-',
+        vencimento: item?.dataVencimento || item?.vencimento || item?.data || '',
+        dataTimestamp: dateToTimestamp(item?.dataVencimento || item?.vencimento || item?.data),
+        status: received ? 'Recebido' : 'A receber',
+        valorBruto: 0,
+        valorLiquido: 0,
+        projects: new Set(),
+      };
+
+      grossCandidates.forEach((value) => {
+        current.valorBruto = Math.max(current.valorBruto, value);
+      });
+      current.valorLiquido += Math.abs(Number(item?.valor) || 0);
+      projectCandidates.forEach((project) => current.projects.add(project));
+      if (received) current.status = 'Recebido';
+
+      const candidateDate = item?.dataVencimento || item?.vencimento || item?.data;
+      const candidateTs = dateToTimestamp(candidateDate);
+      if (!current.vencimento || (!current.dataTimestamp && candidateTs)) {
+        current.vencimento = candidateDate || '';
+        current.dataTimestamp = candidateTs;
+      }
+
+      notes.set(key, current);
+    });
+
+    return [...notes.values()]
+      .map((note) => {
+        const projects = [...note.projects].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        return {
+          ...note,
+          projects,
+          projeto: projects.length ? projects.join(' / ') : 'Não identificado',
+        };
+      })
+      .sort((a, b) => (b.dataTimestamp || 0) - (a.dataTimestamp || 0));
+  }, [nfBaseData]);
+
+  const nfProjectOptions = useMemo(() => [...new Set(nfesAll.flatMap((note) => note.projects))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [nfesAll]);
+
+  const nfesFiltered = useMemo(() => {
+    const dueStart = nfDueStart ? new Date(`${nfDueStart}T00:00:00`).getTime() : 0;
+    const dueEnd = nfDueEnd ? new Date(`${nfDueEnd}T23:59:59`).getTime() : Infinity;
+    const minLiquid = parseMoneyFilter(nfLiquidMin);
+    const maxLiquid = parseMoneyFilter(nfLiquidMax);
+    const documentNeedle = normalizeNfText(nfDocumentFilter);
+
+    return nfesAll.filter((note) => {
+      if (nfProjectFilters.length > 0 && !note.projects.some((project) => nfProjectFilters.includes(project))) return false;
+      if (nfStatusFilters.length > 0 && !nfStatusFilters.includes(note.status)) return false;
+      if (documentNeedle && !normalizeNfText(note.documento).includes(documentNeedle)) return false;
+      if (nfDueStart && (!note.dataTimestamp || note.dataTimestamp < dueStart)) return false;
+      if (nfDueEnd && (!note.dataTimestamp || note.dataTimestamp > dueEnd)) return false;
+      if (minLiquid !== null && note.valorLiquido < minLiquid) return false;
+      if (maxLiquid !== null && note.valorLiquido > maxLiquid) return false;
+      return true;
+    });
+  }, [nfesAll, nfProjectFilters, nfStatusFilters, nfDocumentFilter, nfDueStart, nfDueEnd, nfLiquidMin, nfLiquidMax]);
+
+  const nfTotalReceived = nfesFiltered
+    .filter((note) => note.status === 'Recebido')
+    .reduce((sum, note) => sum + note.valorLiquido, 0);
+  const nfTotalReceivable = nfesFiltered
+    .filter((note) => note.status === 'A receber')
+    .reduce((sum, note) => sum + note.valorLiquido, 0);
+
+  const nfEffectivePageSize = nfPageSize === 'all' ? Math.max(nfesFiltered.length, 1) : Number(nfPageSize) || 10;
+  const nfTotalPages = nfPageSize === 'all' ? 1 : Math.max(1, Math.ceil(nfesFiltered.length / nfEffectivePageSize));
+  const nfCurrentPage = Math.min(nfPage, nfTotalPages);
+  const nfVisibleRows = nfPageSize === 'all'
+    ? nfesFiltered
+    : nfesFiltered.slice((nfCurrentPage - 1) * nfEffectivePageSize, nfCurrentPage * nfEffectivePageSize);
+
+  useEffect(() => {
+    setNfPage(1);
+  }, [nfProjectFilters, nfStatusFilters, nfDocumentFilter, nfDueStart, nfDueEnd, nfLiquidMin, nfLiquidMax]);
+
+  const nfReportRows = useMemo(() => nfesFiltered.map((note) => ({
+    Documento: note.documento,
+    Projeto: note.projeto,
+    Vencimento: note.vencimento || '-',
+    Situação: note.status,
+    'Valor Bruto': note.valorBruto,
+    'Valor Líquido': note.valorLiquido,
+  })), [nfesFiltered]);
+
+  const clearNfFilters = () => {
+    setNfProjectFilters([]);
+    setNfStatusFilters([]);
+    setNfDocumentFilter('');
+    setNfDueStart('');
+    setNfDueEnd('');
+    setNfLiquidMin('');
+    setNfLiquidMax('');
+    setNfPage(1);
+  };
 
   const projetosCruzados = useMemo(() => {
     const mapaProjetos = {};
@@ -1218,6 +1413,157 @@ export default function Projetos() {
           </div>
         )}
       </div>
+
+      {/* Painel de Faturamento / NFES — visão independente dos filtros gerais */}
+      <section className="card" data-report-section style={{ padding: '1.25rem', marginBottom: '1.5rem', borderTop: '2px solid var(--primary)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <FileSpreadsheet size={18} color="var(--primary)" />
+              <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>Painel de Faturamento · Notas Fiscais</h2>
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
+              Todas as NFES do sistema, consolidadas em uma única linha por nota, incluindo recebidas e a receber.
+            </p>
+          </div>
+          <ReportAdder
+            sectionKey="projetos:painel-nfes"
+            title="Painel de Faturamento — Notas Fiscais"
+            componentName="Tabela de Notas Fiscais"
+            page="Projetos"
+            type="TABLE"
+            data={nfReportRows}
+            dataSets={{
+              summary: [{
+                'Quantidade de notas': nfesFiltered.length,
+                'Recebido líquido': nfTotalReceived,
+                'A receber líquido': nfTotalReceivable,
+                'Total líquido': nfTotalReceived + nfTotalReceivable,
+              }],
+              visible: nfVisibleRows.map((note) => ({
+                Documento: note.documento,
+                Projeto: note.projeto,
+                Vencimento: note.vencimento || '-',
+                Situação: note.status,
+                'Valor Bruto': note.valorBruto,
+                'Valor Líquido': note.valorLiquido,
+              })),
+              all: nfReportRows,
+            }}
+            detailMode="visible"
+            detailOptions={["summary","visible","all"]}
+            filters={{
+              Projeto: nfProjectFilters.length ? nfProjectFilters : 'Todos',
+              Documento: nfDocumentFilter || 'Todos',
+              'Vencimento inicial': nfDueStart || 'Todos',
+              'Vencimento final': nfDueEnd || 'Todos',
+              Situação: nfStatusFilters.length ? nfStatusFilters : 'Todas',
+              'Valor líquido mínimo': nfLiquidMin || 'Sem mínimo',
+              'Valor líquido máximo': nfLiquidMax || 'Sem máximo',
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div style={{ padding: '0.9rem 1rem', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: '8px' }}>
+            <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Recebido</span>
+            <strong style={{ display: 'block', marginTop: '0.35rem', color: 'var(--success)', fontSize: '18px' }}>{formatCurrency(nfTotalReceived)}</strong>
+          </div>
+          <div style={{ padding: '0.9rem 1rem', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: '8px' }}>
+            <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>A receber</span>
+            <strong style={{ display: 'block', marginTop: '0.35rem', color: 'var(--warning)', fontSize: '18px' }}>{formatCurrency(nfTotalReceivable)}</strong>
+          </div>
+          <div style={{ padding: '0.9rem 1rem', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+            <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Notas exibidas</span>
+            <strong style={{ display: 'block', marginTop: '0.35rem', color: 'var(--text-main)', fontSize: '18px' }}>{nfesFiltered.length}</strong>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '0.75rem', alignItems: 'end', marginBottom: '1rem' }}>
+          <div style={{ minWidth: 0 }}>
+            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Projeto</label>
+            <MultiSelect options={nfProjectOptions} selected={nfProjectFilters} onChange={setNfProjectFilters} placeholder="Todos os projetos" />
+          </div>
+          <div>
+            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Documento</label>
+            <input value={nfDocumentFilter} onChange={(e) => setNfDocumentFilter(e.target.value)} placeholder="Ex.: NFES.132" style={{ width: '100%', height: '34px', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Vencimento inicial</label>
+            <input type="date" value={nfDueStart} onChange={(e) => setNfDueStart(e.target.value)} style={{ width: '100%', height: '34px', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Vencimento final</label>
+            <input type="date" value={nfDueEnd} onChange={(e) => setNfDueEnd(e.target.value)} style={{ width: '100%', height: '34px', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Líquido mín.</label>
+            <input value={nfLiquidMin} onChange={(e) => setNfLiquidMin(e.target.value)} placeholder="R$ 0,00" style={{ width: '100%', height: '34px', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Líquido máx.</label>
+            <input value={nfLiquidMax} onChange={(e) => setNfLiquidMax(e.target.value)} placeholder="R$ 0,00" style={{ width: '100%', height: '34px', boxSizing: 'border-box' }} />
+          </div>
+          <button onClick={clearNfFilters} className="btn" style={{ height: '34px', whiteSpace: 'nowrap' }} title="Limpar filtros das notas"><FilterX size={14}/> Limpar</button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 320px) 1fr', gap: '0.75rem', alignItems: 'end', marginBottom: '0.75rem' }}>
+          <div style={{ minWidth: 0 }}>
+            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Situação</label>
+            <MultiSelect options={['Recebido','A receber']} selected={nfStatusFilters} onChange={setNfStatusFilters} placeholder="Recebidas e a receber" />
+          </div>
+          <div style={{ textAlign: 'right', fontSize: '11px', color: 'var(--text-secondary)' }}>
+            Uma linha por NFES; rateios internos não geram duplicidade.
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+          <table style={{ width: '100%', minWidth: '820px', fontSize: '12px', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th>Documento</th>
+                <th>Projeto</th>
+                <th>Vencimento</th>
+                <th>Situação</th>
+                <th style={{ textAlign: 'right' }}>Valor Bruto</th>
+                <th style={{ textAlign: 'right' }}>Valor Líquido</th>
+              </tr>
+            </thead>
+            <tbody>
+              {nfVisibleRows.length > 0 ? nfVisibleRows.map((note) => (
+                <tr key={note.key}>
+                  <td style={{ fontWeight: 600 }}>{note.documento}</td>
+                  <td>{note.projeto}</td>
+                  <td>{note.vencimento || '-'}</td>
+                  <td><span className={note.status === 'Recebido' ? 'badge badge-success' : 'badge badge-warning'}>{note.status}</span></td>
+                  <td style={{ textAlign: 'right' }}>{formatCurrency(note.valorBruto)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700, color: note.status === 'Recebido' ? 'var(--success)' : 'var(--warning)' }}>{formatCurrency(note.valorLiquido)}</td>
+                </tr>
+              )) : (
+                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-secondary)' }}>Nenhuma nota fiscal encontrada para os filtros selecionados.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+            {nfesFiltered.length === 0 ? '0 notas' : nfPageSize === 'all' ? `Exibindo todas as ${nfesFiltered.length} notas` : `Página ${nfCurrentPage} de ${nfTotalPages} · ${nfesFiltered.length} notas`}
+          </span>
+          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+            <select value={nfPageSize} onChange={(e) => { setNfPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value)); setNfPage(1); }} style={{ height: '30px', fontSize: '11px' }}>
+              <option value={10}>10 por página</option>
+              <option value={30}>30 por página</option>
+              <option value={50}>50 por página</option>
+              <option value="all">Ver todas</option>
+            </select>
+            {nfPageSize !== 'all' && <>
+              <button className="btn" onClick={() => setNfPage((page) => Math.max(1, page - 1))} disabled={nfCurrentPage === 1} style={{ padding: '0.35rem 0.55rem' }}><ChevronLeft size={14}/></button>
+              <button className="btn" onClick={() => setNfPage((page) => Math.min(nfTotalPages, page + 1))} disabled={nfCurrentPage === nfTotalPages} style={{ padding: '0.35rem 0.55rem' }}><ChevronRight size={14}/></button>
+            </>}
+          </div>
+        </div>
+      </section>
 
       {/* 3. KPIs Contratos */}
       <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Consolidado de Contratos</h3>
