@@ -116,7 +116,7 @@ export default function Home() {
             { name: 'Fluxo de Caixa', desc: 'Saldos bancários e evolução', icon: Activity, color: 'var(--success)', onClick: () => router.push('/fluxo-caixa') },
             { name: 'Projetos', desc: 'Contratos e curvas', icon: FolderKanban, color: 'var(--info)', onClick: () => router.push('/projetos') },
             { name: 'DRE Gerencial', desc: 'Demonstrativo de resultados', icon: ChartColumn, color: 'var(--purple)', onClick: () => router.push('/dre') },
-            { name: 'Atualização de Dados', desc: 'Forçar nova leitura do Google Sheets', icon: RefreshCw, color: 'var(--orange)', onClick: handleSync },
+            { name: 'Atualização de Dados', desc: 'Atualização controlada da base financeira', icon: RefreshCw, color: 'var(--orange)', onClick: () => router.push('/atualizacao-dados') },
             { name: 'Histórico', desc: 'Logs de sincronização', icon: History, color: 'var(--text-secondary)', onClick: () => router.push('/historico') },
           ].map((item, idx) => {
             const Icon = item.icon;
