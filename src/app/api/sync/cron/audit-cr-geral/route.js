@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { batchReadSheets } from '@/lib/googleSheets';
 import { processSiengeData, extractAccountCode, parseBRL } from '@/lib/businessRules';
-import { consolidateFinancialData } from '@/lib/consolidation';
+import { buildDreRevenueItems, consolidateFinancialData } from '@/lib/consolidation';
 import { getProjectKey, isProjectOngoing, isAdministrativeProject } from '@/lib/projectRules';
 
 const GITHUB_ISSUER = 'https://token.actions.githubusercontent.com';
@@ -291,8 +291,18 @@ export async function POST(request) {
     const rawRealizedTotalYtd = roundMoney(
       raw['1010101'].realizedYtdK + raw['1010107'].realizedYtdK
     );
-    const expectedProject80 = roundMoney(rawRealizedTotalYtd * 0.80);
-    const expectedAdmin20 = roundMoney(rawRealizedTotalYtd - expectedProject80);
+    const dreRuleRows = buildDreRevenueItems(processed)
+      .filter((item) => isRealizedStatus(item.status) && isYtd2026(item.data));
+    const expectedProject80 = roundMoney(
+      dreRuleRows
+        .filter((item) => String(item.contaCodigo || '').replace(/\D/g, '') === '1010101')
+        .reduce((sum, item) => sum + (Number(item.valorCaixa ?? item.valor) || 0), 0)
+    );
+    const expectedAdmin20 = roundMoney(
+      dreRuleRows
+        .filter((item) => String(item.contaCodigo || '').replace(/\D/g, '') === '1010107')
+        .reduce((sum, item) => sum + (Number(item.valorCaixa ?? item.valor) || 0), 0)
+    );
     const semAdmConserved = roundMoney(semAdm.allocated + semAdm.unallocated);
     const comAdmConserved = roundMoney(comAdm.allocated + comAdm.unallocated);
     const derivedAdminConserved = roundMoney(comAdmConserved - semAdmConserved);
@@ -312,9 +322,10 @@ export async function POST(request) {
           total: rawRealizedTotalYtd,
         },
         expectedFromBusinessRule: {
-          projeto80: expectedProject80,
-          administrativo20: expectedAdmin20,
-          total: rawRealizedTotalYtd,
+          projeto: expectedProject80,
+          administrativo: expectedAdmin20,
+          total: roundMoney(expectedProject80 + expectedAdmin20),
+          rule: '80/20 para receitas de projeto + 100% ADM para receitas avulsas administrativas',
         },
         sourceAccountDelta: {
           projetoVs80: roundMoney(raw['1010101'].realizedYtdK - expectedProject80),
