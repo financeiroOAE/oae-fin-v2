@@ -10,7 +10,9 @@ import {
   ChartColumn,
   History,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  UsersRound,
+  UserRoundCheck
 } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { readSession, readFinancialMetadata, refreshFinancialData } from '@/lib/clientSync';
@@ -19,6 +21,7 @@ export default function Home() {
   const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
   const [userName, setUserName] = useState('');
+  const [sessionUser, setSessionUser] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState(null);
   const [logoError, setLogoError] = useState(false);
@@ -31,8 +34,9 @@ export default function Home() {
 
       try {
         const sessionData = await readSession();
-        if (active && sessionData?.user?.username) {
-          setUserName(sessionData.user.username);
+        if (active && sessionData?.user) {
+          setSessionUser(sessionData.user);
+          if (sessionData.user.username) setUserName(sessionData.user.username);
         }
       } catch {
         // O nome e opcional; uma falha nessa consulta nao deve bloquear o painel.
@@ -73,6 +77,22 @@ export default function Home() {
     }
   };
 
+  const restrictedManagementMenus = ['equipe_gestao', 'administrativo'];
+  const canAccess = (permission) => restrictedManagementMenus.includes(permission)
+    ? Boolean(sessionUser && (sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission)))
+    : !sessionUser || sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission);
+
+  const homeModules = [
+    { name: 'Visão Financeira', desc: 'Resumo consolidado e KPIs', icon: BarChart3, color: 'var(--primary)', path: '/visao-financeira', permission: 'visao_financeira' },
+    { name: 'Fluxo de Caixa', desc: 'Saldos bancários e evolução', icon: Activity, color: 'var(--success)', path: '/fluxo-caixa', permission: 'fluxo_caixa' },
+    { name: 'Projetos', desc: 'Contratos e curvas', icon: FolderKanban, color: 'var(--info)', path: '/projetos', permission: 'projetos' },
+    { name: 'Equipe', desc: 'Cadastro, pagamentos e custos por obra', icon: UsersRound, color: 'var(--primary)', path: '/equipe', permission: 'equipe_gestao' },
+    { name: 'Administrativo', desc: 'Receitas, custos e movimentações administrativas', icon: UserRoundCheck, color: 'var(--warning)', path: '/administrativo', permission: 'administrativo' },
+    { name: 'DRE Gerencial', desc: 'Demonstrativo de resultados', icon: ChartColumn, color: 'var(--purple)', path: '/dre', permission: 'dre' },
+    { name: 'Atualização de Dados', desc: 'Atualização controlada da base financeira', icon: RefreshCw, color: 'var(--orange)', path: '/atualizacao-dados', permission: 'atualizacao_dados' },
+    { name: 'Histórico', desc: 'Logs de sincronização', icon: History, color: 'var(--text-secondary)', path: '/historico', permission: 'historico' },
+  ].filter((item) => canAccess(item.permission));
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
       {error && (
@@ -111,17 +131,10 @@ export default function Home() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem', maxWidth: '1000px', margin: '0 auto' }}>
-          {[
-            { name: 'Visão Financeira', desc: 'Resumo consolidado e KPIs', icon: BarChart3, color: 'var(--primary)', onClick: () => router.push('/visao-financeira') },
-            { name: 'Fluxo de Caixa', desc: 'Saldos bancários e evolução', icon: Activity, color: 'var(--success)', onClick: () => router.push('/fluxo-caixa') },
-            { name: 'Projetos', desc: 'Contratos e curvas', icon: FolderKanban, color: 'var(--info)', onClick: () => router.push('/projetos') },
-            { name: 'DRE Gerencial', desc: 'Demonstrativo de resultados', icon: ChartColumn, color: 'var(--purple)', onClick: () => router.push('/dre') },
-            { name: 'Atualização de Dados', desc: 'Atualização controlada da base financeira', icon: RefreshCw, color: 'var(--orange)', onClick: () => router.push('/atualizacao-dados') },
-            { name: 'Histórico', desc: 'Logs de sincronização', icon: History, color: 'var(--text-secondary)', onClick: () => router.push('/historico') },
-          ].map((item, idx) => {
+          {homeModules.map((item) => {
             const Icon = item.icon;
             return (
-              <div key={idx} className="card shortcut-card" onClick={item.onClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '1.25rem', gap: '1rem', border: '1px solid var(--border-color)', position: 'relative', overflow: 'hidden' }}>
+              <div key={item.path} className="card shortcut-card" onClick={() => router.push(item.path)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '1.25rem', gap: '1rem', border: '1px solid var(--border-color)', position: 'relative', overflow: 'hidden' }}>
                 <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
                   <Icon size={20} strokeWidth={2} className={item.name === 'Atualização de Dados' && isSyncing ? "spinner" : ""} />
                 </div>
