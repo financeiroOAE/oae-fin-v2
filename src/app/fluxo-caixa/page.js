@@ -238,23 +238,16 @@ export default function FluxoDeCaixa() {
   // Novos blocos analíticos (Dia e Faturamento)
   const faturamentosNfes = useMemo(() => {
     const rawList = baseData.filter(item => {
-      const statusOriginal = String(item.status || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/\u00a0/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toUpperCase();
-
-      return item.natureza === 'Entrada' &&
-        (statusOriginal === 'A RECEBER' || statusOriginal === 'A REALIZAR') &&
-        String(item.documento || '').toUpperCase().includes('NFES');
+      const situacao = String(item.statusExibicao || '').trim();
+      return item.natureza === 'Entrada'
+        && (situacao === 'A receber' || situacao === 'Recebido')
+        && String(item.documento || '').toUpperCase().includes('NFES');
     });
 
-    // A NF vem dividida entre Faturamento (1010101) e Administrativo (1010107).
-    // A coluna J repete o valor total do título em cada linha de rateio; por isso
-    // usamos uma única ocorrência como bruto. A coluna K é somada para formar o
-    // valor líquido operacional da nota.
+    // A NF pode vir dividida entre Faturamento e Administrativo.
+    // A coluna J ("Valor total título") se repete nas linhas de rateio:
+    // para o bruto usamos uma única ocorrência do título; para o líquido,
+    // somamos a coluna K ("Valor") das linhas originais.
     const map = {};
     rawList.forEach(item => {
       const key = String(item.lancamento || 'SEM-LANCAMENTO') + '|' + String(item.documento || item.nome || 'SEM-DOCUMENTO');
@@ -262,10 +255,13 @@ export default function FluxoDeCaixa() {
         ? item.linhasOriginais
         : [item];
 
-      const valoresBrutosTitulo = [
-        item.valorFaturamentoOriginal,
-        ...linhas.map(linha => linha.valorFaturamentoOriginal),
-      ]
+      const valoresBrutosOriginais = linhas
+        .flatMap(linha => [
+          linha.valorFaturamentoOriginal,
+          linha.valorFaturamento,
+          linha.valorTotalTitulo,
+          linha.valorBruto,
+        ])
         .map(Number)
         .filter(valor => Number.isFinite(valor) && valor !== 0);
 
@@ -273,7 +269,17 @@ export default function FluxoDeCaixa() {
         item.valorFaturamentoTitulo
         ?? item.valorFaturamento
         ?? item.valorTotalTitulo
+        ?? item.valorBruto
       ) || 0;
+
+      const valorRealNota = valoresBrutosOriginais.length > 0
+        ? Math.max(...valoresBrutosOriginais.map(Math.abs))
+        : Math.abs(faturamentoConsolidado);
+
+      const valorLiquidoNota = linhas.reduce((acc, linha) => {
+        const valor = Number(linha.valorCaixa ?? linha.valor) || 0;
+        return acc + valor;
+      }, 0) || (Number(item.valor) || 0);
 
       const projetoObra = linhas
         .map(linha => String(linha.projeto || '').trim())
@@ -281,56 +287,116 @@ export default function FluxoDeCaixa() {
           const upper = projeto.toUpperCase();
           return projeto && !upper.includes('ADMINISTRA') && upper !== 'GRUPO OAE' && upper !== 'SEM PROJETO';
         }) || item.projeto;
-      const valorRealNota = valoresBrutosTitulo.length > 0
-        ? Math.max(...valoresBrutosTitulo.map(Math.abs))
-        : faturamentoConsolidado;
+
+      const situacao = item.statusExibicao === 'Recebido' ? 'Recebido' : 'A receber';
 
       if (!map[key]) {
         map[key] = {
           ...item,
           projeto: projetoObra,
+          situacao,
+          valor: valorLiquidoNota,
           valorRealNota,
         };
-      } else {
-        map[key].valor += Number(item.valor) || 0;
-        map[key].valorRealNota = Math.max(
-          Math.abs(Number(map[key].valorRealNota) || 0),
-          Math.abs(Number(valorRealNota) || 0)
-        );
-        if ((!map[key].projeto || String(map[key].projeto).toUpperCase().includes('ADMINISTRA')) && projetoObra) {
-          map[key].projeto = projetoObra;
-        }
+        return;
       }
+
+      const atual = map[key];
+      const priorizarAtual = situacao === 'Recebido' && atual.situacao !== 'Recebido';
+
+      map[key] = {
+        ...(priorizarAtual ? { ...atual, ...item } : atual),
+        projeto: (!atual.projeto || String(atual.projeto).toUpperCase().includes('ADMINISTRA'))
+          ? projetoObra
+          : atual.projeto,
+        situacao: priorizarAtual ? situacao : atual.situacao,
+        valor: Math.max(Math.abs(Number(atual.valor) || 0), Math.abs(Number(valorLiquidoNota) || 0)),
+        valorRealNota: Math.max(
+          Math.abs(Number(atual.valorRealNota) || 0),
+          Math.abs(Number(valorRealNota) || 0)
+        ),
+      };
     });
+
     return Object.values(map).sort((a, b) => b.dataTimestamp - a.dataTimestamp);
   }, [baseData]);
 
   const [filtroFaturamento, setFiltroFaturamento] = useState('MES_ATUAL');
+  const [filtroFaturamentoStatus, setFiltroFaturamentoStatus] = useState('TODOS');
+  const [filtroFaturamentoProjeto, setFiltroFaturamentoProjeto] = useState('TODOS');
+  const [filtroFaturamentoDocumento, setFiltroFaturamentoDocumento] = useState('');
+  const [filtroFaturamentoVencimento, setFiltroFaturamentoVencimento] = useState('');
+  const [filtroFaturamentoValor, setFiltroFaturamentoValor] = useState('');
+
+  const projetosFaturamentoDisponiveis = useMemo(() => (
+    Array.from(new Set(faturamentosNfes.map(row => row.projeto).filter(Boolean))).sort()
+  ), [faturamentosNfes]);
 
   const faturamentosNfesFiltrados = useMemo(() => {
     const hoje = new Date();
     const mesAtual = hoje.getMonth();
     const anoAtual = hoje.getFullYear();
+    const documentoFiltro = filtroFaturamentoDocumento.trim().toUpperCase();
+    const valorFiltroTexto = filtroFaturamentoValor.trim();
+    const valorFiltro = valorFiltroTexto
+      ? Number(valorFiltroTexto.replace(/\./g, '').replace(',', '.'))
+      : null;
 
     return faturamentosNfes
       .filter((row) => {
-        if (filtroFaturamento === 'TODOS') return true;
-        if (!row.data) return false;
-        const [d, m, y] = String(row.data).split('/').map(Number);
-        if (!d || !m || !y) return false;
-        const vencimento = new Date(y, m - 1, d);
-        return vencimento.getMonth() === mesAtual && vencimento.getFullYear() === anoAtual;
+        if (filtroFaturamento !== 'TODOS') {
+          if (!row.data) return false;
+          const [d, m, y] = String(row.data).split('/').map(Number);
+          if (!d || !m || !y) return false;
+          const vencimento = new Date(y, m - 1, d);
+          if (vencimento.getMonth() !== mesAtual || vencimento.getFullYear() !== anoAtual) return false;
+        }
+
+        if (filtroFaturamentoStatus !== 'TODOS' && row.situacao !== filtroFaturamentoStatus) return false;
+        if (filtroFaturamentoProjeto !== 'TODOS' && row.projeto !== filtroFaturamentoProjeto) return false;
+        if (documentoFiltro && !String(row.documento || '').toUpperCase().includes(documentoFiltro)) return false;
+
+        if (filtroFaturamentoVencimento) {
+          const [ano, mes, dia] = filtroFaturamentoVencimento.split('-');
+          const vencimentoFiltro = `${dia}/${mes}/${ano}`;
+          if (String(row.data || '') !== vencimentoFiltro) return false;
+        }
+
+        if (valorFiltroTexto) {
+          if (!Number.isFinite(valorFiltro)) return false;
+          if (Math.abs((Number(row.valor) || 0) - valorFiltro) > 0.009) return false;
+        }
+
+        return true;
       })
       .sort((a, b) => (a.dataTimestamp || 0) - (b.dataTimestamp || 0));
-  }, [faturamentosNfes, filtroFaturamento]);
+  }, [
+    faturamentosNfes,
+    filtroFaturamento,
+    filtroFaturamentoStatus,
+    filtroFaturamentoProjeto,
+    filtroFaturamentoDocumento,
+    filtroFaturamentoVencimento,
+    filtroFaturamentoValor,
+  ]);
 
-  const totalFaturamentosNfes = faturamentosNfesFiltrados.reduce((acc, row) => acc + row.valor, 0);
+  const limparFiltrosFaturamento = () => {
+    setFiltroFaturamento('MES_ATUAL');
+    setFiltroFaturamentoStatus('TODOS');
+    setFiltroFaturamentoProjeto('TODOS');
+    setFiltroFaturamentoDocumento('');
+    setFiltroFaturamentoVencimento('');
+    setFiltroFaturamentoValor('');
+  };
+
+  const totalFaturamentosNfes = faturamentosNfesFiltrados.reduce((acc, row) => acc + (Number(row.valor) || 0), 0);
   const totalValorRealNfes = faturamentosNfesFiltrados.reduce((acc, row) => acc + (Number(row.valorRealNota) || 0), 0);
 
   const reportFaturamentosNfesRows = useMemo(() => [
     ...faturamentosNfesFiltrados.map((row) => ({
       Documento: row.documento,
       Projeto: row.projeto,
+      Situação: row.situacao,
       Vencimento: row.data,
       "Valor Bruto": Number(row.valorRealNota) || 0,
       "Valor Líquido": Number(row.valor) || 0,
@@ -338,6 +404,7 @@ export default function FluxoDeCaixa() {
     ...(faturamentosNfesFiltrados.length > 0 ? [{
       Documento: 'TOTAL DAS NOTAS',
       Projeto: '-',
+      Situação: '-',
       Vencimento: '-',
       "Valor Bruto": totalValorRealNfes,
       "Valor Líquido": totalFaturamentosNfes,
@@ -837,18 +904,20 @@ export default function FluxoDeCaixa() {
                   <FileSpreadsheet size={16} color="var(--primary)" />
                   <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>Painel de Faturamento · Notas Fiscais</h2>
                 </div>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>NFES pendentes, consolidadas em uma única linha por nota.</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>NFES recebidas e a receber, consolidadas em uma única linha por nota e sem duplicar rateios.</p>
               </div>
+
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <select
                   value={filtroFaturamento}
                   onChange={(e) => setFiltroFaturamento(e.target.value)}
                   style={{ minWidth: '190px', height: '34px', fontSize: '11px' }}
-                  aria-label="Filtro do Painel de Faturamento"
+                  aria-label="Período do Painel de Faturamento"
                 >
                   <option value="MES_ATUAL">Vencimento no mês atual</option>
-                  <option value="TODOS">Todos emitidos</option>
+                  <option value="TODOS">Todos os vencimentos</option>
                 </select>
+
                 <ReportAdder
                   sectionKey="fluxo:faturamento-nfes"
                   title="Painel de Faturamento (NFES)"
@@ -859,10 +928,80 @@ export default function FluxoDeCaixa() {
                   dataSets={{ all: reportFaturamentosNfesRows, summary: reportFaturamentosNfesSummary }}
                   detailMode="all"
                   detailOptions={["all", "summary"]}
-                  filters={{ Tipo: "NFES", Situação: "A receber / A realizar" }}
-                  explanation="Relação de notas fiscais faturadas com soma total do valor bruto e do valor líquido."
+                  filters={{
+                    Tipo: "NFES",
+                    Situação: filtroFaturamentoStatus === 'TODOS' ? 'Recebidas + a receber' : filtroFaturamentoStatus,
+                    Período: filtroFaturamento === 'TODOS' ? 'Todos os vencimentos' : 'Mês atual',
+                    Projeto: filtroFaturamentoProjeto === 'TODOS' ? 'Todos' : filtroFaturamentoProjeto,
+                    Documento: filtroFaturamentoDocumento || 'Todos',
+                    Vencimento: filtroFaturamentoVencimento || 'Todos',
+                    "Valor Líquido": filtroFaturamentoValor || 'Todos',
+                  }}
+                  explanation="Relação de notas fiscais recebidas e a receber, com uma única linha por NF e sem duplicação do valor bruto entre rateios."
                 />
               </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <select
+                value={filtroFaturamentoStatus}
+                onChange={(e) => setFiltroFaturamentoStatus(e.target.value)}
+                style={{ height: '34px', fontSize: '11px' }}
+                aria-label="Situação da nota fiscal"
+              >
+                <option value="TODOS">Todas as situações</option>
+                <option value="A receber">A receber</option>
+                <option value="Recebido">Recebido</option>
+              </select>
+
+              <select
+                value={filtroFaturamentoProjeto}
+                onChange={(e) => setFiltroFaturamentoProjeto(e.target.value)}
+                style={{ height: '34px', fontSize: '11px' }}
+                aria-label="Projeto da nota fiscal"
+              >
+                <option value="TODOS">Todos os projetos</option>
+                {projetosFaturamentoDisponiveis.map((projeto) => (
+                  <option key={projeto} value={projeto}>{projeto}</option>
+                ))}
+              </select>
+
+              <input
+                type="search"
+                value={filtroFaturamentoDocumento}
+                onChange={(e) => setFiltroFaturamentoDocumento(e.target.value)}
+                placeholder="Documento / NFES"
+                style={{ height: '34px', fontSize: '11px' }}
+                aria-label="Filtrar por documento"
+              />
+
+              <input
+                type="date"
+                value={filtroFaturamentoVencimento}
+                onChange={(e) => setFiltroFaturamentoVencimento(e.target.value)}
+                style={{ height: '34px', fontSize: '11px' }}
+                aria-label="Filtrar por vencimento"
+              />
+
+              <input
+                type="text"
+                inputMode="decimal"
+                value={filtroFaturamentoValor}
+                onChange={(e) => setFiltroFaturamentoValor(e.target.value)}
+                placeholder="Valor líquido"
+                style={{ height: '34px', fontSize: '11px' }}
+                aria-label="Filtrar por valor líquido"
+              />
+
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={limparFiltrosFaturamento}
+                style={{ minHeight: '34px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+              >
+                <FilterX size={13} />
+                Limpar filtros
+              </button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem' }}>
@@ -881,11 +1020,12 @@ export default function FluxoDeCaixa() {
             </div>
 
             <div className="table-container" style={{ marginTop: '0.5rem', maxHeight: '310px', overflowY: 'auto' }}>
-              <table style={{ fontSize: '11px', minWidth: '760px' }}>
+              <table style={{ fontSize: '11px', minWidth: '860px' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr>
                     <th>Documento</th>
                     <th>Projeto</th>
+                    <th>Situação</th>
                     <th>Vencimento</th>
                     <th style={{ textAlign: 'right' }}>Valor Bruto</th>
                     <th style={{ textAlign: 'right' }}>Valor Líquido</th>
@@ -893,21 +1033,22 @@ export default function FluxoDeCaixa() {
                 </thead>
                 <tbody>
                   {faturamentosNfesFiltrados.length > 0 ? faturamentosNfesFiltrados.map((row, idx) => (
-                    <tr key={idx}>
+                    <tr key={`${row.lancamento || 'sem-lancamento'}-${row.documento || idx}-${idx}`}>
                       <td style={{ fontWeight: '500' }}>{row.documento}</td>
-                      <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.projeto}>{row.projeto}</td>
+                      <td style={{ maxWidth: '170px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.projeto}>{row.projeto}</td>
+                      <td>{row.situacao}</td>
                       <td>{row.data}</td>
                       <td style={{ textAlign: 'right', color: 'var(--text-main)', fontWeight: '600' }}>{formatCurrency(row.valorRealNota)}</td>
                       <td style={{ textAlign: 'right', color: 'var(--success)' }}>{formatCurrency(row.valor)}</td>
                     </tr>
                   )) : (
-                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhum faturamento encontrado.</td></tr>
+                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhuma nota fiscal encontrada para os filtros selecionados.</td></tr>
                   )}
                 </tbody>
                 {faturamentosNfesFiltrados.length > 0 && (
                   <tfoot style={{ position: 'sticky', bottom: 0, background: 'var(--bg-elevated)', zIndex: 10, boxShadow: '0 -2px 10px rgba(0,0,0,0.1)' }}>
                     <tr>
-                      <td colSpan="3" style={{ fontWeight: '600', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.45rem' }}>Total:</td>
+                      <td colSpan="4" style={{ fontWeight: '600', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.45rem' }}>Total:</td>
                       <td style={{ fontWeight: '700', color: 'var(--text-main)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.45rem' }}>{formatCurrency(totalValorRealNfes)}</td>
                       <td style={{ fontWeight: '700', color: 'var(--success)', textAlign: 'right', borderTop: '2px solid var(--border-color)', padding: '0.45rem' }}>{formatCurrency(totalFaturamentosNfes)}</td>
                     </tr>
