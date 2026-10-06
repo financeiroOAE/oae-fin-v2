@@ -13,7 +13,7 @@ import MultiSelect from '@/components/MultiSelect';
 import '../equipe/management.css';
 import '../equipe/managementExtras.css';
 
-const COLORS={received:'#2563eb',paidExpense:'#ef4444',open:'#f59e0b',cashBalance:'#14b8a6',franFixed:'#8b5cf6',franWithdrawal:'#ec4899',pauloFixed:'#06b6d4',pauloWithdrawal:'#eab308'};
+const COLORS={received:'#2563eb',paidExpense:'#ef4444',open:'#f59e0b',franFixed:'#8b5cf6',franWithdrawal:'#ec4899',pauloFixed:'#06b6d4',pauloWithdrawal:'#eab308'};
 const brl=(n)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n)||0);
 const compact=(n)=>new Intl.NumberFormat('pt-BR',{notation:'compact',maximumFractionDigits:1}).format(Number(n)||0);
 const getDateKey=(raw)=>{const value=String(raw||'');let m=value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;m=value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:'';};
@@ -107,12 +107,19 @@ export default function AdministrativeDashboard(){
     const monthRevenue=(data.revenue||[]).filter(r=>r.month===key);
     const monthExpenses=expenses.filter(r=>monthOf(r.data)===key);
     const receivedAdmin=active?monthRevenue.filter(r=>r.realized).reduce((s,r)=>s+Number(r.adminValue||0),0):0;
+    const forecastAdmin=active&&i>=9
+      ? monthRevenue.filter(r=>!r.realized).reduce((s,r)=>s+Number(r.adminValue||0),0)
+      : 0;
     const paidExpense=active?monthExpenses.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0):0;
     const openExpense=active?monthExpenses.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0):0;
-    return{month:monthLabel(key),'Recebido ADM':receivedAdmin,'Despesa paga':paidExpense,'A pagar':openExpense,'Saldo caixa':receivedAdmin-paidExpense};
+    return{
+      month:monthLabel(key),
+      'Recebido ADM':receivedAdmin,
+      'Previsão recebimento ADM':forecastAdmin,
+      'Despesa paga':paidExpense,
+      'A pagar':openExpense,
+    };
   }),[data.revenue,expenses,startDate,endDate]);
-
-  const cashFlowMonthly=chartMonthly.map(row=>({month:row.month,'Recebimentos ADM':row['Recebido ADM'],'Pagamentos ADM':row['Despesa paga'],'Saldo mensal':row['Saldo caixa']}));
 
   const partnerDefs=[
     {token:'FRANCIELLE',name:'Francielle Paiva',short:'Francielle',fixed:25000},
@@ -187,18 +194,10 @@ export default function AdministrativeDashboard(){
 
     <section id="report-adm-receita-despesa" data-report-section className="mgmt-panel mgmt-panel-wide">
       <div className="mgmt-panel-head">
-        <div><h2>Receita x despesa · Jan–Dez/2026</h2><p>Recebimento administrativo realizado, despesa paga e compromissos em aberto.</p></div>
-        <ReportAdder sectionKey="administrativo:receita-despesa" title="Receita x Despesa — 2026" componentName="Gráfico Receita x Despesa" page="Administrativo" type="CHART" data={chartMonthly} filters={reportFilters} captureId="report-adm-receita-despesa"/>
+        <div><h2>Receita x despesa · Jan–Dez/2026</h2><p>Recebido administrativo, previsão de recebimento de out–dez/2026, despesas pagas e compromissos em aberto.</p></div>
+        <ReportAdder sectionKey="administrativo:receita-despesa" title="Receita x Despesa — 2026" componentName="Gráfico Receita x Despesa" page="Administrativo" type="CHART" data={chartMonthly} filters={{...reportFilters,'Previsão de recebimento':'Out–Dez/2026'}} captureId="report-adm-receita-despesa"/>
       </div>
-        <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={chartMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar dataKey="Recebido ADM" fill={COLORS.received} radius={[4,4,0,0]}/><Bar dataKey="Despesa paga" fill={COLORS.paidExpense} radius={[4,4,0,0]}/><Bar dataKey="A pagar" fill={COLORS.open} radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>
-      </section>
-
-    <section id="report-adm-fluxo-mensal" data-report-section className="mgmt-panel mgmt-panel-wide">
-      <div className="mgmt-panel-head">
-        <div><h2>Fluxo de caixa mensal · Administrativo</h2><p>Recebimentos administrativos realizados, pagamentos administrativos e saldo mensal realizado.</p></div>
-        <ReportAdder sectionKey="administrativo:fluxo-caixa-mensal" title="Fluxo de Caixa Mensal — Administrativo" componentName="Gráfico de Fluxo de Caixa Mensal" page="Administrativo" type="CHART" data={cashFlowMonthly} filters={reportFilters} captureId="report-adm-fluxo-mensal"/>
-      </div>
-      <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={cashFlowMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><ReferenceLine y={0} stroke="var(--border-color)"/><Bar dataKey="Recebimentos ADM" fill={COLORS.received}/><Bar dataKey="Pagamentos ADM" fill={COLORS.paidExpense}/><Bar dataKey="Saldo mensal" fill={COLORS.cashBalance}/></BarChart></ResponsiveContainer></div>
+      <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={chartMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar dataKey="Recebido ADM" fill={COLORS.received} radius={[4,4,0,0]}/><Bar dataKey="Previsão recebimento ADM" fill="#0ea5e9" radius={[4,4,0,0]}/><Bar dataKey="Despesa paga" fill={COLORS.paidExpense} radius={[4,4,0,0]}/><Bar dataKey="A pagar" fill={COLORS.open} radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>
     </section>
 
     <section className="mgmt-panel" data-report-section>
