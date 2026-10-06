@@ -25,6 +25,7 @@ export async function GET(request) {
   }
 
   const username = session.user.username;
+  const isAdmin = session.user.role === 'ADMIN';
 
   try {
     // Route handlers do Next recebem NextRequest; usar nextUrl evita reconstruir/parsing manual da URL.
@@ -37,14 +38,15 @@ export async function GET(request) {
       const metadata = await readCurrentSnapshotMetadata();
       const syncedAtMs = metadata?.updatedAt ? new Date(metadata.updatedAt).getTime() : 0;
       const nextManualRefreshAtMs = syncedAtMs ? syncedAtMs + MANUAL_REFRESH_COOLDOWN_MS : 0;
-      const canManualRefresh = !nextManualRefreshAtMs || Date.now() >= nextManualRefreshAtMs;
+      const canManualRefresh = isAdmin || !nextManualRefreshAtMs || Date.now() >= nextManualRefreshAtMs;
       return NextResponse.json({
         ok: Boolean(metadata),
         syncedAt: metadata?.updatedAt?.toISOString?.() || null,
         updatedBy: metadata?.username || null,
         canManualRefresh,
-        nextManualRefreshAt: nextManualRefreshAtMs ? new Date(nextManualRefreshAtMs).toISOString() : null,
-        manualCooldownMinutes: MANUAL_REFRESH_COOLDOWN_MS / 60000,
+        canForceRefresh: isAdmin,
+        nextManualRefreshAt: isAdmin || !nextManualRefreshAtMs ? null : new Date(nextManualRefreshAtMs).toISOString(),
+        manualCooldownMinutes: isAdmin ? 0 : MANUAL_REFRESH_COOLDOWN_MS / 60000,
       }, { headers: JSON_HEADERS });
     }
 
@@ -57,16 +59,15 @@ export async function GET(request) {
           ? Date.now() - new Date(metadata.updatedAt).getTime()
           : Number.POSITIVE_INFINITY;
 
-        if (manual && snapshotAge < MANUAL_REFRESH_COOLDOWN_MS) {
+        if (manual && !isAdmin && snapshotAge < MANUAL_REFRESH_COOLDOWN_MS) {
           const nextManualRefreshAt = new Date(new Date(metadata.updatedAt).getTime() + MANUAL_REFRESH_COOLDOWN_MS);
           return NextResponse.json({
-            ok: false,
-            error: `Atualização bloqueada por segurança. Uma nova sincronização manual estará disponível às ${nextManualRefreshAt.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}.`,
-            code: 'MANUAL_REFRESH_COOLDOWN',
+            ok: true,
+            skipped: true,
+            refreshReason: 'MANUAL_COOLDOWN',
             syncedAt: metadata.updatedAt.toISOString(),
             nextManualRefreshAt: nextManualRefreshAt.toISOString(),
-            manualCooldownMinutes: MANUAL_REFRESH_COOLDOWN_MS / 60000,
-          }, { status: 429, headers: JSON_HEADERS });
+          }, { headers: JSON_HEADERS });
         }
 
         // Coalesce chamadas automáticas quase simultâneas.
@@ -101,6 +102,17 @@ export async function GET(request) {
         return snapshotResponse(refreshedSnapshot);
       } catch (refreshError) {
         await registerSyncError(username, refreshError);
+
+        if (manual && !isAdmin) {
+          const metadata = await readCurrentSnapshotMetadata().catch(() => null);
+          return NextResponse.json({
+            ok: true,
+            skipped: true,
+            refreshReason: 'REFRESH_FAILED_PRESERVED',
+            syncedAt: metadata?.updatedAt?.toISOString?.() || null,
+          }, { headers: JSON_HEADERS });
+        }
+
         return NextResponse.json(
           {
             ok: false,
