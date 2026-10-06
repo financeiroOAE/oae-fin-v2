@@ -1,31 +1,41 @@
 async function readJsonResponse(response) {
   const body = await response.text();
+  const status = Number(response.status) || 0;
 
   if (!body.trim()) {
-    throw new Error('O servidor não concluiu a resposta. Tente novamente em alguns segundos.');
+    throw new Error(status >= 500
+      ? `Servidor temporariamente indisponível (HTTP ${status}). Aguarde alguns segundos e tente novamente.`
+      : 'O servidor não concluiu a resposta. Tente novamente em alguns segundos.');
   }
 
   let data;
   try {
     data = JSON.parse(body);
   } catch {
-    throw new Error('O servidor retornou uma resposta incompleta. Tente novamente em alguns segundos.');
+    if (status === 502 || status === 503 || status === 504 || /^\s*</.test(body)) {
+      throw new Error(`Servidor temporariamente indisponível (HTTP ${status || 502}). Os dados não foram apagados; tente novamente em alguns segundos.`);
+    }
+    throw new Error('O servidor retornou uma resposta inválida. Tente novamente em alguns segundos.');
   }
 
   if (!response.ok) {
-    throw new Error(data.refreshError || data.details?.message || data.error || 'Não foi possível atualizar os dados.');
+    throw new Error(data.refreshError || data.details?.message || data.error || `Não foi possível carregar os dados (HTTP ${status}).`);
   }
 
   return data;
 }
 
-async function requestJson(url) {
+export async function requestJson(url) {
   const response = await fetch(url, { method: 'GET', cache: 'no-store' });
   return readJsonResponse(response);
 }
 
 export async function readSession() {
   return requestJson('/api/session');
+}
+
+export async function readFinancialMetadata() {
+  return requestJson('/api/sync?metadata=1');
 }
 
 export async function refreshFinancialData({ manual = false } = {}) {
