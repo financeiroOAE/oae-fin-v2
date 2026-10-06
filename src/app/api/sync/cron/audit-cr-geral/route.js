@@ -148,9 +148,11 @@ function activeProjectIndex(projetos) {
 function summarizeAllocation(baseRows, activeProjects) {
   let allocated = 0;
   let historicalTotal = 0;
+  let standaloneAdministrativeTotal = 0;
   let administrativeReviewTotal = 0;
   let unresolvedTotal = 0;
   const historical = [];
+  const standaloneAdministrative = [];
   const administrativeReview = [];
   const missing = [];
 
@@ -191,6 +193,12 @@ function summarizeAllocation(baseRows, activeProjects) {
       return;
     }
 
+    if (item.rateioAdministrativoFonte === 'ADMINISTRATIVO_AVULSO_100_PERCENT') {
+      standaloneAdministrativeTotal += value;
+      standaloneAdministrative.push({ ...serialize(item, value), classification: 'ADMINISTRATIVO_AVULSO_VALIDO' });
+      return;
+    }
+
     if (isAdministrativeProject(item.projeto)) {
       administrativeReviewTotal += value;
       administrativeReview.push({ ...serialize(item, value), classification: 'ADMINISTRATIVO_REVISAR' });
@@ -204,10 +212,12 @@ function summarizeAllocation(baseRows, activeProjects) {
   return {
     allocated: roundMoney(allocated),
     historicalTotal: roundMoney(historicalTotal),
+    standaloneAdministrativeTotal: roundMoney(standaloneAdministrativeTotal),
     administrativeReviewTotal: roundMoney(administrativeReviewTotal),
     unresolvedTotal: roundMoney(unresolvedTotal),
-    unallocated: roundMoney(historicalTotal + administrativeReviewTotal + unresolvedTotal),
+    unallocated: roundMoney(historicalTotal + standaloneAdministrativeTotal + administrativeReviewTotal + unresolvedTotal),
     historical,
+    standaloneAdministrative,
     administrativeReview,
     missing,
   };
@@ -303,6 +313,15 @@ export async function POST(request) {
         .filter((item) => String(item.contaCodigo || '').replace(/\D/g, '') === '1010107')
         .reduce((sum, item) => sum + (Number(item.valorCaixa ?? item.valor) || 0), 0)
     );
+    const standaloneSourceProjectValue = roundMoney(
+      dreRuleRows
+        .filter((item) => item.rateioAdministrativoFonte === 'ADMINISTRATIVO_AVULSO_100_PERCENT')
+        .reduce((sum, item) => sum + (item.linhasOriginais || [])
+          .filter((row) => String(row.contaCodigo || '').replace(/\D/g, '') === '1010101')
+          .reduce((rowSum, row) => rowSum + (Number(row.valorCaixa ?? row.valor) || 0), 0), 0)
+    );
+    const adjustedSourceProject = roundMoney(raw['1010101'].realizedYtdK - standaloneSourceProjectValue);
+    const adjustedSourceAdmin = roundMoney(raw['1010107'].realizedYtdK + standaloneSourceProjectValue);
     const semAdmConserved = roundMoney(semAdm.allocated + semAdm.unallocated);
     const comAdmConserved = roundMoney(comAdm.allocated + comAdm.unallocated);
     const derivedAdminConserved = roundMoney(comAdmConserved - semAdmConserved);
@@ -327,9 +346,18 @@ export async function POST(request) {
           total: roundMoney(expectedProject80 + expectedAdmin20),
           rule: '80/20 para receitas de projeto + 100% ADM para receitas avulsas administrativas',
         },
+        rawSourceAccountDelta: {
+          projetoVsRegra: roundMoney(raw['1010101'].realizedYtdK - expectedProject80),
+          administrativoVsRegra: roundMoney(raw['1010107'].realizedYtdK - expectedAdmin20),
+        },
+        businessClassifiedSource: {
+          projeto: adjustedSourceProject,
+          administrativo: adjustedSourceAdmin,
+          standaloneAdministrativeMovedFrom1010101: standaloneSourceProjectValue,
+        },
         sourceAccountDelta: {
-          projetoVs80: roundMoney(raw['1010101'].realizedYtdK - expectedProject80),
-          administrativoVs20: roundMoney(raw['1010107'].realizedYtdK - expectedAdmin20),
+          projetoVs80: roundMoney(adjustedSourceProject - expectedProject80),
+          administrativoVs20: roundMoney(adjustedSourceAdmin - expectedAdmin20),
         },
         delta: {
           semAdm: roundMoney(expectedProject80 - semAdmConserved),
