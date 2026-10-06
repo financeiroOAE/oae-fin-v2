@@ -97,6 +97,12 @@ export default function Sidebar() {
     return canAccess(item.permission) || item.children?.some((child) => canAccess(child.permission));
   });
 
+  const quickMenuItems = menuItems.filter((item) =>
+    ['/', '/visao-financeira', '/fluxo-caixa', '/projetos', '/equipe', '/administrativo', '/dre'].includes(item.path)
+    && canAccess(item.permission)
+  );
+  const showQuickMenu = pathname !== '/login' && pathname !== '/';
+
   return (
     <>
       {isMobile && collapsed && (
@@ -326,6 +332,28 @@ export default function Sidebar() {
           </form>
         </div>
       </aside>
+
+      {showQuickMenu && quickMenuItems.length > 0 && (
+        <nav className="quick-panel-nav" aria-label="Atalhos rápidos do painel">
+          {quickMenuItems.map((item) => {
+            const Icon = item.icon;
+            const active = pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`quick-panel-nav-item ${active ? 'is-active' : ''}`}
+                title={item.name}
+                aria-label={item.name}
+                aria-current={active ? 'page' : undefined}
+              >
+                <Icon size={17} strokeWidth={active ? 2.5 : 2} />
+                <span>{item.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </>
   );
 }
