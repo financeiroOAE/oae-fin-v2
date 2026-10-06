@@ -1414,157 +1414,6 @@ export default function Projetos() {
         )}
       </div>
 
-      {/* Painel de Faturamento / NFES — visão independente dos filtros gerais */}
-      <section className="card" data-report-section style={{ padding: '1.25rem', marginBottom: '1.5rem', borderTop: '2px solid var(--primary)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '1rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FileSpreadsheet size={18} color="var(--primary)" />
-              <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>Painel de Faturamento · Notas Fiscais</h2>
-            </div>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
-              Todas as NFES do sistema, consolidadas em uma única linha por nota, incluindo recebidas e a receber.
-            </p>
-          </div>
-          <ReportAdder
-            sectionKey="projetos:painel-nfes"
-            title="Painel de Faturamento — Notas Fiscais"
-            componentName="Tabela de Notas Fiscais"
-            page="Projetos"
-            type="TABLE"
-            data={nfReportRows}
-            dataSets={{
-              summary: [{
-                'Quantidade de notas': nfesFiltered.length,
-                'Recebido líquido': nfTotalReceived,
-                'A receber líquido': nfTotalReceivable,
-                'Total líquido': nfTotalReceived + nfTotalReceivable,
-              }],
-              visible: nfVisibleRows.map((note) => ({
-                Documento: note.documento,
-                Projeto: note.projeto,
-                Vencimento: note.vencimento || '-',
-                Situação: note.status,
-                'Valor Bruto': note.valorBruto,
-                'Valor Líquido': note.valorLiquido,
-              })),
-              all: nfReportRows,
-            }}
-            detailMode="visible"
-            detailOptions={["summary","visible","all"]}
-            filters={{
-              Projeto: nfProjectFilters.length ? nfProjectFilters : 'Todos',
-              Documento: nfDocumentFilter || 'Todos',
-              'Vencimento inicial': nfDueStart || 'Todos',
-              'Vencimento final': nfDueEnd || 'Todos',
-              Situação: nfStatusFilters.length ? nfStatusFilters : 'Todas',
-              'Valor líquido mínimo': nfLiquidMin || 'Sem mínimo',
-              'Valor líquido máximo': nfLiquidMax || 'Sem máximo',
-            }}
-          />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
-          <div style={{ padding: '0.9rem 1rem', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: '8px' }}>
-            <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Recebido</span>
-            <strong style={{ display: 'block', marginTop: '0.35rem', color: 'var(--success)', fontSize: '18px' }}>{formatCurrency(nfTotalReceived)}</strong>
-          </div>
-          <div style={{ padding: '0.9rem 1rem', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: '8px' }}>
-            <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>A receber</span>
-            <strong style={{ display: 'block', marginTop: '0.35rem', color: 'var(--warning)', fontSize: '18px' }}>{formatCurrency(nfTotalReceivable)}</strong>
-          </div>
-          <div style={{ padding: '0.9rem 1rem', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-            <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Notas exibidas</span>
-            <strong style={{ display: 'block', marginTop: '0.35rem', color: 'var(--text-main)', fontSize: '18px' }}>{nfesFiltered.length}</strong>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', gap: '0.75rem', alignItems: 'end', marginBottom: '1rem' }}>
-          <div style={{ minWidth: 0 }}>
-            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Projeto</label>
-            <MultiSelect options={nfProjectOptions} selected={nfProjectFilters} onChange={setNfProjectFilters} placeholder="Todos os projetos" />
-          </div>
-          <div>
-            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Documento</label>
-            <input value={nfDocumentFilter} onChange={(e) => setNfDocumentFilter(e.target.value)} placeholder="Ex.: NFES.132" style={{ width: '100%', height: '34px', boxSizing: 'border-box' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Vencimento inicial</label>
-            <input type="date" value={nfDueStart} onChange={(e) => setNfDueStart(e.target.value)} style={{ width: '100%', height: '34px', boxSizing: 'border-box' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Vencimento final</label>
-            <input type="date" value={nfDueEnd} onChange={(e) => setNfDueEnd(e.target.value)} style={{ width: '100%', height: '34px', boxSizing: 'border-box' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Líquido mín.</label>
-            <input value={nfLiquidMin} onChange={(e) => setNfLiquidMin(e.target.value)} placeholder="R$ 0,00" style={{ width: '100%', height: '34px', boxSizing: 'border-box' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Líquido máx.</label>
-            <input value={nfLiquidMax} onChange={(e) => setNfLiquidMax(e.target.value)} placeholder="R$ 0,00" style={{ width: '100%', height: '34px', boxSizing: 'border-box' }} />
-          </div>
-          <button onClick={clearNfFilters} className="btn" style={{ height: '34px', whiteSpace: 'nowrap' }} title="Limpar filtros das notas"><FilterX size={14}/> Limpar</button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 320px) 1fr', gap: '0.75rem', alignItems: 'end', marginBottom: '0.75rem' }}>
-          <div style={{ minWidth: 0 }}>
-            <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>Situação</label>
-            <MultiSelect options={['Recebido','A receber']} selected={nfStatusFilters} onChange={setNfStatusFilters} placeholder="Recebidas e a receber" />
-          </div>
-          <div style={{ textAlign: 'right', fontSize: '11px', color: 'var(--text-secondary)' }}>
-            Uma linha por NFES; rateios internos não geram duplicidade.
-          </div>
-        </div>
-
-        <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-          <table style={{ width: '100%', minWidth: '820px', fontSize: '12px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th>Documento</th>
-                <th>Projeto</th>
-                <th>Vencimento</th>
-                <th>Situação</th>
-                <th style={{ textAlign: 'right' }}>Valor Bruto</th>
-                <th style={{ textAlign: 'right' }}>Valor Líquido</th>
-              </tr>
-            </thead>
-            <tbody>
-              {nfVisibleRows.length > 0 ? nfVisibleRows.map((note) => (
-                <tr key={note.key}>
-                  <td style={{ fontWeight: 600 }}>{note.documento}</td>
-                  <td>{note.projeto}</td>
-                  <td>{note.vencimento || '-'}</td>
-                  <td><span className={note.status === 'Recebido' ? 'badge badge-success' : 'badge badge-warning'}>{note.status}</span></td>
-                  <td style={{ textAlign: 'right' }}>{formatCurrency(note.valorBruto)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: note.status === 'Recebido' ? 'var(--success)' : 'var(--warning)' }}>{formatCurrency(note.valorLiquido)}</td>
-                </tr>
-              )) : (
-                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-secondary)' }}>Nenhuma nota fiscal encontrada para os filtros selecionados.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-            {nfesFiltered.length === 0 ? '0 notas' : nfPageSize === 'all' ? `Exibindo todas as ${nfesFiltered.length} notas` : `Página ${nfCurrentPage} de ${nfTotalPages} · ${nfesFiltered.length} notas`}
-          </span>
-          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-            <select value={nfPageSize} onChange={(e) => { setNfPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value)); setNfPage(1); }} style={{ height: '30px', fontSize: '11px' }}>
-              <option value={10}>10 por página</option>
-              <option value={30}>30 por página</option>
-              <option value={50}>50 por página</option>
-              <option value="all">Ver todas</option>
-            </select>
-            {nfPageSize !== 'all' && <>
-              <button className="btn" onClick={() => setNfPage((page) => Math.max(1, page - 1))} disabled={nfCurrentPage === 1} style={{ padding: '0.35rem 0.55rem' }}><ChevronLeft size={14}/></button>
-              <button className="btn" onClick={() => setNfPage((page) => Math.min(nfTotalPages, page + 1))} disabled={nfCurrentPage === nfTotalPages} style={{ padding: '0.35rem 0.55rem' }}><ChevronRight size={14}/></button>
-            </>}
-          </div>
-        </div>
-      </section>
-
       {/* 3. KPIs Contratos */}
       <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Consolidado de Contratos</h3>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -1824,6 +1673,149 @@ export default function Projetos() {
         </div>
       </div>
 
+
+      {/* Painel de Faturamento / NFES — abaixo do Progresso de Contratos */}
+      <section className="card" data-report-section style={{ padding: '1rem', marginBottom: '1.25rem', borderTop: '2px solid var(--primary)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <FileSpreadsheet size={16} color="var(--primary)" />
+              <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>Painel de Faturamento · Notas Fiscais</h2>
+            </div>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Uma linha por NFES, com recebidas e a receber.</p>
+          </div>
+          <ReportAdder
+            sectionKey="projetos:painel-nfes"
+            title="Painel de Faturamento — Notas Fiscais"
+            componentName="Tabela de Notas Fiscais"
+            page="Projetos"
+            type="TABLE"
+            data={nfReportRows}
+            dataSets={{
+              summary: [{
+                'Quantidade de notas': nfesFiltered.length,
+                'Recebido líquido': nfTotalReceived,
+                'A receber líquido': nfTotalReceivable,
+                'Total líquido': nfTotalReceived + nfTotalReceivable,
+              }],
+              visible: nfVisibleRows.map((note) => ({
+                Documento: note.documento,
+                Projeto: note.projeto,
+                Vencimento: note.vencimento || '-',
+                Situação: note.status,
+                'Valor Bruto': note.valorBruto,
+                'Valor Líquido': note.valorLiquido,
+              })),
+              all: nfReportRows,
+            }}
+            detailMode="visible"
+            detailOptions={["summary","visible","all"]}
+            filters={{
+              Projeto: nfProjectFilters.length ? nfProjectFilters : 'Todos',
+              Documento: nfDocumentFilter || 'Todos',
+              'Vencimento inicial': nfDueStart || 'Todos',
+              'Vencimento final': nfDueEnd || 'Todos',
+              Situação: nfStatusFilters.length ? nfStatusFilters : 'Todas',
+              'Valor líquido mínimo': nfLiquidMin || 'Sem mínimo',
+              'Valor líquido máximo': nfLiquidMax || 'Sem máximo',
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <div style={{ padding: '0.65rem 0.75rem', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: '7px' }}>
+            <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Recebido</span>
+            <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--success)', fontSize: '15px' }}>{formatCurrency(nfTotalReceived)}</strong>
+          </div>
+          <div style={{ padding: '0.65rem 0.75rem', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)', borderRadius: '7px' }}>
+            <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>A receber</span>
+            <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--warning)', fontSize: '15px' }}>{formatCurrency(nfTotalReceivable)}</strong>
+          </div>
+          <div style={{ padding: '0.65rem 0.75rem', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '7px' }}>
+            <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Notas</span>
+            <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--text-main)', fontSize: '15px' }}>{nfesFiltered.length}</strong>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.5rem', alignItems: 'end', marginBottom: '0.65rem' }}>
+          <div style={{ minWidth: 0 }}>
+            <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Projeto</label>
+            <MultiSelect options={nfProjectOptions} selected={nfProjectFilters} onChange={setNfProjectFilters} placeholder="Todos os projetos" />
+          </div>
+          <div>
+            <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Documento</label>
+            <input value={nfDocumentFilter} onChange={(e) => setNfDocumentFilter(e.target.value)} placeholder="Ex.: NFES.132" style={{ width: '100%', height: '40px', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Vencimento inicial</label>
+            <input type="date" value={nfDueStart} onChange={(e) => setNfDueStart(e.target.value)} style={{ width: '100%', height: '40px', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Vencimento final</label>
+            <input type="date" value={nfDueEnd} onChange={(e) => setNfDueEnd(e.target.value)} style={{ width: '100%', height: '40px', boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Situação</label>
+            <MultiSelect options={['Recebido','A receber']} selected={nfStatusFilters} onChange={setNfStatusFilters} placeholder="Todas" />
+          </div>
+          <div>
+            <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Líquido mín.</label>
+            <input value={nfLiquidMin} onChange={(e) => setNfLiquidMin(e.target.value)} placeholder="R$ 0,00" style={{ width: '100%', height: '40px', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Líquido máx.</label>
+            <input value={nfLiquidMax} onChange={(e) => setNfLiquidMax(e.target.value)} placeholder="R$ 0,00" style={{ width: '100%', height: '40px', boxSizing: 'border-box' }} />
+          </div>
+          <button onClick={clearNfFilters} className="btn" style={{ height: '40px', whiteSpace: 'nowrap' }} title="Limpar filtros das notas"><FilterX size={13}/> Limpar</button>
+        </div>
+
+        <div style={{ overflow: 'auto', maxHeight: '310px', border: '1px solid var(--border-color)', borderRadius: '7px' }}>
+          <table style={{ width: '100%', minWidth: '780px', fontSize: '11px', borderCollapse: 'collapse' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 3, background: 'var(--bg-elevated)' }}>
+              <tr>
+                <th>Documento</th>
+                <th>Projeto</th>
+                <th>Vencimento</th>
+                <th>Situação</th>
+                <th style={{ textAlign: 'right' }}>Valor Bruto</th>
+                <th style={{ textAlign: 'right' }}>Valor Líquido</th>
+              </tr>
+            </thead>
+            <tbody>
+              {nfVisibleRows.length > 0 ? nfVisibleRows.map((note) => (
+                <tr key={note.key}>
+                  <td style={{ fontWeight: 600 }}>{note.documento}</td>
+                  <td>{note.projeto}</td>
+                  <td>{note.vencimento || '-'}</td>
+                  <td><span className={note.status === 'Recebido' ? 'badge badge-success' : 'badge badge-warning'}>{note.status}</span></td>
+                  <td style={{ textAlign: 'right' }}>{formatCurrency(note.valorBruto)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700, color: note.status === 'Recebido' ? 'var(--success)' : 'var(--warning)' }}>{formatCurrency(note.valorLiquido)}</td>
+                </tr>
+              )) : (
+                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-secondary)' }}>Nenhuma nota fiscal encontrada para os filtros selecionados.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.6rem' }}>
+          <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+            {nfesFiltered.length === 0 ? '0 notas' : nfPageSize === 'all' ? `Todas as ${nfesFiltered.length} notas` : `Página ${nfCurrentPage} de ${nfTotalPages} · ${nfesFiltered.length} notas`}
+          </span>
+          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+            <select value={nfPageSize} onChange={(e) => { setNfPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value)); setNfPage(1); }} style={{ height: '28px', fontSize: '10px' }}>
+              <option value={10}>10 por página</option>
+              <option value={30}>30 por página</option>
+              <option value={50}>50 por página</option>
+              <option value="all">Ver todas</option>
+            </select>
+            {nfPageSize !== 'all' && <>
+              <button className="btn" onClick={() => setNfPage((page) => Math.max(1, page - 1))} disabled={nfCurrentPage === 1} style={{ padding: '0.3rem 0.45rem' }}><ChevronLeft size={13}/></button>
+              <button className="btn" onClick={() => setNfPage((page) => Math.min(nfTotalPages, page + 1))} disabled={nfCurrentPage === nfTotalPages} style={{ padding: '0.3rem 0.45rem' }}><ChevronRight size={13}/></button>
+            </>}
+          </div>
+        </div>
+      </section>
 
       <div data-report-control data-report-exclude className="card" style={{ padding: '1.5rem', marginBottom: '2rem', display: isReportMode ? 'none' : 'block' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
