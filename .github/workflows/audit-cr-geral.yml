@@ -4,9 +4,9 @@ on:
   push:
     branches: [main]
   schedule:
-    # 08h20 UTC corresponde a 05h20 no horario de Brasilia (UTC-3),
-    # depois da sincronizacao financeira oficial das 05h00.
-    - cron: '20 8 * * *'
+    # 20h20 UTC corresponde a 17h20 no horario de Brasilia (UTC-3),
+    # depois da sincronizacao financeira oficial das 17h00.
+    - cron: '20 20 * * *'
   workflow_dispatch:
 
 permissions:
@@ -67,7 +67,7 @@ jobs:
             | map(abs)
             | max <= 0.02
           ' >/dev/null; then
-            echo "::warning::A distribuicao historica entre as contas 1010101 e 1010107 diverge da regra gerencial 80/20. Consulte sourceAccountDelta no resultado da auditoria."
+            echo "::warning::A distribuicao das contas 1010101 e 1010107 diverge da regra gerencial (80/20 para projetos + receitas avulsas 100% ADM). Consulte sourceAccountDelta no resultado da auditoria."
           fi
 
           echo "Auditoria financeira concluida: total preservado e regra gerencial validada."
