@@ -80,14 +80,14 @@ function MetricCard({ icon: Icon, label, value, info, tone = 'primary', currency
 
 function Pager({ total, page, setPage, pageSize, setPageSize }) {
   const showAll = pageSize === 'all';
-  const effective = showAll ? Math.max(total, 1) : Number(pageSize) || 15;
+  const effective = showAll ? Math.max(total, 1) : Number(pageSize) || 10;
   const pages = showAll ? 1 : Math.max(1, Math.ceil(total / effective));
   const current = Math.min(page, pages);
   return <div className="mgmt-pagination">
     <span>{total===0?'0 registros':showAll?`Exibindo todos os ${total}`:`Página ${current} de ${pages} · ${total} registros`}</span>
     <div className="mgmt-pagination-actions">
       <select value={pageSize} onChange={(e)=>{setPageSize(e.target.value==='all'?'all':Number(e.target.value));setPage(1)}}>
-        <option value={15}>15 por página</option><option value={30}>30 por página</option><option value="all">Ver todos</option>
+        <option value={10}>10 por página</option><option value={30}>30 por página</option><option value={50}>50 por página</option><option value="all">Ver todos</option>
       </select>
       {!showAll&&<>
         <button className="btn" onClick={()=>setPage(1)} disabled={current===1}><ChevronsLeft size={15}/></button>
@@ -208,9 +208,23 @@ export default function TeamDashboard(){
   const[accountFilters,setAccountFilters]=useState([]);
   const[statusFilters,setStatusFilters]=useState([]);
   const[rosterPage,setRosterPage]=useState(1);
-  const[rosterPageSize,setRosterPageSize]=useState(15);
+  const[rosterPageSize,setRosterPageSize]=useState(10);
   const[projectPage,setProjectPage]=useState(1);
-  const[projectPageSize,setProjectPageSize]=useState(15);
+  const[projectPageSize,setProjectPageSize]=useState(10);
+
+  const[rosterNameFilters,setRosterNameFilters]=useState([]);
+  const[rosterRoleFilters,setRosterRoleFilters]=useState([]);
+  const[rosterTypeFilters,setRosterTypeFilters]=useState([]);
+  const[rosterProjectFilters,setRosterProjectFilters]=useState([]);
+  const[rosterReferenceFilter,setRosterReferenceFilter]=useState('');
+  const[rosterPaidFilter,setRosterPaidFilter]=useState('');
+  const[rosterOpenFilter,setRosterOpenFilter]=useState('');
+
+  const[projectNameFilters,setProjectNameFilters]=useState([]);
+  const[projectPeopleFilter,setProjectPeopleFilter]=useState('');
+  const[projectPaidFilter,setProjectPaidFilter]=useState('');
+  const[projectOpenFilter,setProjectOpenFilter]=useState('');
+  const[projectTotalFilter,setProjectTotalFilter]=useState('');
   const[selectedPerson,setSelectedPerson]=useState(null);
   const[error,setError]=useState('');
 
@@ -339,12 +353,54 @@ export default function TeamDashboard(){
     'Custo total':paid+open,
   }];
 
-  const rosterEffective=rosterPageSize==='all'?Math.max(peopleRoster.length,1):rosterPageSize;
-  const visibleRoster=rosterPageSize==='all'?peopleRoster:peopleRoster.slice((rosterPage-1)*rosterEffective,rosterPage*rosterEffective);
-  const projectEffective=projectPageSize==='all'?Math.max(projectRows.length,1):projectPageSize;
-  const visibleProjects=projectPageSize==='all'?projectRows:projectRows.slice((projectPage-1)*projectEffective,projectPage*projectEffective);
+  const rosterRoles=useMemo(()=>[...new Set(peopleRoster.flatMap(item=>item.roles).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),[peopleRoster]);
+  const rosterTypes=['Equipe','Mensal / fixo','Terceiro'];
+  const rosterProjects=useMemo(()=>[...new Set(peopleRoster.flatMap(item=>item.projects).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),[peopleRoster]);
+
+  const parseNumericFilter=(value)=>{
+    const normalized=String(value||'').trim().replace(/\./g,'').replace(',','.').replace(/[^\d.-]/g,'');
+    return normalized ? Number(normalized) : null;
+  };
+  const matchesNumeric=(actual,filterValue)=>{
+    const target=parseNumericFilter(filterValue);
+    if(target===null||Number.isNaN(target)) return true;
+    return Math.abs(Number(actual||0)-target)<0.01;
+  };
+
+  const rosterFiltered=useMemo(()=>peopleRoster.filter(item=>{
+    const rows=item.transactions.filter(r=>inRange(r,startDate,endDate));
+    const rowPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
+    const rowOpen=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
+    const type=item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe';
+
+    if(rosterNameFilters.length>0&&!rosterNameFilters.includes(item.name))return false;
+    if(rosterRoleFilters.length>0&&!item.roles.some(role=>rosterRoleFilters.includes(role)))return false;
+    if(rosterTypeFilters.length>0&&!rosterTypeFilters.includes(type))return false;
+    if(rosterProjectFilters.length>0&&!item.projects.some(project=>rosterProjectFilters.includes(project)))return false;
+    if(!matchesNumeric(item.referenceValue,rosterReferenceFilter))return false;
+    if(!matchesNumeric(rowPaid,rosterPaidFilter))return false;
+    if(!matchesNumeric(rowOpen,rosterOpenFilter))return false;
+    return true;
+  }),[peopleRoster,startDate,endDate,rosterNameFilters,rosterRoleFilters,rosterTypeFilters,rosterProjectFilters,rosterReferenceFilter,rosterPaidFilter,rosterOpenFilter]);
+
+  const projectFiltered=useMemo(()=>projectRows.filter(item=>{
+    if(projectNameFilters.length>0&&!projectNameFilters.includes(item.name))return false;
+    if(!matchesNumeric(item.peopleCount,projectPeopleFilter))return false;
+    if(!matchesNumeric(item.paid,projectPaidFilter))return false;
+    if(!matchesNumeric(item.open,projectOpenFilter))return false;
+    if(!matchesNumeric(item.total,projectTotalFilter))return false;
+    return true;
+  }),[projectRows,projectNameFilters,projectPeopleFilter,projectPaidFilter,projectOpenFilter,projectTotalFilter]);
+
+
+  const rosterEffective=rosterPageSize==='all'?Math.max(rosterFiltered.length,1):rosterPageSize;
+  const visibleRoster=rosterPageSize==='all'?rosterFiltered:rosterFiltered.slice((rosterPage-1)*rosterEffective,rosterPage*rosterEffective);
+  const projectEffective=projectPageSize==='all'?Math.max(projectFiltered.length,1):projectPageSize;
+  const visibleProjects=projectPageSize==='all'?projectFiltered:projectFiltered.slice((projectPage-1)*projectEffective,projectPage*projectEffective);
 
   useEffect(()=>{setRosterPage(1);setProjectPage(1)},[startDate,endDate,personFilters,projectFilters,accountFilters,statusFilters]);
+  useEffect(()=>{setRosterPage(1)},[rosterNameFilters,rosterRoleFilters,rosterTypeFilters,rosterProjectFilters,rosterReferenceFilter,rosterPaidFilter,rosterOpenFilter]);
+  useEffect(()=>{setProjectPage(1)},[projectNameFilters,projectPeopleFilter,projectPaidFilter,projectOpenFilter,projectTotalFilter]);
 
   return <div className="mgmt">
     <header className="mgmt-header">
@@ -404,16 +460,33 @@ export default function TeamDashboard(){
         style={{float:'right'}}
       />
       <div className="mgmt-panel-head"><div><h2>Cadastro da equipe</h2><p>Clique no cadastro para abrir a ficha financeira completa no centro da tela.</p></div></div>
+      <div className="mgmt-table-filters mgmt-table-filters-seven">
+        <label>Pessoa / empresa<MultiSelect options={peopleRoster.map(item=>item.name)} selected={rosterNameFilters} onChange={setRosterNameFilters} placeholder="Todas"/></label>
+        <label>Cargo / função<MultiSelect options={rosterRoles} selected={rosterRoleFilters} onChange={setRosterRoleFilters} placeholder="Todos"/></label>
+        <label>Tipo<MultiSelect options={rosterTypes} selected={rosterTypeFilters} onChange={setRosterTypeFilters} placeholder="Todos"/></label>
+        <label>Valor de referência<input type="text" value={rosterReferenceFilter} onChange={e=>setRosterReferenceFilter(e.target.value)} placeholder="Valor exato"/></label>
+        <label>Projetos<MultiSelect options={rosterProjects} selected={rosterProjectFilters} onChange={setRosterProjectFilters} placeholder="Todos"/></label>
+        <label>Pago<input type="text" value={rosterPaidFilter} onChange={e=>setRosterPaidFilter(e.target.value)} placeholder="Valor exato"/></label>
+        <label>A pagar<input type="text" value={rosterOpenFilter} onChange={e=>setRosterOpenFilter(e.target.value)} placeholder="Valor exato"/></label>
+      </div>
       <div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Pessoa / empresa</th><th>Cargo / função</th><th>Tipo</th><th>Valor de referência</th><th>Projetos</th><th>Pago</th><th>A pagar</th></tr></thead><tbody>
         {visibleRoster.map(item=>{const rows=item.transactions.filter(r=>inRange(r,startDate,endDate));const rowPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const rowOpen=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);return <tr key={item.key} onClick={()=>setSelectedPerson(item)}><td><strong>{item.name}</strong></td><td>{item.roles.join(' · ')||'—'}</td><td>{item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe'}</td><td>{item.fixedMonthly&&!item.referenceValue?'Mensal / fixo':brl(item.referenceValue)}</td><td>{item.projects.length}</td><td className="mgmt-value-paid">{brl(rowPaid)}</td><td className="mgmt-value-open">{brl(rowOpen)}</td></tr>})}
       </tbody></table></div>
-      <Pager total={peopleRoster.length} page={rosterPage} setPage={setRosterPage} pageSize={rosterPageSize} setPageSize={setRosterPageSize}/>
+      <Pager total={rosterFiltered.length} page={rosterPage} setPage={setRosterPage} pageSize={rosterPageSize} setPageSize={setRosterPageSize}/>
     </section>
 
     <section className="mgmt-panel" data-report-section>
       <ReportAdder sectionKey="equipe:obras-custos" title="Custos por Obra" componentName="Tabela de Custos por Obra" page="Equipe" type="TABLE" data={projectRows.map(p=>({Projeto:p.name,'Pessoas / terceiros':p.peopleCount,Pago:p.paid,'A pagar':p.open,Total:p.total}))} filters={reportFilters} style={{float:'right'}}/>
-      <h2>Equipe por projeto</h2><div className="mgmt-table-wrap"><table className="mgmt-table"><thead><tr><th>Projeto</th><th>Pessoas / terceiros</th><th>Pago</th><th>A pagar</th><th>Total</th></tr></thead><tbody>{visibleProjects.map(p=><tr key={p.name}><td><strong>{p.name}</strong></td><td>{p.peopleCount}</td><td className="mgmt-value-paid">{brl(p.paid)}</td><td className="mgmt-value-open">{brl(p.open)}</td><td><strong>{brl(p.total)}</strong></td></tr>)}</tbody></table></div>
-      <Pager total={projectRows.length} page={projectPage} setPage={setProjectPage} pageSize={projectPageSize} setPageSize={setProjectPageSize}/>
+      <h2>Equipe por projeto</h2>
+      <div className="mgmt-table-filters mgmt-table-filters-five">
+        <label>Projeto<MultiSelect options={projectRows.map(item=>item.name)} selected={projectNameFilters} onChange={setProjectNameFilters} placeholder="Todos"/></label>
+        <label>Pessoas / terceiros<input type="number" min="0" value={projectPeopleFilter} onChange={e=>setProjectPeopleFilter(e.target.value)} placeholder="Qtd. exata"/></label>
+        <label>Pago<input type="text" value={projectPaidFilter} onChange={e=>setProjectPaidFilter(e.target.value)} placeholder="Valor exato"/></label>
+        <label>A pagar<input type="text" value={projectOpenFilter} onChange={e=>setProjectOpenFilter(e.target.value)} placeholder="Valor exato"/></label>
+        <label>Total<input type="text" value={projectTotalFilter} onChange={e=>setProjectTotalFilter(e.target.value)} placeholder="Valor exato"/></label>
+      </div>
+      <div className="mgmt-table-wrap"><table className="mgmt-table"><thead><tr><th>Projeto</th><th>Pessoas / terceiros</th><th>Pago</th><th>A pagar</th><th>Total</th></tr></thead><tbody>{visibleProjects.map(p=><tr key={p.name}><td><strong>{p.name}</strong></td><td>{p.peopleCount}</td><td className="mgmt-value-paid">{brl(p.paid)}</td><td className="mgmt-value-open">{brl(p.open)}</td><td><strong>{brl(p.total)}</strong></td></tr>)}</tbody></table></div>
+      <Pager total={projectFiltered.length} page={projectPage} setPage={setProjectPage} pageSize={projectPageSize} setPageSize={setProjectPageSize}/>
     </section>
 
     <PersonModal person={selectedPerson} onClose={()=>setSelectedPerson(null)}/>
