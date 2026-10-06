@@ -16,8 +16,6 @@ import './managementExtras.css';
 
 const PAID_COLOR = '#22c55e';
 const OPEN_COLOR = '#f59e0b';
-const THIRD_PAID_COLOR = '#8b5cf6';
-const THIRD_OPEN_COLOR = '#ec4899';
 const PRIMARY_COLOR = '#3b82f6';
 const brl = (n) => new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format(Number(n)||0);
 const compact = (n) => new Intl.NumberFormat('pt-BR', { notation:'compact', maximumFractionDigits:1 }).format(Number(n)||0);
@@ -391,20 +389,15 @@ export default function TeamDashboard(){
     const map=new Map();
     filteredEntries.forEach(entry=>(entry.transactions||[]).forEach(row=>{
       if(getMonth(row.data)!==key||!inRange(row,startDate,endDate))return;
+      if(!row.paid)return;
       if(projectFilters.length>0&&!projectFilters.includes(row.projeto))return;
       if(accountFilters.length>0&&!accountFilters.includes(rowAccountOption(row)))return;
-      if(statusFilters.length>0&&!statusFilters.includes(row.paid?'Pago':'A pagar'))return;
-      map.set(row.sourceKey,{row,thirdParty:Boolean(entry.thirdParty)});
+      if(statusFilters.length>0&&!statusFilters.includes('Pago'))return;
+      map.set(row.sourceKey,row);
     }));
-    const items=[...map.values()];
-    const regular=items.filter(item=>!item.thirdParty);
-    const third=items.filter(item=>item.thirdParty);
     return{
       month:monthLabel(key),
-      'Equipe · Pago':regular.filter(item=>item.row.paid).reduce((s,item)=>s+Number(item.row.valor||0),0),
-      'Equipe · A pagar':regular.filter(item=>!item.row.paid).reduce((s,item)=>s+Number(item.row.valor||0),0),
-      'Terceiros · Pago':third.filter(item=>item.row.paid).reduce((s,item)=>s+Number(item.row.valor||0),0),
-      'Terceiros · A pagar':third.filter(item=>!item.row.paid).reduce((s,item)=>s+Number(item.row.valor||0),0),
+      'Pago total': [...map.values()].reduce((sum,row)=>sum+Number(row.valor||0),0),
     };
   }),[filteredEntries,startDate,endDate,projectFilters,accountFilters,statusFilters]);
 
@@ -518,8 +511,8 @@ export default function TeamDashboard(){
     <div className="mgmt-flow mgmt-flow-balanced">
       <section id="report-equipe-evolucao" data-report-section className="mgmt-panel">
         <ReportAdder sectionKey="equipe:evolucao" title="Evolução mensal da Equipe" componentName="Gráfico de Evolução Mensal" page="Equipe" type="CHART" data={evolutionData} filters={reportFilters} captureId="report-equipe-evolucao" style={{float:'right'}}/>
-        <h2>Evolução mensal da equipe</h2><p>Comparação mensal entre a equipe vinculada à operação e terceiros, separando pago e a pagar.</p>
-        <div className="mgmt-chart"><ResponsiveContainer><LineChart data={evolutionData}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Equipe · Pago" stroke={PAID_COLOR} strokeWidth={2.8}/><Line type="monotone" dataKey="Equipe · A pagar" stroke={OPEN_COLOR} strokeWidth={2.4}/><Line type="monotone" dataKey="Terceiros · Pago" stroke={THIRD_PAID_COLOR} strokeWidth={2.8}/><Line type="monotone" dataKey="Terceiros · A pagar" stroke={THIRD_OPEN_COLOR} strokeWidth={2.4}/></LineChart></ResponsiveContainer></div>
+        <h2>Evolução mensal da equipe</h2><p>Total pago para a equipe em cada mês, somando todos os vínculos e terceiros.</p>
+        <div className="mgmt-chart"><ResponsiveContainer><LineChart data={evolutionData}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago total" stroke={PAID_COLOR} strokeWidth={3} dot={{r:3}} activeDot={{r:5}}/></LineChart></ResponsiveContainer></div>
       </section>
 
       <section id="report-equipe-obras" data-report-section className="mgmt-panel">
