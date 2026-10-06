@@ -30,6 +30,16 @@ export async function GET(request) {
     const force = request.nextUrl?.searchParams?.get('force') === '1';
     const refreshOnly = request.nextUrl?.searchParams?.get('refresh') === '1';
     const manual = request.nextUrl?.searchParams?.get('manual') === '1';
+    const metadataOnly = request.nextUrl?.searchParams?.get('metadata') === '1';
+
+    if (metadataOnly) {
+      const metadata = await readCurrentSnapshotMetadata();
+      return NextResponse.json({
+        ok: Boolean(metadata),
+        syncedAt: metadata?.updatedAt?.toISOString?.() || null,
+        updatedBy: metadata?.username || null,
+      }, { headers: JSON_HEADERS });
+    }
 
     const requestedRefresh = force || refreshOnly;
 
