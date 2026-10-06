@@ -46,7 +46,7 @@ Nunca versione `.env.local`, tokens, senhas ou credenciais do banco.
 
 - Ao abrir ou recarregar uma página, o painel utiliza o último snapshot salvo.
 - Uma nova leitura do Google Sheets ocorre ao clicar em **Atualizar Dados**.
-- A sincronização automática oficial é executada diariamente às 05h pelo workflow `daily-financial-sync.yml`.
+- A sincronização automática oficial é executada diariamente às 17h pelo workflow `daily-financial-sync.yml`.
 - Se uma atualização falhar, o snapshot anterior permanece disponível.
 
 ## Produção
