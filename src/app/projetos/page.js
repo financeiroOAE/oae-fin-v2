@@ -1704,21 +1704,6 @@ export default function Projetos() {
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          <div style={{ padding: '0.65rem 0.75rem', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)', borderRadius: '7px' }}>
-            <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Recebido</span>
-            <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--success)', fontSize: '15px' }}>{formatCurrency(nfTotalReceived)}</strong>
-          </div>
-          <div style={{ padding: '0.65rem 0.75rem', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)', borderRadius: '7px' }}>
-            <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>A receber</span>
-            <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--warning)', fontSize: '15px' }}>{formatCurrency(nfTotalReceivable)}</strong>
-          </div>
-          <div style={{ padding: '0.65rem 0.75rem', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '7px' }}>
-            <span style={{ display: 'block', fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Notas</span>
-            <strong style={{ display: 'block', marginTop: '0.2rem', color: 'var(--text-main)', fontSize: '15px' }}>{nfesFiltered.length}</strong>
-          </div>
-        </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.5rem', alignItems: 'end', marginBottom: '0.65rem' }}>
           <div style={{ minWidth: 0 }}>
             <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Projeto</label>
