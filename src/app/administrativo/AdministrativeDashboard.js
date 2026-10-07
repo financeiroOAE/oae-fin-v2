@@ -63,7 +63,7 @@ function MovementModal({title,rows,onClose}){
   </div></div>;
 }
 
-export default function AdministrativeDashboard(){
+export default function AdministrativeDashboard({ view = 'overview' }){
   const {isReportMode,openReportBuilder,exitReportMode}=useReport();
   const[data,setData]=useState({revenue:[],expenses:[],adminTeamRows:[],partnerRows:[],monthly:[]});
   const[startDate,setStartDate]=useState('2026-01-01');
@@ -170,6 +170,44 @@ export default function AdministrativeDashboard(){
   };
   const reportMovementRows=adminFinancialRows.map(r=>({Data:r.data,'Nome / fornecedor':r.nome,Conta:r.contaDescricao,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
 
+  const partnerSection=<section id="report-adm-socios" data-report-section className="mgmt-panel">
+    <ReportAdder sectionKey="administrativo:socios" title="Movimentação dos Sócios" componentName="Salários e Retiradas dos Sócios" page="Administrativo" type="CHART" data={partnerMonthly} captureId="report-adm-socios" filters={{Ano:2026,Visão:partnerView}} style={{float:'right'}}/>
+    <div className="mgmt-panel-head"><div><h2>Movimentação dos sócios</h2><p>Fixo e retirada separados, com análise individual ou conjunta.</p></div><div className="mgmt-segmented"><button className={partnerView==='TODOS'?'active':''} onClick={()=>setPartnerView('TODOS')}>Conjunto</button><button className={partnerView==='FRAN'?'active':''} onClick={()=>setPartnerView('FRAN')}>Francielle</button><button className={partnerView==='PAULO'?'active':''} onClick={()=>setPartnerView('PAULO')}>Paulo</button></div></div>
+
+    <div className="mgmt-partner-summary">
+      {partners.map(p=><button key={p.name} className="mgmt-partner-card" onClick={()=>setDetail({title:`Movimentação · ${p.name}`,rows:p.rows})}>
+        <div className="mgmt-partner-name"><span>{p.name}</span><small>Fixo mensal de referência: {brl(p.fixed)}</small></div>
+        <div><span>Pago como equipe em 2026</span><strong className="mgmt-value-paid">{brl(p.fixedPaid)}</strong></div>
+        <div><span>A pagar como equipe</span><strong className="mgmt-value-open">{brl(p.fixedOpen)}</strong></div>
+        <div><span>Retiradas realizadas</span><strong>{brl(p.withdrawal)}</strong></div>
+      </button>)}
+    </div>
+
+    <div className="mgmt-chart"><ResponsiveContainer><BarChart data={partnerMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.14}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/>
+      {partnerSeries.includes('Francielle · Fixo pago')&&<Bar dataKey="Francielle · Fixo pago" fill={COLORS.franFixed} opacity={0.88}/>}
+      {partnerSeries.includes('Francielle · Retirada')&&<Bar dataKey="Francielle · Retirada" fill={COLORS.franWithdrawal}/>}
+      {partnerSeries.includes('Paulo · Fixo pago')&&<Bar dataKey="Paulo · Fixo pago" fill={COLORS.pauloFixed} opacity={0.88}/>}
+      {partnerSeries.includes('Paulo · Retirada')&&<Bar dataKey="Paulo · Retirada" fill={COLORS.pauloWithdrawal}/>}
+      {partnerView==='FRAN'&&<ReferenceLine y={25000} stroke={COLORS.franFixed} strokeDasharray="5 5" label={{value:'Fixo R$ 25 mil',fill:COLORS.franFixed,fontSize:10}}/>}
+      {partnerView==='PAULO'&&<ReferenceLine y={42000} stroke={COLORS.pauloFixed} strokeDasharray="5 5" label={{value:'Fixo R$ 42 mil',fill:COLORS.pauloFixed,fontSize:10}}/>}
+    </BarChart></ResponsiveContainer></div>
+  </section>;
+
+  if(view==='socios'){
+    return <div className="mgmt mgmt-admin">
+      <header className="mgmt-header">
+        <div><span className="mgmt-eyebrow">ADMINISTRATIVO · DIRETORES · 2026</span><h1>Movimentação dos Sócios</h1><p>Relação exclusiva de Francielle Paiva e Paulo Henrique Lemes Araujo.</p></div>
+        <div className="mgmt-actions">
+          <FinancialRefreshButton onUpdated={reloadAdministrativeData} onError={setError} label="Atualizar dados"/>
+          <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Administrativo')} className={`btn ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do Modo Relatório':'Gerar Relatório'}</button>
+        </div>
+      </header>
+      {error&&<div className="mgmt-alert">{error}</div>}
+      {partnerSection}
+      <MovementModal title={detail?.title} rows={detail?.rows} onClose={()=>setDetail(null)}/>
+    </div>;
+  }
+
   return <div className="mgmt mgmt-admin">
     <header className="mgmt-header">
       <div><span className="mgmt-eyebrow">ADMINISTRATIVO · EXERCÍCIO 2026</span><h1>Administrativo</h1><p>Receita administrativa, custos, equipe ADM, sócios e contas a pagar.</p></div>
@@ -233,28 +271,7 @@ export default function AdministrativeDashboard(){
       {!adminTeam.length&&<p>Sem pessoas/empresas classificadas como Equipe ADM.</p>}
     </section>
 
-    <section id="report-adm-socios" data-report-section className="mgmt-panel">
-      <ReportAdder sectionKey="administrativo:socios" title="Movimentação dos Sócios" componentName="Salários e Retiradas dos Sócios" page="Administrativo" type="CHART" data={partnerMonthly} captureId="report-adm-socios" filters={{Ano:2026,Visão:partnerView}} style={{float:'right'}}/>
-      <div className="mgmt-panel-head"><div><h2>Movimentação dos sócios</h2><p>Fixo e retirada separados, com análise individual ou conjunta.</p></div><div className="mgmt-segmented"><button className={partnerView==='TODOS'?'active':''} onClick={()=>setPartnerView('TODOS')}>Conjunto</button><button className={partnerView==='FRAN'?'active':''} onClick={()=>setPartnerView('FRAN')}>Francielle</button><button className={partnerView==='PAULO'?'active':''} onClick={()=>setPartnerView('PAULO')}>Paulo</button></div></div>
-
-      <div className="mgmt-partner-summary">
-        {partners.map(p=><button key={p.name} className="mgmt-partner-card" onClick={()=>setDetail({title:`Movimentação · ${p.name}`,rows:p.rows})}>
-          <div className="mgmt-partner-name"><span>{p.name}</span><small>Fixo mensal de referência: {brl(p.fixed)}</small></div>
-          <div><span>Pago como equipe em 2026</span><strong className="mgmt-value-paid">{brl(p.fixedPaid)}</strong></div>
-          <div><span>A pagar como equipe</span><strong className="mgmt-value-open">{brl(p.fixedOpen)}</strong></div>
-          <div><span>Retiradas realizadas</span><strong>{brl(p.withdrawal)}</strong></div>
-        </button>)}
-      </div>
-
-      <div className="mgmt-chart"><ResponsiveContainer><BarChart data={partnerMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.14}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/>
-        {partnerSeries.includes('Francielle · Fixo pago')&&<Bar dataKey="Francielle · Fixo pago" fill={COLORS.franFixed} opacity={0.88}/>}
-        {partnerSeries.includes('Francielle · Retirada')&&<Bar dataKey="Francielle · Retirada" fill={COLORS.franWithdrawal}/>}
-        {partnerSeries.includes('Paulo · Fixo pago')&&<Bar dataKey="Paulo · Fixo pago" fill={COLORS.pauloFixed} opacity={0.88}/>}
-        {partnerSeries.includes('Paulo · Retirada')&&<Bar dataKey="Paulo · Retirada" fill={COLORS.pauloWithdrawal}/>}
-        {partnerView==='FRAN'&&<ReferenceLine y={25000} stroke={COLORS.franFixed} strokeDasharray="5 5" label={{value:'Fixo R$ 25 mil',fill:COLORS.franFixed,fontSize:10}}/>}
-        {partnerView==='PAULO'&&<ReferenceLine y={42000} stroke={COLORS.pauloFixed} strokeDasharray="5 5" label={{value:'Fixo R$ 42 mil',fill:COLORS.pauloFixed,fontSize:10}}/>}
-      </BarChart></ResponsiveContainer></div>
-    </section>
+    {partnerSection}
 
     <section data-report-section style={{marginBottom:'2rem'}}>
       <ReportAdder sectionKey="administrativo:movimentacoes" title="Movimentações Financeiras — Administrativo" componentName="Tabela de Movimentações Administrativas" page="Administrativo" type="TABLE" data={reportMovementRows} dataSets={{summary:[{'Quantidade de lançamentos':reportMovementRows.length,'Pago':paid,'A pagar':open}],visible:reportMovementRows.slice(0,30),all:reportMovementRows}} detailMode="visible" detailOptions={['summary','visible','all']} filters={reportFilters} style={{float:'right'}}/>
