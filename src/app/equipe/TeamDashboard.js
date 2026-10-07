@@ -221,11 +221,10 @@ function PersonModal({ person, onClose }) {
         ))}
       </div>
 
-      <div className="mgmt-meta-grid">
+      <div className="mgmt-meta-grid mgmt-meta-grid-three">
         <div><span>Tipo</span><strong>{person.thirdParty?'Terceiro':person.fixedMonthly?'Mensal / fixo':'Equipe'}</strong></div>
         <div><span>Plano utilizado</span><strong>{displayPlans.length?displayPlans.join(' · '):'Não identificado'}</strong></div>
         <div><span>Projetos vinculados</span><strong>{person.projects.length}</strong></div>
-        <div><span>Valor de referência</span><strong>{person.fixedMonthly&&!person.referenceValue?'Mensal / fixo':brl(person.referenceValue)}</strong></div>
       </div>
 
       <div className="mgmt-kpis">
