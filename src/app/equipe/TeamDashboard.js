@@ -266,7 +266,7 @@ function PersonModal({ person, onClose }) {
         <p className="mgmt-muted">Cada cor representa um plano de equipe com lançamentos pagos no CP_GERAL. Valores em aberto são exibidos separadamente.</p>
         <div className="mgmt-chart-sm"><ResponsiveContainer>
           <BarChart data={months}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={(v,name)=>[brl(v),name]}/><Legend/>
-            {planKeys.map((plan,index)=><Bar key={plan} dataKey={plan} stackId="pago" fill={PLAN_COLORS[index%PLAN_COLORS.length]} isAnimationActive={false}/>)}
+            {planKeys.map((plan,index)=><Bar key={plan} dataKey={plan} stackId="pago" fill={PLAN_COLORS[financialPlans.findIndex(item=>item.plan===plan)%PLAN_COLORS.length]} isAnimationActive={false}/>)}
           </BarChart>
         </ResponsiveContainer></div>
         <div className="mgmt-table-wrap" style={{marginTop:12}}><table className="mgmt-table"><thead><tr><th>Plano financeiro</th><th>Pago</th><th>A pagar</th><th>Total</th></tr></thead><tbody>
