@@ -48,6 +48,7 @@
 .mgmt-overlay-center{justify-content:center;align-items:center;padding:22px;overflow:auto}
 .mgmt-modal-center{width:min(1080px,calc(100vw - 32px));max-height:calc(100vh - 44px);overflow:auto;background:var(--bg-card);border:1px solid var(--border-color);border-radius:14px;padding:24px;box-shadow:0 30px 80px rgba(0,0,0,.48)}
 .mgmt-meta-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:15px 0}
+.mgmt-meta-grid-three{grid-template-columns:repeat(3,minmax(0,1fr))}
 .mgmt-meta-grid>div{padding:13px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-elevated)}
 .mgmt-meta-grid span,.mgmt-meta-grid strong{display:block}
 .mgmt-meta-grid span{font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
