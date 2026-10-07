@@ -325,3 +325,25 @@
 .mgmt-director-projects .mgmt-table td{padding-top:9px;padding-bottom:9px}
 @media(max-width:1050px){.mgmt-director-grid{grid-template-columns:1fr}}
 @media(max-width:700px){.mgmt-director-chart{height:225px}}
+
+
+/* Fin_Diretoria — hierarquia de ações e tabela financeira */
+.mgmt-partner-detail-button{
+  width:100%;
+  margin-top:8px;
+  justify-content:center;
+  min-height:34px;
+}
+.mgmt-director-open-primary{
+  margin:4px 0 10px;
+  min-height:34px;
+  padding:8px 12px;
+}
+.mgmt-director-movements{
+  margin-top:18px;
+  padding-top:16px;
+  border-top:1px solid var(--border-color);
+}
+.mgmt-director-summary{
+  margin-bottom:14px;
+}
