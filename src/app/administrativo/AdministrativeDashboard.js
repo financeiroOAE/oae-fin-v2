@@ -58,7 +58,7 @@ function MovementModal({title,rows,onClose}){
   const exportConfig={title,orientation:'auto',includeExplanations:true};
   return <div className="mgmt-overlay mgmt-overlay-center" onMouseDown={onClose}><div className="mgmt-modal-center" onMouseDown={e=>e.stopPropagation()}>
     <div className="mgmt-panel-head"><div><span className="mgmt-eyebrow">DETALHAMENTO · 2026</span><h2>{title}</h2><p>Pago {brl(paid)} · A pagar {brl(open)}</p></div><div className="mgmt-actions"><button className="btn" onClick={()=>exportReportToPdf(exportItems,exportConfig)}><FileDown size={15}/> PDF</button><button className="btn" onClick={()=>exportReportToExcel(exportItems,exportConfig)}><FileSpreadsheet size={15}/> Excel</button><ReportAdder sectionKey={sectionKey} title={title} componentName="Detalhamento Administrativo" page="Administrativo" type="TABLE" data={reportRows} filters={{Ano:2026}}/><button className="btn" onClick={onClose}><X size={16}/> Fechar</button></div></div>
-    <section className="mgmt-subcard"><h3>Relação mensal</h3><div className="mgmt-chart-sm"><ResponsiveContainer><LineChart data={monthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago" stroke="#22c55e" strokeWidth={2.5}/><Line type="monotone" dataKey="A pagar" stroke={COLORS.open} strokeWidth={2.5}/></LineChart></ResponsiveContainer></div></section>
+    <section className="mgmt-subcard"><h3>Relação mensal</h3><div className="mgmt-chart-sm"><ResponsiveContainer><LineChart data={monthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" isAnimationActive={false} dataKey="Pago" stroke="#22c55e" strokeWidth={2.5}/><Line type="monotone" isAnimationActive={false} dataKey="A pagar" stroke={COLORS.open} strokeWidth={2.5}/></LineChart></ResponsiveContainer></div></section>
     <section className="mgmt-subcard" style={{marginTop:14}}><h3>Lançamentos</h3><p className="mgmt-muted">Filtros, 30 por página, 50 ou Todos.</p><DataTable data={tableRows} initialPageSize={30} pageSizeOptions={[30,50,'all']}/></section>
   </div></div>;
 }
@@ -328,8 +328,8 @@ export default function AdministrativeDashboard({ view = 'overview' }){
     </div>
 
     <div className="mgmt-chart mgmt-partner-general-chart"><ResponsiveContainer><LineChart data={partnerGeneralMonthly} margin={{top:12,right:18,left:0,bottom:4}}><CartesianGrid strokeDasharray="2 6" opacity={0.09} vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}} axisLine={false} tickLine={false}/><YAxis tickFormatter={compact} tick={{fontSize:10}} axisLine={false} tickLine={false}/><Tooltip formatter={(v)=>brl(v)} contentStyle={{borderRadius:10,padding:'9px 11px',fontSize:11,boxShadow:'0 10px 28px rgba(0,0,0,.14)'}} cursor={{stroke:'var(--border-color)',strokeWidth:1}}/><Legend iconType="circle" wrapperStyle={{fontSize:11}}/>
-      <Line type="monotone" dataKey="Equipe ADM" stroke={COLORS.received} strokeWidth={2.6} dot={false} activeDot={{r:4}}/>
-      <Line type="monotone" dataKey="Retiradas" stroke={COLORS.franWithdrawal} strokeWidth={2.6} dot={false} activeDot={{r:4}}/>
+      <Line type="monotone" isAnimationActive={false} dataKey="Equipe ADM" stroke={COLORS.received} strokeWidth={2.6} dot={false} activeDot={{r:4}}/>
+      <Line type="monotone" isAnimationActive={false} dataKey="Retiradas" stroke={COLORS.franWithdrawal} strokeWidth={2.6} dot={false} activeDot={{r:4}}/>
     </LineChart></ResponsiveContainer></div>
   </section>;
 
@@ -371,8 +371,8 @@ export default function AdministrativeDashboard({ view = 'overview' }){
           </button>
 
           <div className="mgmt-chart-sm mgmt-director-chart"><ResponsiveContainer><BarChart data={monthly}><CartesianGrid strokeDasharray="3 3" opacity={0.12}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/>
-            <Bar dataKey="Fixo pago" fill={tone==='fran'?COLORS.franFixed:COLORS.pauloFixed} opacity={0.9}/>
-            <Bar dataKey="Retirada" fill={tone==='fran'?COLORS.franWithdrawal:COLORS.pauloWithdrawal}/>
+            <Bar isAnimationActive={false} dataKey="Fixo pago" fill={tone==='fran'?COLORS.franFixed:COLORS.pauloFixed} opacity={0.9}/>
+            <Bar isAnimationActive={false} dataKey="Retirada" fill={tone==='fran'?COLORS.franWithdrawal:COLORS.pauloWithdrawal}/>
             <ReferenceLine y={partner.fixed} stroke={tone==='fran'?COLORS.franFixed:COLORS.pauloFixed} strokeDasharray="5 5" label={{value:`Fixo ${brl(partner.fixed)}`,fill:tone==='fran'?COLORS.franFixed:COLORS.pauloFixed,fontSize:9}}/>
           </BarChart></ResponsiveContainer></div>
 
@@ -456,7 +456,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
         <div><h2>Receita x despesa · Jan–Dez/2026</h2><p>Recebido administrativo, previsão de recebimento de out–dez/2026, despesas pagas e compromissos em aberto.</p></div>
         <ReportAdder sectionKey="administrativo:receita-despesa" title="Receita x Despesa — 2026" componentName="Gráfico Receita x Despesa" page="Administrativo" type="CHART" data={chartMonthly} filters={{...reportFilters,'Previsão de recebimento':'Out–Dez/2026'}} captureId="report-adm-receita-despesa"/>
       </div>
-      <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={chartMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar dataKey="Recebido ADM" fill={COLORS.received} radius={[4,4,0,0]}/><Bar dataKey="Previsão recebimento ADM" fill="#0ea5e9" radius={[4,4,0,0]}/><Bar dataKey="Despesa paga" fill={COLORS.paidExpense} radius={[4,4,0,0]}/><Bar dataKey="A pagar" fill={COLORS.open} radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>
+      <div className="mgmt-chart mgmt-chart-wide"><ResponsiveContainer><BarChart data={chartMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Bar isAnimationActive={false} dataKey="Recebido ADM" fill={COLORS.received} radius={[4,4,0,0]}/><Bar isAnimationActive={false} dataKey="Previsão recebimento ADM" fill="#0ea5e9" radius={[4,4,0,0]}/><Bar isAnimationActive={false} dataKey="Despesa paga" fill={COLORS.paidExpense} radius={[4,4,0,0]}/><Bar isAnimationActive={false} dataKey="A pagar" fill={COLORS.open} radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>
     </section>
 
     <section className="mgmt-panel" data-report-section>
@@ -468,7 +468,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
     <section id="report-adm-equipe" data-report-section className="mgmt-panel">
       <ReportAdder sectionKey="administrativo:equipe-adm" title="Visão da Equipe Administrativa" componentName="Equipe Administrativa 2026" page="Administrativo" type="CHART" data={adminTeamMonthly} captureId="report-adm-equipe" filters={{Ano:2026}} style={{float:'right'}}/>
       <div className="mgmt-panel-head"><div><h2>Visão da equipe administrativa</h2><p>Regra anual: todo o pago em 2026 e todo o a pagar previsto até dezembro/2026.</p></div><InfoTooltip title="Equipe Administrativa" content="Este bloco ignora o filtro superior de período por regra: mostra o exercício completo de janeiro a dezembro/2026."/></div>
-      <div className="mgmt-chart-sm"><ResponsiveContainer><LineChart data={adminTeamMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago" stroke="#22c55e" strokeWidth={2.5}/><Line type="monotone" dataKey="A pagar" stroke={COLORS.open} strokeWidth={2.5}/></LineChart></ResponsiveContainer></div>
+      <div className="mgmt-chart-sm"><ResponsiveContainer><LineChart data={adminTeamMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" isAnimationActive={false} dataKey="Pago" stroke="#22c55e" strokeWidth={2.5}/><Line type="monotone" isAnimationActive={false} dataKey="A pagar" stroke={COLORS.open} strokeWidth={2.5}/></LineChart></ResponsiveContainer></div>
       <div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Pessoa / empresa</th><th>Pago 2026</th><th>A pagar até dez/2026</th><th>Total</th></tr></thead><tbody>{adminTeam.map(x=><tr key={x.name} onClick={()=>setDetail({title:`Equipe ADM · ${x.name}`,rows:x.rows})}><td><strong>{x.name}</strong></td><td className="mgmt-value-paid">{brl(x.paid)}</td><td className="mgmt-value-open">{brl(x.open)}</td><td>{brl(x.total)}</td></tr>)}</tbody></table></div>
       {!adminTeam.length&&<p>Sem pessoas/empresas classificadas como Equipe ADM.</p>}
     </section>
