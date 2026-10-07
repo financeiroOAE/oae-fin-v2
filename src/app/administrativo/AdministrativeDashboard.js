@@ -73,7 +73,6 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   const[statusFilters,setStatusFilters]=useState([]);
   const[showAllAccounts,setShowAllAccounts]=useState(false);
   const[detail,setDetail]=useState(null);
-  const[partnerView,setPartnerView]=useState('TODOS');
   const[error,setError]=useState('');
 
   const reloadAdministrativeData=async()=>{
@@ -177,7 +176,6 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   const franMonthly=partnerMonthly.map((row)=>({month:row.month,'Fixo pago':row['Francielle · Fixo pago'],'Retirada':row['Francielle · Retirada']}));
   const pauloMonthly=partnerMonthly.map((row)=>({month:row.month,'Fixo pago':row['Paulo · Fixo pago'],'Retirada':row['Paulo · Retirada']}));
 
-  const partnerSeries=partnerView==='FRAN'?['Francielle · Fixo pago','Francielle · Retirada']:partnerView==='PAULO'?['Paulo · Fixo pago','Paulo · Retirada']:['Francielle · Fixo pago','Francielle · Retirada','Paulo · Fixo pago','Paulo · Retirada'];
 
   const adminFinancialRows=useMemo(()=>expenses.map(r=>({...r,natureza:'Saída',projeto:'ADMINISTRAÇÃO',contaDescricao:r.contaNome||r.contaCodigo,status:r.paid?'Realizado':'A realizar'})),[expenses]);
   const reportFilters={
