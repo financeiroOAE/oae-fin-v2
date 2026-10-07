@@ -79,7 +79,7 @@ function DirectorPersonModal({ partner, projects, onProject, onClose }){
       <div className="mgmt-meta-grid mgmt-meta-grid-three">
         <div><span>Pago como equipe</span><strong className="mgmt-value-paid">{brl(partner.fixedPaid)}</strong></div>
         <div><span>Retiradas realizadas</span><strong>{brl(partner.withdrawal)}</strong></div>
-        <div><span>Outros pagamentos</span><strong>{brl(partner.otherPaid)}</strong></div>
+        <div><span>Total mensal + retiradas</span><strong>{brl(Number(partner.fixedPaid||0)+Number(partner.withdrawal||0))}</strong></div>
       </div>
 
       <section className="mgmt-subcard" style={{marginTop:14}}>
@@ -246,11 +246,21 @@ export default function AdministrativeDashboard({ view = 'overview' }){
 
   const partnerMonthly=useMemo(()=>Array.from({length:12},(_,i)=>{const key=`2026-${String(i+1).padStart(2,'0')}`;const row={month:monthLabel(key)};partners.forEach(p=>{const rows=p.rows.filter(r=>monthOf(r.data)===key);row[`${p.short} · Fixo pago`]=rows.filter(r=>r.type==='EQUIPE_ADM_SOCIO'&&r.paid).reduce((s,r)=>s+Number(r.valor||0),0);row[`${p.short} · Retirada`]=rows.filter(r=>r.type==='RETIRADA'&&r.paid).reduce((s,r)=>s+Number(r.valor||0),0)});return row}),[partners]);
 
-  const directorSummary=useMemo(()=>({
-    withdrawals:partners.reduce((sum,partner)=>sum+Number(partner.withdrawal||0),0),
-    teamPaid:partners.reduce((sum,partner)=>sum+Number(partner.fixedPaid||0),0),
-    otherPaid:partners.reduce((sum,partner)=>sum+Number(partner.otherPaid||0),0),
-  }),[partners]);
+  const partnerGeneralMonthly=useMemo(()=>partnerMonthly.map((row)=>({
+    month:row.month,
+    Francielle:Number(row['Francielle · Fixo pago']||0)+Number(row['Francielle · Retirada']||0),
+    Paulo:Number(row['Paulo · Fixo pago']||0)+Number(row['Paulo · Retirada']||0),
+  })),[partnerMonthly]);
+
+  const directorSummary=useMemo(()=>{
+    const withdrawals=partners.reduce((sum,partner)=>sum+Number(partner.withdrawal||0),0);
+    const teamPaid=partners.reduce((sum,partner)=>sum+Number(partner.fixedPaid||0),0);
+    return {
+      withdrawals,
+      teamPaid,
+      total:withdrawals+teamPaid,
+    };
+  },[partners]);
 
   const projectParticipation=useMemo(()=>Object.fromEntries(partners.map((partner)=>{
     const map=new Map();
@@ -305,8 +315,8 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   const reportMovementRows=adminFinancialRows.map(r=>({Data:r.data,'Nome / fornecedor':r.nome,Conta:r.contaDescricao,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
 
   const partnerSection=<section id="report-adm-socios" data-report-section className="mgmt-panel">
-    <ReportAdder sectionKey="administrativo:socios" title="Visão Geral dos Sócios" componentName="Movimentação Geral dos Sócios" page="Administrativo" type="CHART" data={partnerMonthly} captureId="report-adm-socios" filters={{Ano:2026}} style={{float:'right'}}/>
-    <div className="mgmt-panel-head"><div><h2>Visão geral dos sócios</h2><p>Francielle e Paulo no mesmo gráfico, com fixo pago e retiradas separados.</p></div></div>
+    <ReportAdder sectionKey="administrativo:socios" title="Visão Geral dos Sócios" componentName="Movimentação Geral dos Sócios" page="Administrativo" type="CHART" data={partnerGeneralMonthly} captureId="report-adm-socios" filters={{Ano:2026}} style={{float:'right'}}/>
+    <div className="mgmt-panel-head"><div><h2>Visão geral dos sócios</h2><p>Total mensal de cada sócio: pagamento mensal + retiradas realizadas.</p></div></div>
 
     <div className="mgmt-partner-summary">
       {partners.map(p=><div key={p.name} className="mgmt-partner-card mgmt-partner-card-light">
@@ -317,12 +327,10 @@ export default function AdministrativeDashboard({ view = 'overview' }){
       </div>)}
     </div>
 
-    <div className="mgmt-chart"><ResponsiveContainer><BarChart data={partnerMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.14}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/>
-      <Bar dataKey="Francielle · Fixo pago" fill={COLORS.franFixed} opacity={0.88}/>
-      <Bar dataKey="Francielle · Retirada" fill={COLORS.franWithdrawal}/>
-      <Bar dataKey="Paulo · Fixo pago" fill={COLORS.pauloFixed} opacity={0.88}/>
-      <Bar dataKey="Paulo · Retirada" fill={COLORS.pauloWithdrawal}/>
-    </BarChart></ResponsiveContainer></div>
+    <div className="mgmt-chart mgmt-partner-general-chart"><ResponsiveContainer><LineChart data={partnerGeneralMonthly} margin={{top:12,right:18,left:0,bottom:4}}><CartesianGrid strokeDasharray="2 6" opacity={0.09} vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}} axisLine={false} tickLine={false}/><YAxis tickFormatter={compact} tick={{fontSize:10}} axisLine={false} tickLine={false}/><Tooltip formatter={(v)=>brl(v)} contentStyle={{borderRadius:10,padding:'9px 11px',fontSize:11,boxShadow:'0 10px 28px rgba(0,0,0,.14)'}} cursor={{stroke:'var(--border-color)',strokeWidth:1}}/><Legend iconType="circle" wrapperStyle={{fontSize:11}}/>
+      <Line type="monotone" dataKey="Francielle" stroke={COLORS.franFixed} strokeWidth={2.6} dot={false} activeDot={{r:4}}/>
+      <Line type="monotone" dataKey="Paulo" stroke={COLORS.pauloFixed} strokeWidth={2.6} dot={false} activeDot={{r:4}}/>
+    </LineChart></ResponsiveContainer></div>
   </section>;
 
   if(view==='socios'){
@@ -345,8 +353,8 @@ export default function AdministrativeDashboard({ view = 'overview' }){
 
       <div className="mgmt-metrics-grid mgmt-director-summary">
         <AdminMetricCard icon={CircleDollarSign} label="Total de retiradas" value={directorSummary.withdrawals} tone="warning" info="Soma das retiradas realizadas de Francielle e Paulo em 2026."/>
-        <AdminMetricCard icon={ReceiptText} label="Total pago como equipe" value={directorSummary.teamPaid} tone="success" info="Soma dos pagamentos realizados aos dois no plano de Equipe ADM em 2026."/>
-        <AdminMetricCard icon={Landmark} label="Outros pagamentos" value={directorSummary.otherPaid} tone="info" info="Outros pagamentos realizados em 2026 no CP_GERAL em nome de Francielle ou Paulo, excluindo Equipe ADM e Retiradas."/>
+        <AdminMetricCard icon={ReceiptText} label="Pagamento mensal" value={directorSummary.teamPaid} tone="success" info="Soma dos pagamentos mensais realizados aos dois no plano de Equipe ADM em 2026."/>
+        <AdminMetricCard icon={Landmark} label="Total geral" value={directorSummary.total} tone="info" info="Total de retiradas + pagamentos mensais realizados para Francielle e Paulo em 2026."/>
       </div>
 
       {partnerSection}
