@@ -63,6 +63,53 @@ function MovementModal({title,rows,onClose}){
   </div></div>;
 }
 
+const scopeToken=(value)=>String(value||'item').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+
+function DirectorProjectModal({ selection, onClose }){
+  const {openReportBuilder}=useReport();
+  if(!selection)return null;
+  const {partner,project}=selection;
+  const rows=project.rows||[];
+  const tableRows=rows.map(r=>({...r,natureza:'Saída',projeto:r.projeto||project.name,contaDescricao:r.contaNome||r.contaCodigo||'',status:r.paid?'Realizado':'A realizar'}));
+  const reportRows=rows.map(r=>({Data:r.data,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Nome:r.nome||partner.name,Projeto:r.projeto||project.name,Conta:r.contaNome||r.contaCodigo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
+  const scope=`administrativo:diretoria:pessoa-projeto:${scopeToken(partner.short)}:${scopeToken(project.name)}`;
+
+  return <div className="mgmt-overlay mgmt-overlay-center mgmt-overlay-project" onMouseDown={onClose}>
+    <div className="mgmt-modal-center mgmt-project-modal" onMouseDown={(e)=>e.stopPropagation()}>
+      <div className="mgmt-panel-head">
+        <div><span className="mgmt-eyebrow">MOVIMENTOS DA OBRA · 2026</span><h2>{project.name}</h2><p>{partner.name} · {rows.length} lançamento{rows.length!==1?'s':''}</p></div>
+        <div className="mgmt-actions">
+          <button className="btn" onClick={()=>openReportBuilder('Administrativo',scope,`${partner.name} · ${project.name}`)}><FileText size={15}/> Gerar Relatório</button>
+          <button className="btn" onClick={onClose}><X size={16}/> Fechar</button>
+        </div>
+      </div>
+      <div aria-hidden="true" style={{display:'none'}}>
+        <ReportAdder
+          sectionKey={`${scope}:resumo`}
+          title={`Resumo — ${partner.name} — ${project.name}`}
+          componentName="Resumo da Diretoria por Projeto"
+          page="Administrativo"
+          scope={scope}
+          type="SUMMARY"
+          data={[{Pessoa:partner.name,Projeto:project.name,Pago:project.paid,'A pagar':project.open,Total:project.paid+project.open,Lançamentos:rows.length}]}
+          filters={{Pessoa:partner.name,Projeto:project.name}}
+        />
+        <ReportAdder
+          sectionKey={`${scope}:movimentos`}
+          title={`Movimentações — ${partner.name} — ${project.name}`}
+          componentName="Movimentações da Diretoria por Projeto"
+          page="Administrativo"
+          scope={scope}
+          type="TABLE"
+          data={reportRows}
+          filters={{Pessoa:partner.name,Projeto:project.name}}
+        />
+      </div>
+      <DataTable data={tableRows} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
+    </div>
+  </div>;
+}
+
 export default function AdministrativeDashboard({ view = 'overview' }){
   const {isReportMode,openReportBuilder,exitReportMode}=useReport();
   const[data,setData]=useState({revenue:[],expenses:[],adminTeamRows:[],partnerRows:[],monthly:[]});
@@ -73,6 +120,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   const[statusFilters,setStatusFilters]=useState([]);
   const[showAllAccounts,setShowAllAccounts]=useState(false);
   const[detail,setDetail]=useState(null);
+  const[selectedDirectorProject,setSelectedDirectorProject]=useState(null);
   const[error,setError]=useState('');
 
   const reloadAdministrativeData=async()=>{
@@ -160,17 +208,19 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   const projectParticipation=useMemo(()=>Object.fromEntries(partners.map((partner)=>{
     const map=new Map();
     partner.rows
-      .filter((row)=>row.type==='EQUIPE_ADM_SOCIO'&&row.paid)
+      .filter((row)=>row.type==='EQUIPE_ADM_SOCIO')
       .forEach((row)=>{
         const project=String(row.projeto||'').trim();
         const normalized=project.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
         if(!project||normalized.includes('ADMINISTR')||normalized==='PROJETOS'||normalized==='SEM PROJETO') return;
-        const item=map.get(project)||{project,paid:0,rows:[]};
-        item.paid+=Number(row.valor||0);
+        const item=map.get(project)||{name:project,paid:0,open:0,rows:[]};
+        item[row.paid?'paid':'open']+=Number(row.valor||0);
         item.rows.push(row);
         map.set(project,item);
       });
-    return [partner.short,[...map.values()].map((item)=>({...item,paid:Math.round(item.paid*100)/100})).sort((a,b)=>b.paid-a.paid)];
+    return [partner.short,[...map.values()]
+      .map((item)=>({...item,paid:Math.round(item.paid*100)/100,open:Math.round(item.open*100)/100}))
+      .sort((a,b)=>(b.paid+b.open)-(a.paid+a.open))];
   })),[partners]);
 
   const franMonthly=partnerMonthly.map((row)=>({month:row.month,'Fixo pago':row['Francielle · Fixo pago'],'Retirada':row['Francielle · Retirada']}));
@@ -246,17 +296,27 @@ export default function AdministrativeDashboard({ view = 'overview' }){
           </BarChart></ResponsiveContainer></div>
 
           <div className="mgmt-director-projects">
-            <div className="mgmt-panel-head mgmt-director-project-head"><div><h3>Participação por projeto</h3><p>Somente valores efetivamente pagos em 2026 no plano de Equipe ADM vinculados a uma obra.</p></div></div>
-            {projects.length?<div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Projeto</th><th>Valor pago</th><th>Participação</th></tr></thead><tbody>{projects.map((item)=>{
-              const total=projects.reduce((sum,row)=>sum+Number(row.paid||0),0);
-              const share=total>0?(item.paid/total)*100:0;
-              return <tr key={item.project} onClick={()=>setDetail({title:`${partner.short} · ${item.project}`,rows:item.rows})}><td><strong>{item.project}</strong></td><td className="mgmt-value-paid">{brl(item.paid)}</td><td>{share.toFixed(1)}%</td></tr>;
-            })}</tbody></table></div>:<p className="mgmt-muted">Sem pagamentos vinculados diretamente a projetos para este sócio.</p>}
+            <div className="mgmt-panel-head mgmt-director-project-head"><div><h3>Participação por projeto</h3><p>Mesmo padrão da aba Equipe: pago, a pagar e abertura das movimentações da obra.</p></div></div>
+            <div className="mgmt-project-cards">
+              {projects.map((item)=><button
+                type="button"
+                className={`mgmt-project-card mgmt-project-card-button ${selectedDirectorProject?.partner?.short===partner.short&&selectedDirectorProject?.project?.name===item.name?'active':''}`}
+                key={item.name}
+                onClick={()=>setSelectedDirectorProject({partner,project:item})}
+              >
+                <strong>{item.name}</strong>
+                <div><span>Pago</span><b className="mgmt-value-paid">{brl(item.paid)}</b></div>
+                <div><span>A pagar</span><b className="mgmt-value-open">{brl(item.open)}</b></div>
+                <small>{item.rows.length} lançamento{item.rows.length!==1?'s':''} · clique para ver</small>
+              </button>)}
+            </div>
+            {!projects.length&&<p className="mgmt-muted">Sem movimentações vinculadas a obras.</p>}
           </div>
         </section>)}
       </div>
 
       <MovementModal title={detail?.title} rows={detail?.rows} onClose={()=>setDetail(null)}/>
+      <DirectorProjectModal selection={selectedDirectorProject} onClose={()=>setSelectedDirectorProject(null)}/>
     </div>;
   }
 
