@@ -28,7 +28,7 @@ export default function Sidebar() {
   const [iconError, setIconError] = useState(false);
   const [sessionUser, setSessionUser] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [administrativeOpen, setAdministrativeOpen] = useState(false);
+  const [administrativeOpen, setAdministrativeOpen] = useState(null);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -80,7 +80,7 @@ export default function Sidebar() {
   const isSettingsPath = ['/configuracoes', '/atualizacao-dados', '/historico'].some((path) => pathname.startsWith(path));
   const isAdministrativePath = pathname.startsWith('/administrativo');
   const showSettingsChildren = settingsOpen || isSettingsPath;
-  const showAdministrativeChildren = administrativeOpen || isAdministrativePath;
+  const showAdministrativeChildren = administrativeOpen ?? isAdministrativePath;
   const menuItems = [
     { name: 'Início', path: '/', icon: LayoutDashboard, permission: 'inicio' },
     { name: 'Visão Financeira', path: '/visao-financeira', icon: BarChart3, permission: 'visao_financeira' },
@@ -117,7 +117,7 @@ export default function Sidebar() {
       )}
       
       {isMobile && !collapsed && (
-        <div onClick={() => setCollapsed(true)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 95, backdropFilter: 'blur(2px)' }} />
+        <div onClick={() => setCollapsed(true)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 95 }} />
       )}
       
       <aside style={{
@@ -127,7 +127,8 @@ export default function Sidebar() {
         flexShrink: 0,
         backgroundColor: 'var(--bg-sidebar)',
         borderRight: '1px solid var(--border-color)',
-        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease',
+        // Evita reflow contínuo de gráficos e tabelas durante o recolhimento.
+        transition: isMobile ? 'transform 0.18s ease-out' : 'none',
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
@@ -245,9 +246,28 @@ export default function Sidebar() {
               const showGroupChildren = isAdministrativeGroup ? showAdministrativeChildren : showSettingsChildren;
               const isActive = pathname === item.path || visibleChildren.some((child) => pathname === child.path);
               const Icon = item.icon;
+              const MenuLink = isAdministrativeGroup ? 'button' : Link;
               return (
                 <li key={item.name}>
-                  <Link href={item.path} onClick={() => { if (isGroup) { if (isAdministrativeGroup) setAdministrativeOpen(true); else setSettingsOpen(true); } if(isMobile) setCollapsed(true); }} style={{
+                  <MenuLink
+                    {...(isAdministrativeGroup
+                      ? { type: 'button', 'aria-expanded': showGroupChildren, 'aria-controls': 'sidebar-administrativo-submenu' }
+                      : { href: item.path })}
+                    onClick={() => {
+                      if (isAdministrativeGroup) {
+                        if (collapsed && !isMobile) {
+                          setCollapsed(false);
+                          localStorage.setItem('sidebar_collapsed', 'false');
+                          setAdministrativeOpen(true);
+                        } else {
+                          setAdministrativeOpen((open) => !(open ?? isAdministrativePath));
+                        }
+                      } else {
+                        if (isGroup) setSettingsOpen(true);
+                        if (isMobile) setCollapsed(true);
+                      }
+                    }}
+                    style={{
                     display: 'flex',
                     alignItems: 'center',
                     padding: '0.5rem',
@@ -255,7 +275,12 @@ export default function Sidebar() {
                     textDecoration: 'none',
                     backgroundColor: isActive ? 'rgba(57, 198, 198, 0.1)' : 'transparent',
                     borderRadius: '6px',
-                    transition: 'all 0.2s ease',
+                    border: 'none',
+                    width: isAdministrativeGroup ? '100%' : undefined,
+                    font: 'inherit',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.12s ease',
                     justifyContent: (collapsed && !isMobile) ? 'center' : 'flex-start',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden'
@@ -270,22 +295,24 @@ export default function Sidebar() {
                     {!(collapsed && !isMobile) && (
                       <>
                         <span style={{ fontSize: '14px', fontWeight: isActive ? '600' : '500', marginLeft: '0.6rem', flex: 1 }}>{item.name}</span>
-                        {isGroup && (
-                          <span role="button" tabIndex={0} aria-label={showGroupChildren ? 'Recolher submenu' : 'Expandir submenu'} onClick={(event) => { event.preventDefault(); event.stopPropagation(); if (isAdministrativeGroup) setAdministrativeOpen((open) => !open); else setSettingsOpen((open) => !open); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (isAdministrativeGroup) setAdministrativeOpen((open) => !open); else setSettingsOpen((open) => !open); } }} style={{ display: 'flex', padding: '2px', color: 'inherit', cursor: 'pointer' }}>
+                        {isGroup && (isAdministrativeGroup ? (
+                          <ChevronDown size={14} aria-hidden="true" style={{ transform: showGroupChildren ? 'rotate(180deg)' : 'none' }} />
+                        ) : (
+                          <span role="button" tabIndex={0} aria-label={showGroupChildren ? 'Recolher submenu' : 'Expandir submenu'} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setSettingsOpen((open) => !open); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setSettingsOpen((open) => !open); } }} style={{ display: 'flex', padding: '2px', color: 'inherit', cursor: 'pointer' }}>
                             <ChevronDown size={14} style={{ transform: showGroupChildren ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                           </span>
-                        )}
+                        ))}
                       </>
                     )}
-                  </Link>
+                  </MenuLink>
                   {isGroup && showGroupChildren && !(collapsed && !isMobile) && (
-                    <ul style={{ listStyle: 'none', margin: '0.2rem 0 0.3rem 1.15rem', paddingLeft: '0.65rem', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <ul id={isAdministrativeGroup ? 'sidebar-administrativo-submenu' : undefined} style={{ listStyle: 'none', margin: '0.2rem 0 0.3rem 1.15rem', paddingLeft: '0.65rem', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                       {visibleChildren.map((child) => {
                         const ChildIcon = child.icon;
                         const childActive = pathname === child.path;
                         return (
                           <li key={child.path}>
-                            <Link href={child.path} onClick={() => { if (isMobile) setCollapsed(true); }} style={{ display: 'flex', alignItems: 'center', gap: child.subtle ? '0.4rem' : '0.5rem', padding: child.subtle ? '0.38rem 0.5rem' : '0.45rem 0.55rem', borderRadius: '6px', textDecoration: 'none', color: childActive ? 'var(--primary)' : 'var(--text-secondary)', background: childActive ? (child.subtle ? 'rgba(57,198,198,0.05)' : 'rgba(57,198,198,0.09)') : 'transparent', fontSize: child.subtle ? '11px' : '12px', fontWeight: childActive ? (child.subtle ? '600' : '700') : '500', lineHeight: 1.25, opacity: child.subtle && !childActive ? 0.86 : 1 }}>
+                            <Link href={child.path} prefetch={false} onClick={() => { if (isMobile) setCollapsed(true); }} style={{ display: 'flex', alignItems: 'center', gap: child.subtle ? '0.4rem' : '0.5rem', padding: child.subtle ? '0.38rem 0.5rem' : '0.45rem 0.55rem', borderRadius: '6px', textDecoration: 'none', color: childActive ? 'var(--primary)' : 'var(--text-secondary)', background: childActive ? (child.subtle ? 'rgba(57,198,198,0.05)' : 'rgba(57,198,198,0.09)') : 'transparent', fontSize: child.subtle ? '11px' : '12px', fontWeight: childActive ? (child.subtle ? '600' : '700') : '500', lineHeight: 1.25, opacity: child.subtle && !childActive ? 0.86 : 1 }}>
                               <ChildIcon size={child.subtle ? 13 : 14} style={{ flexShrink: 0 }} /> <span style={{ whiteSpace: 'normal' }}>{child.name}</span>
                             </Link>
                           </li>
