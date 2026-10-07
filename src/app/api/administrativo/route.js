@@ -50,6 +50,7 @@ function adminType(row) {
   const account = norm(row.contaNome);
   if (isPartner(row) && (code === '2010522' || account.includes('RETIRAD') && account.includes('SOCIO'))) return 'RETIRADA';
   if (isPartner(row) && (code === '2010302' || account.includes('EQUIP') && account.includes('ADM'))) return 'EQUIPE_ADM_SOCIO';
+  if (isPartner(row)) return 'OUTRO_PAGAMENTO_SOCIO';
   if (code === '2010302' || account.includes('EQUIP') && account.includes('ADM')) return 'EQUIPE_ADM';
   return 'DESPESA_ADM';
 }
@@ -121,7 +122,7 @@ export async function GET() {
     rules: {
       revenueAdministrative: '20% da coluna K para receitas de projeto; receitas avulsas sem projeto e com centro de custo ADMINISTRAÇÃO entram 100% no Administrativo',
       expenseScope: 'Centro de custo ADMINISTRAÇÃO',
-      partnerScope: 'Francielle/Paulo: plano 2010302 em todo o CP_GERAL + retiradas 2010522',
+      partnerScope: 'Francielle/Paulo: todos os lançamentos de 2026 no CP_GERAL, classificados em Equipe ADM, Retirada e Outros pagamentos',
     },
   }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
