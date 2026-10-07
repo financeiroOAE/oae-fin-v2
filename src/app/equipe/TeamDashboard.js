@@ -79,7 +79,6 @@ const accountOptionLabel = (code, name) => {
 };
 const entryAccountOptions = (entry) => {
   const values=new Set();
-  if(entry.account||entry.accountCode) values.add(accountOptionLabel(entry.accountCode,entry.account));
   (entry.transactions||[]).forEach(row=>{
     if(row.contaNome||row.contaCodigo||row.contaDescricao) values.add(accountOptionLabel(row.contaCodigo,row.contaNome||row.contaDescricao));
   });
@@ -144,7 +143,7 @@ function PersonModal({ person, onClose }) {
   const personReportScope=`equipe:ficha:${person.key}`;
   const rows=person.transactions||[];
   const {plans: financialPlans,months,planKeys}=monthlyByPlan(rows);
-  const displayPlans=financialPlans.length?financialPlans.map(item=>item.plan):[...new Set(person.accounts.map(planLabel).filter(Boolean))];
+  const displayPlans=financialPlans.map(item=>item.plan);
   const paid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
   const open=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
 
@@ -485,7 +484,7 @@ export default function TeamDashboard(){
     const relevantRows=(entry.transactions||[]).filter(r=>inRange(r,startDate,endDate));
     if(projectFilters.length>0&&!relevantRows.some(r=>projectFilters.includes(r.projeto)))return false;
     if(accountFilters.length>0){
-      const hasAccount=entryAccountOptions(entry).some(value=>accountFilters.includes(value)) || relevantRows.some(row=>accountFilters.includes(rowAccountOption(row)));
+      const hasAccount=relevantRows.some(row=>accountFilters.includes(rowAccountOption(row)));
       if(!hasAccount)return false;
     }
     if(statusFilters.length>0){
@@ -503,7 +502,7 @@ export default function TeamDashboard(){
     const relevantRows=(entry.transactions||[]).filter(row=>inTeamRelationScope(entry,row,startDate,endDate));
     if(projectFilters.length>0&&!relevantRows.some(row=>projectFilters.includes(row.projeto)))return false;
     if(accountFilters.length>0){
-      const hasAccount=entryAccountOptions(entry).some(value=>accountFilters.includes(value)) || relevantRows.some(row=>accountFilters.includes(rowAccountOption(row)));
+      const hasAccount=relevantRows.some(row=>accountFilters.includes(rowAccountOption(row)));
       if(!hasAccount)return false;
     }
     if(statusFilters.length>0){
@@ -534,7 +533,6 @@ export default function TeamDashboard(){
       const key=norm(entry.person);
       const item=map.get(key)||{key,name:entry.person,roles:new Set(),projects:new Set(),accounts:new Set(),thirdParty:false,fixedMonthly:false,transactions:new Map()};
       if(entry.role)item.roles.add(entry.role);
-      if(entry.account)item.accounts.add(entry.account);
       (entry.project?[entry.project]:entry.projects||[]).filter(Boolean).filter(p=>norm(p)!=='PROJETOS').filter(p=>projectFilters.length===0||projectFilters.includes(p)).forEach(p=>item.projects.add(p));
       item.thirdParty ||= Boolean(entry.thirdParty);
       item.fixedMonthly ||= Boolean(entry.fixedMonthly);
@@ -641,7 +639,7 @@ export default function TeamDashboard(){
       'Cargo / função':item.roles.join(' · '),
       'Tipo':item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe',
       'Projetos vinculados':item.projects.join(' · '),
-      'Plano(s) cadastral(is)':item.accounts.map(planLabel).join(' · '),
+      'Plano(s) movimentado(s)':item.accounts.map(planLabel).join(' · '),
     };
     if(rows.length===0) return [{...base,Data:'',Documento:'',Obra:'',Plano:'',Situação:'Sem movimentação',Valor:0}];
     return rows.map(r=>({
