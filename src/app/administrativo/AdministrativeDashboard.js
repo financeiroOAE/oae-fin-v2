@@ -323,8 +323,6 @@ export default function AdministrativeDashboard({ view = 'overview' }){
       {!adminTeam.length&&<p>Sem pessoas/empresas classificadas como Equipe ADM.</p>}
     </section>
 
-    {partnerSection}
-
     <section data-report-section style={{marginBottom:'2rem'}}>
       <ReportAdder sectionKey="administrativo:movimentacoes" title="Movimentações Financeiras — Administrativo" componentName="Tabela de Movimentações Administrativas" page="Administrativo" type="TABLE" data={reportMovementRows} dataSets={{summary:[{'Quantidade de lançamentos':reportMovementRows.length,'Pago':paid,'A pagar':open}],visible:reportMovementRows.slice(0,30),all:reportMovementRows}} detailMode="visible" detailOptions={['summary','visible','all']} filters={reportFilters} style={{float:'right'}}/>
       <h2 style={{fontSize:'18px',fontWeight:600,marginBottom:'1rem'}}>Movimentações Financeiras · Administrativo</h2>
