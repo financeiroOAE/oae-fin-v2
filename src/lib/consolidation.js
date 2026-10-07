@@ -214,8 +214,8 @@ export function buildDreRevenueItems(baseData) {
         valorFaturamentoOriginal: allocation.administrative,
         valorTotalTitulo: allocation.administrative,
         contaCodigo: '1010107',
-        contaNome: 'REC. ADMINISTRATIVO (100%)',
-        contaDescricao: 'REC. ADMINISTRATIVO (100%)',
+        contaNome: 'REC. ADMINISTRATIVA (OUTRAS)',
+        contaDescricao: 'REC. ADMINISTRATIVA (OUTRAS)',
         projeto: 'ADMINISTRAÇÃO',
         parcelaRateio: 'ADMINISTRACAO_100',
       }];
