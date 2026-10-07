@@ -158,6 +158,25 @@ export default function AdministrativeDashboard({ view = 'overview' }){
 
   const partnerMonthly=useMemo(()=>Array.from({length:12},(_,i)=>{const key=`2026-${String(i+1).padStart(2,'0')}`;const row={month:monthLabel(key)};partners.forEach(p=>{const rows=p.rows.filter(r=>monthOf(r.data)===key);row[`${p.short} · Fixo pago`]=rows.filter(r=>r.type==='EQUIPE_ADM_SOCIO'&&r.paid).reduce((s,r)=>s+Number(r.valor||0),0);row[`${p.short} · Retirada`]=rows.filter(r=>r.type==='RETIRADA'&&r.paid).reduce((s,r)=>s+Number(r.valor||0),0)});return row}),[partners]);
 
+  const projectParticipation=useMemo(()=>Object.fromEntries(partners.map((partner)=>{
+    const map=new Map();
+    partner.rows
+      .filter((row)=>row.type==='EQUIPE_ADM_SOCIO'&&row.paid)
+      .forEach((row)=>{
+        const project=String(row.projeto||'').trim();
+        const normalized=project.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+        if(!project||normalized.includes('ADMINISTR')||normalized==='PROJETOS'||normalized==='SEM PROJETO') return;
+        const item=map.get(project)||{project,paid:0,rows:[]};
+        item.paid+=Number(row.valor||0);
+        item.rows.push(row);
+        map.set(project,item);
+      });
+    return [partner.short,[...map.values()].map((item)=>({...item,paid:Math.round(item.paid*100)/100})).sort((a,b)=>b.paid-a.paid)];
+  })),[partners]);
+
+  const franMonthly=partnerMonthly.map((row)=>({month:row.month,'Fixo pago':row['Francielle · Fixo pago'],'Retirada':row['Francielle · Retirada']}));
+  const pauloMonthly=partnerMonthly.map((row)=>({month:row.month,'Fixo pago':row['Paulo · Fixo pago'],'Retirada':row['Paulo · Retirada']}));
+
   const partnerSeries=partnerView==='FRAN'?['Francielle · Fixo pago','Francielle · Retirada']:partnerView==='PAULO'?['Paulo · Fixo pago','Paulo · Retirada']:['Francielle · Fixo pago','Francielle · Retirada','Paulo · Fixo pago','Paulo · Retirada'];
 
   const adminFinancialRows=useMemo(()=>expenses.map(r=>({...r,natureza:'Saída',projeto:'ADMINISTRAÇÃO',contaDescricao:r.contaNome||r.contaCodigo,status:r.paid?'Realizado':'A realizar'})),[expenses]);
@@ -171,12 +190,12 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   const reportMovementRows=adminFinancialRows.map(r=>({Data:r.data,'Nome / fornecedor':r.nome,Conta:r.contaDescricao,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
 
   const partnerSection=<section id="report-adm-socios" data-report-section className="mgmt-panel">
-    <ReportAdder sectionKey="administrativo:socios" title="Movimentação dos Sócios" componentName="Salários e Retiradas dos Sócios" page="Administrativo" type="CHART" data={partnerMonthly} captureId="report-adm-socios" filters={{Ano:2026,Visão:partnerView}} style={{float:'right'}}/>
-    <div className="mgmt-panel-head"><div><h2>Movimentação dos sócios</h2><p>Fixo e retirada separados, com análise individual ou conjunta.</p></div><div className="mgmt-segmented"><button className={partnerView==='TODOS'?'active':''} onClick={()=>setPartnerView('TODOS')}>Conjunto</button><button className={partnerView==='FRAN'?'active':''} onClick={()=>setPartnerView('FRAN')}>Francielle</button><button className={partnerView==='PAULO'?'active':''} onClick={()=>setPartnerView('PAULO')}>Paulo</button></div></div>
+    <ReportAdder sectionKey="administrativo:socios" title="Visão Geral dos Sócios" componentName="Movimentação Geral dos Sócios" page="Administrativo" type="CHART" data={partnerMonthly} captureId="report-adm-socios" filters={{Ano:2026}} style={{float:'right'}}/>
+    <div className="mgmt-panel-head"><div><h2>Visão geral dos sócios</h2><p>Francielle e Paulo no mesmo gráfico, com fixo pago e retiradas separados.</p></div></div>
 
     <div className="mgmt-partner-summary">
-      {partners.map(p=><button key={p.name} className="mgmt-partner-card" onClick={()=>setDetail({title:`Movimentação · ${p.name}`,rows:p.rows})}>
-        <div className="mgmt-partner-name"><span>{p.name}</span><small>Fixo mensal de referência: {brl(p.fixed)}</small></div>
+      {partners.map(p=><button key={p.name} className="mgmt-partner-card mgmt-partner-card-light" onClick={()=>setDetail({title:`Movimentação · ${p.name}`,rows:p.rows})}>
+        <div className="mgmt-partner-name"><span>{p.name}</span><small>Clique para ver as movimentações</small></div>
         <div><span>Pago como equipe em 2026</span><strong className="mgmt-value-paid">{brl(p.fixedPaid)}</strong></div>
         <div><span>A pagar como equipe</span><strong className="mgmt-value-open">{brl(p.fixedOpen)}</strong></div>
         <div><span>Retiradas realizadas</span><strong>{brl(p.withdrawal)}</strong></div>
@@ -184,26 +203,61 @@ export default function AdministrativeDashboard({ view = 'overview' }){
     </div>
 
     <div className="mgmt-chart"><ResponsiveContainer><BarChart data={partnerMonthly}><CartesianGrid strokeDasharray="3 3" opacity={0.14}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/>
-      {partnerSeries.includes('Francielle · Fixo pago')&&<Bar dataKey="Francielle · Fixo pago" fill={COLORS.franFixed} opacity={0.88}/>}
-      {partnerSeries.includes('Francielle · Retirada')&&<Bar dataKey="Francielle · Retirada" fill={COLORS.franWithdrawal}/>}
-      {partnerSeries.includes('Paulo · Fixo pago')&&<Bar dataKey="Paulo · Fixo pago" fill={COLORS.pauloFixed} opacity={0.88}/>}
-      {partnerSeries.includes('Paulo · Retirada')&&<Bar dataKey="Paulo · Retirada" fill={COLORS.pauloWithdrawal}/>}
-      {partnerView==='FRAN'&&<ReferenceLine y={25000} stroke={COLORS.franFixed} strokeDasharray="5 5" label={{value:'Fixo R$ 25 mil',fill:COLORS.franFixed,fontSize:10}}/>}
-      {partnerView==='PAULO'&&<ReferenceLine y={42000} stroke={COLORS.pauloFixed} strokeDasharray="5 5" label={{value:'Fixo R$ 42 mil',fill:COLORS.pauloFixed,fontSize:10}}/>}
+      <Bar dataKey="Francielle · Fixo pago" fill={COLORS.franFixed} opacity={0.88}/>
+      <Bar dataKey="Francielle · Retirada" fill={COLORS.franWithdrawal}/>
+      <Bar dataKey="Paulo · Fixo pago" fill={COLORS.pauloFixed} opacity={0.88}/>
+      <Bar dataKey="Paulo · Retirada" fill={COLORS.pauloWithdrawal}/>
     </BarChart></ResponsiveContainer></div>
   </section>;
 
   if(view==='socios'){
-    return <div className="mgmt mgmt-admin">
-      <header className="mgmt-header">
-        <div><span className="mgmt-eyebrow">ADMINISTRATIVO · DIRETORES · 2026</span><h1>Movimentação dos Sócios</h1><p>Relação exclusiva de Francielle Paiva e Paulo Henrique Lemes Araujo.</p></div>
+    const fran=partners.find((p)=>p.short==='Francielle');
+    const paulo=partners.find((p)=>p.short==='Paulo');
+    const directorPanels=[
+      {partner:fran,monthly:franMonthly,projects:projectParticipation.Francielle||[],tone:'fran'},
+      {partner:paulo,monthly:pauloMonthly,projects:projectParticipation.Paulo||[],tone:'paulo'},
+    ].filter((item)=>item.partner);
+
+    return <div className="mgmt mgmt-admin mgmt-fin-diretoria">
+      <header className="mgmt-header mgmt-director-header">
+        <div><span className="mgmt-eyebrow">ADMINISTRATIVO · DIRETORIA · 2026</span><h1>Fin_Diretoria</h1><p>Visão financeira de Francielle Paiva e Paulo Henrique Lemes Araujo.</p></div>
         <div className="mgmt-actions">
-          <FinancialRefreshButton onUpdated={reloadAdministrativeData} onError={setError} label="Atualizar dados"/>
-          <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Administrativo')} className={`btn ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do Modo Relatório':'Gerar Relatório'}</button>
+          <FinancialRefreshButton onUpdated={reloadAdministrativeData} onError={setError} label="Atualizar"/>
+          <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Administrativo')} className={`btn btn-quiet ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do relatório':'Relatório'}</button>
         </div>
       </header>
       {error&&<div className="mgmt-alert">{error}</div>}
+
       {partnerSection}
+
+      <div className="mgmt-director-grid">
+        {directorPanels.map(({partner,monthly,projects,tone})=><section key={partner.short} className="mgmt-panel mgmt-director-panel" data-report-section>
+          <div className="mgmt-panel-head">
+            <div><span className="mgmt-eyebrow">{partner.short.toUpperCase()} · VISÃO INDIVIDUAL</span><h2>{partner.name}</h2><p>Fixo pago, retiradas e participação financeira por projeto.</p></div>
+            <ReportAdder sectionKey={`administrativo:diretoria:${partner.short.toLowerCase()}`} title={`Fin_Diretoria · ${partner.short}`} componentName={`Visão individual · ${partner.short}`} page="Administrativo" type="CHART" data={monthly} filters={{Ano:2026}}/>
+          </div>
+
+          <button className="mgmt-director-open" onClick={()=>setDetail({title:`Movimentação · ${partner.name}`,rows:partner.rows})}>
+            Ver todas as movimentações
+          </button>
+
+          <div className="mgmt-chart-sm mgmt-director-chart"><ResponsiveContainer><BarChart data={monthly}><CartesianGrid strokeDasharray="3 3" opacity={0.12}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/>
+            <Bar dataKey="Fixo pago" fill={tone==='fran'?COLORS.franFixed:COLORS.pauloFixed} opacity={0.9}/>
+            <Bar dataKey="Retirada" fill={tone==='fran'?COLORS.franWithdrawal:COLORS.pauloWithdrawal}/>
+            <ReferenceLine y={partner.fixed} stroke={tone==='fran'?COLORS.franFixed:COLORS.pauloFixed} strokeDasharray="5 5" label={{value:`Fixo ${brl(partner.fixed)}`,fill:tone==='fran'?COLORS.franFixed:COLORS.pauloFixed,fontSize:9}}/>
+          </BarChart></ResponsiveContainer></div>
+
+          <div className="mgmt-director-projects">
+            <div className="mgmt-panel-head mgmt-director-project-head"><div><h3>Participação por projeto</h3><p>Somente valores efetivamente pagos em 2026 no plano de Equipe ADM vinculados a uma obra.</p></div></div>
+            {projects.length?<div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Projeto</th><th>Valor pago</th><th>Participação</th></tr></thead><tbody>{projects.map((item)=>{
+              const total=projects.reduce((sum,row)=>sum+Number(row.paid||0),0);
+              const share=total>0?(item.paid/total)*100:0;
+              return <tr key={item.project} onClick={()=>setDetail({title:`${partner.short} · ${item.project}`,rows:item.rows})}><td><strong>{item.project}</strong></td><td className="mgmt-value-paid">{brl(item.paid)}</td><td>{share.toFixed(1)}%</td></tr>;
+            })}</tbody></table></div>:<p className="mgmt-muted">Sem pagamentos vinculados diretamente a projetos para este sócio.</p>}
+          </div>
+        </section>)}
+      </div>
+
       <MovementModal title={detail?.title} rows={detail?.rows} onClose={()=>setDetail(null)}/>
     </div>;
   }
