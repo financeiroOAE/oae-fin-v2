@@ -18,6 +18,28 @@ import './managementExtras.css';
 
 const PAID_COLOR = '#22c55e';
 const OPEN_COLOR = '#f59e0b';
+const PLAN_COLORS = ['#3b82f6','#a855f7','#14b8a6','#f97316','#e11d48','#64748b','#84cc16','#06b6d4'];
+const financePlan = (row) => accountOptionLabel(row.contaCodigo,row.contaNome||row.contaDescricao);
+const monthlyByPlan = (rows) => {
+  const planTotals = new Map();
+  const months = Array.from({length:12},(_,i)=>({month:monthLabel(`2026-${String(i+1).padStart(2,'0')}`),key:`2026-${String(i+1).padStart(2,'0')}`,Pago:0,'A pagar':0}));
+  const perMonth = new Map(months.map(month=>[month.key,month]));
+  (rows||[]).forEach(row=>{
+    const key=getMonth(row.data);
+    const month=perMonth.get(key);
+    if(!month)return;
+    const plan=financePlan(row);
+    if(!planTotals.has(plan))planTotals.set(plan,{plan,paid:0,open:0,count:0});
+    const total=planTotals.get(plan);
+    const value=Number(row.valor)||0;
+    total[row.paid?'paid':'open']+=value;
+    total.count+=1;
+    month[row.paid?'Pago':'A pagar']+=value;
+    if(row.paid)month[plan]=(month[plan]||0)+value;
+  });
+  const plans=[...planTotals.values()].sort((a,b)=>(b.paid+b.open)-(a.paid+a.open)||a.plan.localeCompare(b.plan,'pt-BR'));
+  return {plans,months,planKeys:plans.filter(plan=>plan.paid!==0).map(plan=>plan.plan)};
+};
 const PRIMARY_COLOR = '#3b82f6';
 const brl = (n) => new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format(Number(n)||0);
 const compact = (n) => new Intl.NumberFormat('pt-BR', { notation:'compact', maximumFractionDigits:1 }).format(Number(n)||0);
@@ -121,16 +143,12 @@ function PersonModal({ person, onClose }) {
   if(!person) return null;
   const personReportScope=`equipe:ficha:${person.key}`;
   const rows=person.transactions||[];
-  const movementPlans=[...new Set(rows.map(r=>planLabel(r.contaNome||r.contaCodigo)).filter(Boolean))];
-  const displayPlans=movementPlans.length?movementPlans:[...new Set(person.accounts.map(planLabel).filter(Boolean))];
+  const {plans: financialPlans,months,planKeys}=monthlyByPlan(rows);
+  const displayPlans=financialPlans.length?financialPlans.map(item=>item.plan):[...new Set(person.accounts.map(planLabel).filter(Boolean))];
   const paid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
   const open=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
 
-  const months=Array.from({length:12},(_,i)=>{
-    const key=`2026-${String(i+1).padStart(2,'0')}`;
-    const monthRows=rows.filter(r=>getMonth(r.data)===key);
-    return {month:monthLabel(key),Pago:monthRows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':monthRows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0)};
-  });
+  const planReportRows=financialPlans.map(item=>({Plano:item.plan,Pago:item.paid,'A pagar':item.open,Total:item.paid+item.open,Lançamentos:item.count}));
 
   const byProject=[...rows.reduce((map,row)=>{
     const key=String(row.projeto||'Sem obra').trim()||'Sem obra';
@@ -169,7 +187,16 @@ function PersonModal({ person, onClose }) {
       page:'Equipe',
       type:'TABLE',
       filters:{Pessoa:person.name,Ano:2026},
-      data:months,
+      data:months.map(({key,...month})=>month),
+    },
+    {
+      sectionKey:`equipe:export:ficha:${person.key}:planos`,
+      title:`Divisão por plano financeiro — ${person.name}`,
+      componentName:'Pagamentos e pendências por plano financeiro',
+      page:'Equipe',
+      type:'TABLE',
+      filters:{Pessoa:person.name,Ano:2026,Fonte:'CP_GERAL'},
+      data:planReportRows,
     },
     {
       sectionKey:`equipe:export:ficha:${person.key}:obras`,
@@ -235,13 +262,16 @@ function PersonModal({ person, onClose }) {
       </div>
 
       <section className="mgmt-subcard">
-        <h3>Evolução mensal</h3>
+        <h3>Pagamentos mensais por plano financeiro</h3>
+        <p className="mgmt-muted">Cada cor representa um plano de equipe com lançamentos pagos no CP_GERAL. Valores em aberto são exibidos separadamente.</p>
         <div className="mgmt-chart-sm"><ResponsiveContainer>
-          <LineChart data={months}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={(v)=>brl(v)}/><Legend/>
-            <Line type="monotone" dataKey="Pago" stroke={PAID_COLOR} strokeWidth={2.6} dot={{r:3}}/>
-            <Line type="monotone" dataKey="A pagar" stroke={OPEN_COLOR} strokeWidth={2.6} dot={{r:3}}/>
-          </LineChart>
+          <BarChart data={months}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={(v,name)=>[brl(v),name]}/><Legend/>
+            {planKeys.map((plan,index)=><Bar key={plan} dataKey={plan} stackId="pago" fill={PLAN_COLORS[index%PLAN_COLORS.length]} isAnimationActive={false}/>)}
+          </BarChart>
         </ResponsiveContainer></div>
+        <div className="mgmt-table-wrap" style={{marginTop:12}}><table className="mgmt-table"><thead><tr><th>Plano financeiro</th><th>Pago</th><th>A pagar</th><th>Total</th></tr></thead><tbody>
+          {financialPlans.map((item,index)=><tr key={item.plan}><td><span style={{display:'inline-block',width:9,height:9,borderRadius:2,background:PLAN_COLORS[index%PLAN_COLORS.length],marginRight:8}}/>{item.plan}</td><td>{brl(item.paid)}</td><td>{brl(item.open)}</td><td>{brl(item.paid+item.open)}</td></tr>)}
+        </tbody></table></div>
       </section>
 
       <section className="mgmt-subcard" style={{marginTop:14}}>
@@ -502,11 +532,10 @@ export default function TeamDashboard(){
     const map=new Map();
     relationEntries.forEach(entry=>{
       const key=norm(entry.person);
-      const item=map.get(key)||{key,name:entry.person,roles:new Set(),projects:new Set(),accounts:new Set(),contractValues:[],thirdParty:false,fixedMonthly:false,transactions:new Map()};
+      const item=map.get(key)||{key,name:entry.person,roles:new Set(),projects:new Set(),accounts:new Set(),thirdParty:false,fixedMonthly:false,transactions:new Map()};
       if(entry.role)item.roles.add(entry.role);
       if(entry.account)item.accounts.add(entry.account);
       (entry.project?[entry.project]:entry.projects||[]).filter(Boolean).filter(p=>norm(p)!=='PROJETOS').filter(p=>projectFilters.length===0||projectFilters.includes(p)).forEach(p=>item.projects.add(p));
-      if(!entry.fixedMonthly&&Number(entry.contractValue||0)>0)item.contractValues.push(Number(entry.contractValue));
       item.thirdParty ||= Boolean(entry.thirdParty);
       item.fixedMonthly ||= Boolean(entry.fixedMonthly);
       (entry.transactions||[]).forEach(row=>{
@@ -520,7 +549,7 @@ export default function TeamDashboard(){
       map.set(key,item);
     });
     return[...map.values()]
-      .map(item=>({...item,roles:[...item.roles],projects:[...item.projects],accounts:[...item.accounts],transactions:[...item.transactions.values()],referenceValue:item.contractValues.reduce((s,v)=>s+v,0)}))
+      .map(item=>({...item,roles:[...item.roles],projects:[...item.projects],accounts:[...item.accounts],transactions:[...item.transactions.values()]}))
       .sort((a,b)=>{
         const openA=a.transactions.filter(row=>!row.paid).reduce((sum,row)=>sum+Number(row.valor||0),0);
         const openB=b.transactions.filter(row=>!row.paid).reduce((sum,row)=>sum+Number(row.valor||0),0);
