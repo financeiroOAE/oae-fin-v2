@@ -28,6 +28,7 @@ export default function Sidebar() {
   const [iconError, setIconError] = useState(false);
   const [sessionUser, setSessionUser] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [administrativeOpen, setAdministrativeOpen] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -77,14 +78,22 @@ export default function Sidebar() {
     ? Boolean(sessionUser && (sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission)))
     : !sessionUser || sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission);
   const isSettingsPath = ['/configuracoes', '/atualizacao-dados', '/historico'].some((path) => pathname.startsWith(path));
+  const isAdministrativePath = pathname.startsWith('/administrativo');
   const showSettingsChildren = settingsOpen || isSettingsPath;
+  const showAdministrativeChildren = administrativeOpen || isAdministrativePath;
   const menuItems = [
     { name: 'Início', path: '/', icon: LayoutDashboard, permission: 'inicio' },
     { name: 'Visão Financeira', path: '/visao-financeira', icon: BarChart3, permission: 'visao_financeira' },
     { name: 'Fluxo de Caixa', path: '/fluxo-caixa', icon: Activity, permission: 'fluxo_caixa' },
     { name: 'Projetos', path: '/projetos', icon: FolderKanban, permission: 'projetos' },
     { name: 'Equipe', path: '/equipe', icon: UsersRound, permission: 'equipe_gestao' },
-    { name: 'Administrativo', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo' },
+    {
+      name: 'Administrativo', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo',
+      children: [
+        { name: 'Visão Geral', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo' },
+        { name: 'Movimentação dos Sócios', path: '/administrativo/socios', icon: UsersRound, permission: 'administrativo' },
+      ],
+    },
     { name: 'DRE Gerencial', path: '/dre', icon: ChartColumn, permission: 'dre' },
     {
       name: 'Configurações', path: '/configuracoes', icon: Settings, permission: 'configuracoes',
@@ -231,12 +240,14 @@ export default function Sidebar() {
           <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
             {menuItems.map((item) => {
               const visibleChildren = (item.children || []).filter((child) => canAccess(child.permission));
-              const isSettingsGroup = visibleChildren.length > 0;
+              const isGroup = visibleChildren.length > 0;
+              const isAdministrativeGroup = item.path === '/administrativo';
+              const showGroupChildren = isAdministrativeGroup ? showAdministrativeChildren : showSettingsChildren;
               const isActive = pathname === item.path || visibleChildren.some((child) => pathname === child.path);
               const Icon = item.icon;
               return (
                 <li key={item.name}>
-                  <Link href={item.path} onClick={() => { if (isSettingsGroup) setSettingsOpen(true); if(isMobile) setCollapsed(true); }} style={{
+                  <Link href={item.path} onClick={() => { if (isGroup) { if (isAdministrativeGroup) setAdministrativeOpen(true); else setSettingsOpen(true); } if(isMobile) setCollapsed(true); }} style={{
                     display: 'flex',
                     alignItems: 'center',
                     padding: '0.5rem',
@@ -259,15 +270,15 @@ export default function Sidebar() {
                     {!(collapsed && !isMobile) && (
                       <>
                         <span style={{ fontSize: '14px', fontWeight: isActive ? '600' : '500', marginLeft: '0.6rem', flex: 1 }}>{item.name}</span>
-                        {isSettingsGroup && (
-                          <span role="button" tabIndex={0} aria-label={settingsOpen ? 'Recolher configurações' : 'Expandir configurações'} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setSettingsOpen((open) => !open); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setSettingsOpen((open) => !open); } }} style={{ display: 'flex', padding: '2px', color: 'inherit', cursor: 'pointer' }}>
-                            <ChevronDown size={14} style={{ transform: showSettingsChildren ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                        {isGroup && (
+                          <span role="button" tabIndex={0} aria-label={showGroupChildren ? 'Recolher submenu' : 'Expandir submenu'} onClick={(event) => { event.preventDefault(); event.stopPropagation(); if (isAdministrativeGroup) setAdministrativeOpen((open) => !open); else setSettingsOpen((open) => !open); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (isAdministrativeGroup) setAdministrativeOpen((open) => !open); else setSettingsOpen((open) => !open); } }} style={{ display: 'flex', padding: '2px', color: 'inherit', cursor: 'pointer' }}>
+                            <ChevronDown size={14} style={{ transform: showGroupChildren ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                           </span>
                         )}
                       </>
                     )}
                   </Link>
-                  {isSettingsGroup && showSettingsChildren && !(collapsed && !isMobile) && (
+                  {isGroup && showGroupChildren && !(collapsed && !isMobile) && (
                     <ul style={{ listStyle: 'none', margin: '0.2rem 0 0.3rem 1.15rem', paddingLeft: '0.65rem', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                       {visibleChildren.map((child) => {
                         const ChildIcon = child.icon;
