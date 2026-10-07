@@ -73,18 +73,29 @@ export async function GET() {
       return is2026 || isFutureOpen;
     });
 
-  const cpByAccount = new Map();
+  // O cadastro EQUIPE informa função e vínculo, mas NÃO limita o plano financeiro.
+  // Um profissional pode ter pagamentos em Coordenação, Arquitetura e outros
+  // planos de equipe no mesmo exercício. Só CP_GERAL define a conta e o valor.
+  const cpByPerson = new Map();
   const teamAccountRows = [];
   cp.forEach((row) => {
-    if (row.teamAccount) teamAccountRows.push(row);
-    if (!row._accountCode) return;
-    if (!cpByAccount.has(row._accountCode)) cpByAccount.set(row._accountCode, []);
-    cpByAccount.get(row._accountCode).push(row);
+    if (!row.teamAccount) return;
+    teamAccountRows.push(row);
+    const party = norm(row.nome).replace(/^\d{2}[.\s]?\d{3}[.\s]?\d{3}\s+/, '').trim();
+    if (!party) return;
+    if (!cpByPerson.has(party)) cpByPerson.set(party, []);
+    cpByPerson.get(party).push(row);
   });
 
   const entries = roster.map((item, index) => {
-    const accountCode = String(item.accountCode || '').replace(/\D/g, '');
-    const candidates = accountCode ? (cpByAccount.get(accountCode) || []) : teamAccountRows;
+    const aliases = partyAliases(item.person);
+    const exactMatches = new Map();
+    aliases.forEach((alias) => {
+      (cpByPerson.get(alias) || []).forEach((row) => exactMatches.set(row.sourceKey, row));
+    });
+    // Fallback para diferenças de razão social/nome entre o cadastro e o CP.
+    // Só percorre as linhas da equipe quando não há correspondência exata.
+    const candidates = exactMatches.size ? [...exactMatches.values()] : teamAccountRows.filter((row) => matchesParty(item.person, row.nome));
     const transactions = candidates.filter((row) => {
       if (!matchesParty(item.person, row.nome)) return false;
       if (item.thirdParty && !matchesProject(item.departmentProject, row.projeto)) return false;
@@ -141,8 +152,9 @@ export async function GET() {
       snapshotAt: snapshot?.updatedAt || null,
       rules: {
         zeroContractValue: 'MENSAL_FIXO',
-        sourceRoster: 'EQUIPE',
-        sourceFinancial: 'CP_GERAL',
+        sourceRoster: 'EQUIPE (identificação, função e vínculo)',
+        sourceFinancial: 'CP_GERAL (todos os planos de equipe por pessoa)',
+        accountRule: 'Os planos e valores vêm de cada lançamento de CP_GERAL, nunca do plano ou valor-base do cadastro.',
         futureOpenThirdParty: 'A PAGAR após dez/2026 incluído somente para cadastros TERCEIRO (EQUIP. TÉC. / TERCEIROS)',
       },
     }, { headers: { 'Cache-Control': 'private, no-store' } });
