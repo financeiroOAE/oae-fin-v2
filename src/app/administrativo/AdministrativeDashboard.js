@@ -248,8 +248,8 @@ export default function AdministrativeDashboard({ view = 'overview' }){
 
   const partnerGeneralMonthly=useMemo(()=>partnerMonthly.map((row)=>({
     month:row.month,
-    Francielle:Number(row['Francielle · Fixo pago']||0)+Number(row['Francielle · Retirada']||0),
-    Paulo:Number(row['Paulo · Fixo pago']||0)+Number(row['Paulo · Retirada']||0),
+    'Equipe ADM':Number(row['Francielle · Fixo pago']||0)+Number(row['Paulo · Fixo pago']||0),
+    'Retiradas':Number(row['Francielle · Retirada']||0)+Number(row['Paulo · Retirada']||0),
   })),[partnerMonthly]);
 
   const directorSummary=useMemo(()=>{
@@ -316,7 +316,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
 
   const partnerSection=<section id="report-adm-socios" data-report-section className="mgmt-panel">
     <ReportAdder sectionKey="administrativo:socios" title="Visão Geral dos Sócios" componentName="Movimentação Geral dos Sócios" page="Administrativo" type="CHART" data={partnerGeneralMonthly} captureId="report-adm-socios" filters={{Ano:2026}} style={{float:'right'}}/>
-    <div className="mgmt-panel-head"><div><h2>Visão geral dos sócios</h2><p>Total mensal de cada sócio: pagamento mensal + retiradas realizadas.</p></div></div>
+    <div className="mgmt-panel-head"><div><h2>Visão geral dos sócios</h2><p>Leitura mensal consolidada: Equipe ADM dos dois e retiradas dos dois.</p></div></div>
 
     <div className="mgmt-partner-summary">
       {partners.map(p=><div key={p.name} className="mgmt-partner-card mgmt-partner-card-light">
@@ -328,8 +328,8 @@ export default function AdministrativeDashboard({ view = 'overview' }){
     </div>
 
     <div className="mgmt-chart mgmt-partner-general-chart"><ResponsiveContainer><LineChart data={partnerGeneralMonthly} margin={{top:12,right:18,left:0,bottom:4}}><CartesianGrid strokeDasharray="2 6" opacity={0.09} vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}} axisLine={false} tickLine={false}/><YAxis tickFormatter={compact} tick={{fontSize:10}} axisLine={false} tickLine={false}/><Tooltip formatter={(v)=>brl(v)} contentStyle={{borderRadius:10,padding:'9px 11px',fontSize:11,boxShadow:'0 10px 28px rgba(0,0,0,.14)'}} cursor={{stroke:'var(--border-color)',strokeWidth:1}}/><Legend iconType="circle" wrapperStyle={{fontSize:11}}/>
-      <Line type="monotone" dataKey="Francielle" stroke={COLORS.franFixed} strokeWidth={2.6} dot={false} activeDot={{r:4}}/>
-      <Line type="monotone" dataKey="Paulo" stroke={COLORS.pauloFixed} strokeWidth={2.6} dot={false} activeDot={{r:4}}/>
+      <Line type="monotone" dataKey="Equipe ADM" stroke={COLORS.received} strokeWidth={2.6} dot={false} activeDot={{r:4}}/>
+      <Line type="monotone" dataKey="Retiradas" stroke={COLORS.franWithdrawal} strokeWidth={2.6} dot={false} activeDot={{r:4}}/>
     </LineChart></ResponsiveContainer></div>
   </section>;
 
@@ -367,7 +367,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
           </div>
 
           <button className="btn btn-primary mgmt-director-open-primary" onClick={()=>setSelectedDirectorPerson(partner)}>
-            Ver todas as movimentações
+            Ver resumo por obra
           </button>
 
           <div className="mgmt-chart-sm mgmt-director-chart"><ResponsiveContainer><BarChart data={monthly}><CartesianGrid strokeDasharray="3 3" opacity={0.12}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/>
