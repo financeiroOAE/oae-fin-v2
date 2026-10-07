@@ -91,7 +91,7 @@ export default function Sidebar() {
       name: 'Administrativo', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo',
       children: [
         { name: 'Visão Geral', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo' },
-        { name: 'Movimentação dos Sócios', path: '/administrativo/socios', icon: UsersRound, permission: 'administrativo' },
+        { name: 'Fin_Diretoria', path: '/administrativo/socios', icon: UsersRound, permission: 'administrativo', subtle: true },
       ],
     },
     { name: 'DRE Gerencial', path: '/dre', icon: ChartColumn, permission: 'dre' },
@@ -285,8 +285,8 @@ export default function Sidebar() {
                         const childActive = pathname === child.path;
                         return (
                           <li key={child.path}>
-                            <Link href={child.path} onClick={() => { if (isMobile) setCollapsed(true); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 0.55rem', borderRadius: '6px', textDecoration: 'none', color: childActive ? 'var(--primary)' : 'var(--text-secondary)', background: childActive ? 'rgba(57,198,198,0.09)' : 'transparent', fontSize: '12px', fontWeight: childActive ? '700' : '500', lineHeight: 1.25 }}>
-                              <ChildIcon size={14} style={{ flexShrink: 0 }} /> <span style={{ whiteSpace: 'normal' }}>{child.name}</span>
+                            <Link href={child.path} onClick={() => { if (isMobile) setCollapsed(true); }} style={{ display: 'flex', alignItems: 'center', gap: child.subtle ? '0.4rem' : '0.5rem', padding: child.subtle ? '0.38rem 0.5rem' : '0.45rem 0.55rem', borderRadius: '6px', textDecoration: 'none', color: childActive ? 'var(--primary)' : 'var(--text-secondary)', background: childActive ? (child.subtle ? 'rgba(57,198,198,0.05)' : 'rgba(57,198,198,0.09)') : 'transparent', fontSize: child.subtle ? '11px' : '12px', fontWeight: childActive ? (child.subtle ? '600' : '700') : '500', lineHeight: 1.25, opacity: child.subtle && !childActive ? 0.86 : 1 }}>
+                              <ChildIcon size={child.subtle ? 13 : 14} style={{ flexShrink: 0 }} /> <span style={{ whiteSpace: 'normal' }}>{child.name}</span>
                             </Link>
                           </li>
                         );
