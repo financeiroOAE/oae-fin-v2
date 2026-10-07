@@ -91,7 +91,7 @@ export default function Sidebar() {
       name: 'Administrativo', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo',
       children: [
         { name: 'Visão Geral', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo' },
-        { name: 'Fin_Diretoria', path: '/administrativo/socios', icon: UsersRound, permission: 'administrativo', subtle: true },
+        { name: 'Diretora', path: '/administrativo/socios', icon: UsersRound, permission: 'administrativo', subtle: true },
       ],
     },
     { name: 'DRE Gerencial', path: '/dre', icon: ChartColumn, permission: 'dre' },
