@@ -72,7 +72,7 @@ function DirectorPersonModal({ partner, projects, onProject, onClose }){
   return <div className="mgmt-overlay mgmt-overlay-center" onMouseDown={onClose}>
     <div className="mgmt-modal-center" onMouseDown={(e)=>e.stopPropagation()}>
       <div className="mgmt-panel-head">
-        <div><span className="mgmt-eyebrow">FIN_DIRETORIA · 2026</span><h2>{partner.name}</h2><p>Pago {brl(paid)} · A pagar {brl(open)}</p></div>
+        <div><span className="mgmt-eyebrow">DIRETORA · 2026</span><h2>{partner.name}</h2><p>Pago {brl(paid)} · A pagar {brl(open)}</p></div>
         <button className="btn" onClick={onClose}><X size={16}/> Fechar</button>
       </div>
 
@@ -272,6 +272,27 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   const franMonthly=partnerMonthly.map((row)=>({month:row.month,'Fixo pago':row['Francielle · Fixo pago'],'Retirada':row['Francielle · Retirada']}));
   const pauloMonthly=partnerMonthly.map((row)=>({month:row.month,'Fixo pago':row['Paulo · Fixo pago'],'Retirada':row['Paulo · Retirada']}));
 
+  const directorFinancialRows=useMemo(()=>partners
+    .flatMap((partner)=>partner.rows.map((row)=>({
+      ...row,
+      natureza:'Saída',
+      projeto:row.projeto||'ADMINISTRAÇÃO',
+      contaDescricao:row.contaNome||row.contaCodigo||'',
+      status:row.paid?'Realizado':'A realizar',
+    })))
+    .sort((a,b)=>getDateKey(b.data).localeCompare(getDateKey(a.data))),[partners]);
+
+  const directorReportRows=useMemo(()=>directorFinancialRows.map((row)=>({
+    Data:row.data,
+    Pessoa:row.nome,
+    Projeto:row.projeto||'ADMINISTRAÇÃO',
+    Conta:row.contaNome||row.contaCodigo||'',
+    Documento:row.documento||'',
+    Lançamento:row.lancamento||row.titulo||'',
+    Situação:row.paid?'Pago':'A pagar',
+    Valor:row.valor,
+  })),[directorFinancialRows]);
+
 
   const adminFinancialRows=useMemo(()=>expenses.map(r=>({...r,natureza:'Saída',projeto:'ADMINISTRAÇÃO',contaDescricao:r.contaNome||r.contaCodigo,status:r.paid?'Realizado':'A realizar'})),[expenses]);
   const reportFilters={
@@ -293,7 +314,6 @@ export default function AdministrativeDashboard({ view = 'overview' }){
         <div><span>Pago como equipe em 2026</span><strong className="mgmt-value-paid">{brl(p.fixedPaid)}</strong></div>
         <div><span>A pagar como equipe</span><strong className="mgmt-value-open">{brl(p.fixedOpen)}</strong></div>
         <div><span>Retiradas realizadas</span><strong>{brl(p.withdrawal)}</strong></div>
-        <button type="button" className="btn btn-primary mgmt-partner-detail-button" onClick={()=>setSelectedDirectorPerson(p)}>Ver todas as movimentações</button>
       </div>)}
     </div>
 
@@ -315,7 +335,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
 
     return <div className="mgmt mgmt-admin mgmt-fin-diretoria">
       <header className="mgmt-header mgmt-director-header">
-        <div><span className="mgmt-eyebrow">ADMINISTRATIVO · DIRETORIA · 2026</span><h1>Fin_Diretoria</h1><p>Visão financeira de Francielle Paiva e Paulo Henrique Lemes Araujo.</p></div>
+        <div><span className="mgmt-eyebrow">ADMINISTRATIVO · DIRETORIA · 2026</span><h1>Diretora</h1><p>Visão financeira de Francielle Paiva e Paulo Henrique Lemes Araujo.</p></div>
         <div className="mgmt-actions">
           <FinancialRefreshButton onUpdated={reloadAdministrativeData} onError={setError} label="Atualizar"/>
           <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Administrativo')} className={`btn btn-quiet ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do relatório':'Relatório'}</button>
@@ -335,7 +355,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
         {directorPanels.map(({partner,monthly,projects,tone})=><section key={partner.short} className="mgmt-panel mgmt-director-panel" data-report-section>
           <div className="mgmt-panel-head">
             <div><span className="mgmt-eyebrow">{partner.short.toUpperCase()} · VISÃO INDIVIDUAL</span><h2>{partner.name}</h2><p>Fixo pago, retiradas e participação financeira por projeto.</p></div>
-            <ReportAdder sectionKey={`administrativo:diretoria:${partner.short.toLowerCase()}`} title={`Fin_Diretoria · ${partner.short}`} componentName={`Visão individual · ${partner.short}`} page="Administrativo" type="CHART" data={monthly} filters={{Ano:2026}}/>
+            <ReportAdder sectionKey={`administrativo:diretoria:${partner.short.toLowerCase()}`} title={`Diretora · ${partner.short}`} componentName={`Visão individual · ${partner.short}`} page="Administrativo" type="CHART" data={monthly} filters={{Ano:2026}}/>
           </div>
 
           <button className="btn btn-primary mgmt-director-open-primary" onClick={()=>setSelectedDirectorPerson(partner)}>
@@ -348,16 +368,28 @@ export default function AdministrativeDashboard({ view = 'overview' }){
             <ReferenceLine y={partner.fixed} stroke={tone==='fran'?COLORS.franFixed:COLORS.pauloFixed} strokeDasharray="5 5" label={{value:`Fixo ${brl(partner.fixed)}`,fill:tone==='fran'?COLORS.franFixed:COLORS.pauloFixed,fontSize:9}}/>
           </BarChart></ResponsiveContainer></div>
 
-          <div className="mgmt-director-movements">
-            <div className="mgmt-panel-head mgmt-director-project-head"><div><h3>Movimentação Financeira</h3><p>Lançamentos financeiros de {partner.short} em 2026.</p></div></div>
-            <DataTable
-              data={partner.rows.map((row)=>({...row,natureza:'Saída',projeto:row.projeto||'ADMINISTRAÇÃO',contaDescricao:row.contaNome||row.contaCodigo||'',status:row.paid?'Realizado':'A realizar'}))}
-              initialPageSize={10}
-              pageSizeOptions={[10,30,50,'all']}
-            />
-          </div>
+
         </section>)}
       </div>
+
+      <section className="mgmt-panel mgmt-director-movements-unified" data-report-section>
+        <div className="mgmt-panel-head">
+          <div><h2>Movimentação Financeira</h2><p>Movimentações de Francielle Paiva e Paulo Henrique Lemes Araujo em uma única relação.</p></div>
+          <ReportAdder
+            sectionKey="administrativo:diretora:movimentacoes"
+            title="Movimentação Financeira — Diretora"
+            componentName="Movimentação Financeira da Diretora"
+            page="Administrativo"
+            type="TABLE"
+            data={directorReportRows}
+            dataSets={{summary:[{'Quantidade de lançamentos':directorReportRows.length}],visible:directorReportRows.slice(0,30),all:directorReportRows}}
+            detailMode="visible"
+            detailOptions={['summary','visible','all']}
+            filters={{Ano:2026,Pessoas:'Francielle Paiva + Paulo Henrique Lemes Araujo'}}
+          />
+        </div>
+        <DataTable data={directorFinancialRows} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
+      </section>
 
       <MovementModal title={detail?.title} rows={detail?.rows} onClose={()=>setDetail(null)}/>
       <DirectorPersonModal
