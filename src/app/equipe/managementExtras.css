@@ -274,3 +274,54 @@
 @media(max-width:560px){
   .mgmt-table-filters-seven,.mgmt-table-filters-six,.mgmt-table-filters-five{grid-template-columns:1fr}
 }
+
+
+/* Fin_Diretoria: leitura mais leve e distribuída */
+.mgmt-fin-diretoria .mgmt-director-header{padding-bottom:4px}
+.mgmt-fin-diretoria .mgmt-director-header h1{font-size:clamp(24px,2.4vw,32px);letter-spacing:-.025em}
+.mgmt-fin-diretoria .btn-quiet{
+  background:transparent;
+  border-color:var(--border-color);
+  color:var(--text-secondary);
+  box-shadow:none;
+  padding:7px 10px;
+  font-size:11px;
+}
+.mgmt-fin-diretoria .btn-quiet:hover{color:var(--text-main);background:var(--bg-card-hover)}
+.mgmt-partner-card-light{
+  background:transparent;
+  border-color:color-mix(in srgb,var(--border-color) 82%,transparent);
+  box-shadow:none;
+}
+.mgmt-partner-card-light:hover{transform:none;background:var(--bg-card-hover)}
+.mgmt-director-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+  align-items:start;
+  margin-top:14px;
+}
+.mgmt-director-panel{min-width:0}
+.mgmt-director-panel .mgmt-panel-head{align-items:flex-start}
+.mgmt-director-open{
+  appearance:none;
+  border:0;
+  border-bottom:1px solid var(--border-color);
+  background:transparent;
+  color:var(--text-secondary);
+  padding:0 0 5px;
+  margin:2px 0 4px;
+  font:inherit;
+  font-size:11px;
+  cursor:pointer;
+}
+.mgmt-director-open:hover{color:var(--primary);border-bottom-color:var(--primary)}
+.mgmt-director-chart{height:255px;margin-top:12px}
+.mgmt-director-projects{margin-top:18px;padding-top:16px;border-top:1px solid var(--border-color)}
+.mgmt-director-project-head{margin-bottom:8px}
+.mgmt-director-project-head h3{font-size:14px;margin:0 0 4px}
+.mgmt-director-project-head p{font-size:10px}
+.mgmt-director-projects .mgmt-table th,
+.mgmt-director-projects .mgmt-table td{padding-top:9px;padding-bottom:9px}
+@media(max-width:1050px){.mgmt-director-grid{grid-template-columns:1fr}}
+@media(max-width:700px){.mgmt-director-chart{height:225px}}
