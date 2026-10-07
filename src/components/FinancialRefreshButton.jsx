@@ -4,6 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { readFinancialMetadata, refreshFinancialData } from "@/lib/clientSync";
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isTransientRefreshError = (error) => {
+  const message = String(error?.message || '').toUpperCase();
+  return message.includes('HTTP 502')
+    || message.includes('HTTP 503')
+    || message.includes('HTTP 504')
+    || message.includes('TEMPORARIAMENTE INDISPONÍVEL')
+    || message.includes('TEMPORARIAMENTE INDISPONIVEL');
+};
+
 export default function FinancialRefreshButton({
   onUpdated,
   onError,
@@ -33,7 +44,24 @@ export default function FinancialRefreshButton({
     if (loading) return;
     setLoading(true);
     try {
-      const result = await refreshFinancialData({ manual: true });
+      let result = null;
+      let lastError = null;
+      const attempts = isAdmin ? 3 : 1;
+
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+          result = await refreshFinancialData({ manual: true });
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+          if (!isAdmin || !isTransientRefreshError(error) || attempt === attempts) break;
+          await sleep(attempt === 1 ? 2000 : 5000);
+        }
+      }
+
+      if (lastError) throw lastError;
+
       await loadMetadata();
       await onUpdated?.(result);
     } catch (error) {

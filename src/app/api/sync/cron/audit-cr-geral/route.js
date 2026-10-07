@@ -145,6 +145,74 @@ function activeProjectIndex(projetos) {
   return map;
 }
 
+function auditProjectBilling2026(projetos) {
+  const rows = (projetos || []).filter((project) => String(project.OBRA || '').trim());
+  const headerCandidates = rows[0]
+    ? Object.keys(rows[0]).filter((key) => {
+        const normalized = String(key || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toUpperCase();
+        return normalized.includes('FATUR') && normalized.includes('2026');
+      })
+    : [];
+
+  const byProjectKey = new Map();
+  let totalColumnJ = 0;
+  let totalHeaderDetected = 0;
+
+  const details = rows.map((project) => {
+    const obra = String(project.OBRA || '').trim();
+    const key = getProjectKey(project.ID || obra);
+    const columnJ = parseBRL(project.FATURADO_2026_COL_J);
+    const headerDetected = parseBRL(project.FATURADO_2026_HEADER);
+
+    totalColumnJ += columnJ;
+    totalHeaderDetected += headerDetected;
+
+    if (key) {
+      if (!byProjectKey.has(key)) byProjectKey.set(key, []);
+      byProjectKey.get(key).push({ obra, columnJ, headerDetected });
+    }
+
+    return {
+      key,
+      obra,
+      empresa: String(project.EMPRESA || '').trim(),
+      tipo: String(project.TIPO || '').trim(),
+      columnJ: roundMoney(columnJ),
+      headerDetected: roundMoney(headerDetected),
+    };
+  });
+
+  const duplicates = [...byProjectKey.entries()]
+    .filter(([, items]) => items.length > 1)
+    .map(([key, items]) => ({
+      key,
+      count: items.length,
+      totalColumnJ: roundMoney(items.reduce((sum, item) => sum + item.columnJ, 0)),
+      rows: items,
+    }));
+
+  const suspicious = details
+    .filter((item) => Math.abs(item.columnJ - item.headerDetected) > 0.01)
+    .slice(0, 50);
+
+  return {
+    rowCount: rows.length,
+    headers: rows[0] ? Object.keys(rows[0]) : [],
+    headerCandidates,
+    totalColumnJ: roundMoney(totalColumnJ),
+    totalHeaderDetected: roundMoney(totalHeaderDetected),
+    deltaColumnJVsHeader: roundMoney(totalColumnJ - totalHeaderDetected),
+    duplicateProjectKeys: duplicates,
+    mismatchedRows: suspicious,
+    topColumnJ: [...details]
+      .sort((a, b) => Math.abs(b.columnJ) - Math.abs(a.columnJ))
+      .slice(0, 30),
+  };
+}
+
 function summarizeAllocation(baseRows, activeProjects) {
   let allocated = 0;
   let historicalTotal = 0;
@@ -275,6 +343,7 @@ export async function POST(request) {
     const rawCr = sheetsData.CR_GERAL || [];
     const { projetos, processed } = buildProcessedCr(sheetsData);
     const activeProjects = activeProjectIndex(projetos);
+    const projectBilling2026 = auditProjectBilling2026(projetos);
 
     const raw = {
       headers: rawCr[0] ? Object.keys(rawCr[0]) : [],
@@ -331,6 +400,7 @@ export async function POST(request) {
       generatedAt: new Date().toISOString(),
       githubRunId: oidc.run_id || null,
       raw,
+      projectBilling2026,
       processed: processedBreakdown,
       panelSimulation: {
         semAdm,
