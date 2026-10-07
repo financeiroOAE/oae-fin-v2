@@ -5,7 +5,17 @@ const norm = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u
 const amount = (value) => Number(value) || 0;
 
 export function monthOf(value) {
-  const raw = String(value || '').trim();
+  // A planilha CP_GERAL pode fornecer datas como número serial do Excel.
+  // Sem conversão, meses inteiros desaparecem da aba Equipe e dos relatórios.
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  if (/^\d{5}(?:\.\d+)?$/.test(raw)) {
+    const serial = Number(raw);
+    if (serial >= 20000 && serial <= 80000) {
+      const date = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 7);
+    }
+  }
   let match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (match) return `${match[1]}-${match[2].padStart(2, '0')}`;
   match = raw.match(/^\d{1,2}\/(\d{1,2})\/(\d{4})/);
