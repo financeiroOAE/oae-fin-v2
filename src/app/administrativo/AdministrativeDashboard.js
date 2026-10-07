@@ -255,7 +255,6 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   const projectParticipation=useMemo(()=>Object.fromEntries(partners.map((partner)=>{
     const map=new Map();
     partner.rows
-      .filter((row)=>row.type==='EQUIPE_ADM_SOCIO')
       .forEach((row)=>{
         const project=String(row.projeto||'').trim();
         const normalized=project.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
