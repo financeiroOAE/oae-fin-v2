@@ -345,5 +345,14 @@
   border-top:1px solid var(--border-color);
 }
 .mgmt-director-summary{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
   margin-bottom:14px;
+}
+.mgmt-partner-general-chart{
+  height:300px;
+  padding:4px 2px 0;
+}
+@media(max-width:900px){
+  .mgmt-director-summary{grid-template-columns:1fr!important}
+  .mgmt-partner-general-chart{height:270px}
 }
