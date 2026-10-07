@@ -45,7 +45,15 @@ const brl = (n) => new Intl.NumberFormat('pt-BR', { style:'currency', currency:'
 const compact = (n) => new Intl.NumberFormat('pt-BR', { notation:'compact', maximumFractionDigits:1 }).format(Number(n)||0);
 const norm = (v) => String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
 const getDateKey = (raw) => {
-  const value=String(raw||'');
+  const value=String(raw??'').trim();
+  // Datas Excel numéricas também devem alimentar o filtro e o gráfico mensal.
+  if (/^\d{5}(?:\.\d+)?$/.test(value)) {
+    const serial=Number(value);
+    if(serial>=20000&&serial<=80000) {
+      const date=new Date(Date.UTC(1899,11,30)+Math.floor(serial)*86400000);
+      return Number.isNaN(date.getTime())?'':date.toISOString().slice(0,10);
+    }
+  }
   let m=value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
   m=value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
