@@ -16,7 +16,7 @@ import { consolidateFinancialData } from "@/lib/consolidation";
 import { getFinancialDisplayStatus, isForecastOnlyReceivableDocument, isProjectRevenue } from "@/lib/financialClassification";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
-import { getRolling30DayRange } from "@/lib/dateRange";
+import { getRolling30DayRange, applyValidFilterDate } from "@/lib/dateRange";
 import { getActiveProjectNames } from "@/lib/projectRules";
 import { loadFinancialData } from "@/lib/clientSync";
 import FinancialRefreshButton from "@/components/FinancialRefreshButton";
@@ -570,11 +570,11 @@ export default function FluxoDeCaixa() {
       <div className="card" style={{ padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
         <div style={{ flex: '1 1 150px' }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Data Inicial</label>
-          <input type="date" value={filterDataInicial} onChange={(e) => setFilterDataInicial(e.target.value)} />
+          <input type="date" value={filterDataInicial} onChange={e=>applyValidFilterDate(e.target.value, setFilterDataInicial)} />
         </div>
         <div style={{ flex: '1 1 150px' }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Data Final</label>
-          <input type="date" value={filterDataFinal} onChange={(e) => setFilterDataFinal(e.target.value)} />
+          <input type="date" value={filterDataFinal} onChange={e=>applyValidFilterDate(e.target.value, setFilterDataFinal)} />
         </div>
         <div style={{ flex: '2 1 200px', minWidth: 0 }}>
           <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Situação</label>
