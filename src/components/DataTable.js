@@ -7,7 +7,6 @@ import {
   Search, FilterX
 } from 'lucide-react';
 import MultiSelect from '@/components/MultiSelect';
-import { isDocumentedPayableNext30Days } from '@/lib/paymentCommitment';
 
 export default function DataTable({ data, initialPageSize = 25, pageSizeOptions = [25, 50, 100] }) {
   // Configuração
@@ -263,7 +262,7 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
               </tr>
             ) : (
               paginatedData.map((row, idx) => (
-                <tr key={idx} style={{ transition: 'background 0.2s ease', ...(isDocumentedPayableNext30Days(row) ? { background: 'rgba(56, 189, 248, 0.10)', boxShadow: 'inset 3px 0 0 #38bdf8' } : {}) }}>
+                <tr key={idx} style={{ transition: 'background 0.2s ease' }}>
                   <td style={{ whiteSpace: 'nowrap' }}>{row.data}</td>
                   <td style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={row.nome}>{row.nome}</td>
                   <td style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${row.contaCodigo} - ${row.contaDescricao}`}>
@@ -276,7 +275,6 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
                     <span className={`badge ${['Pago', 'Recebido'].includes(row.statusExibicao) ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '11px', padding: '0.2rem 0.4rem' }}>
                       {row.statusExibicao}
                     </span>
-                    {isDocumentedPayableNext30Days(row) && <span title="Documento formal a pagar com vencimento nos próximos 30 dias" style={{ display:'inline-block', marginLeft:6, fontSize:10, fontWeight:700, color:'#38bdf8', whiteSpace:'nowrap' }}>Vence em até 30 dias</span>}
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: '500', color: row.natureza === 'Entrada' ? 'var(--success)' : 'var(--danger)', whiteSpace: 'nowrap' }}>
                     {row.natureza === 'Entrada' ? '+' : '-'}{formatCurrency(row.valor)}
