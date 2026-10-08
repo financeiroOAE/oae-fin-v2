@@ -77,17 +77,26 @@ export default function Home() {
     }
   };
 
-  const restrictedManagementMenus = ['equipe_gestao', 'administrativo'];
+  const restrictedManagementMenus = ['equipe_gestao', 'administrativo_geral', 'administrativo_diretoria'];
   const canAccess = (permission) => restrictedManagementMenus.includes(permission)
     ? Boolean(sessionUser && (sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission)))
     : !sessionUser || sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission);
+  const canViewAdministrativeGeneral = canAccess('administrativo_geral');
+  const canViewDiretoria = canAccess('administrativo_diretoria');
 
   const homeModules = [
     { name: 'Visão Financeira', desc: 'Resumo consolidado e KPIs', icon: BarChart3, color: 'var(--primary)', path: '/visao-financeira', permission: 'visao_financeira' },
     { name: 'Fluxo de Caixa', desc: 'Saldos bancários e evolução', icon: Activity, color: 'var(--success)', path: '/fluxo-caixa', permission: 'fluxo_caixa' },
     { name: 'Projetos', desc: 'Contratos e curvas', icon: FolderKanban, color: 'var(--info)', path: '/projetos', permission: 'projetos' },
     { name: 'Equipe', desc: 'Cadastro, pagamentos e custos por obra', icon: UsersRound, color: 'var(--primary)', path: '/equipe', permission: 'equipe_gestao' },
-    { name: 'Administrativo', desc: 'Receitas, custos e movimentações administrativas', icon: UserRoundCheck, color: 'var(--warning)', path: '/administrativo', permission: 'administrativo' },
+    {
+      name: canViewAdministrativeGeneral ? 'Administrativo' : 'Diretoria',
+      desc: canViewAdministrativeGeneral ? 'Receitas, custos e movimentações administrativas' : 'Movimentações financeiras da diretoria',
+      icon: UserRoundCheck,
+      color: 'var(--warning)',
+      path: canViewAdministrativeGeneral ? '/administrativo' : '/administrativo/socios',
+      permission: canViewAdministrativeGeneral ? 'administrativo_geral' : 'administrativo_diretoria',
+    },
     { name: 'DRE Gerencial', desc: 'Demonstrativo de resultados', icon: ChartColumn, color: 'var(--purple)', path: '/dre', permission: 'dre' },
     { name: 'Atualização de Dados', desc: 'Atualização controlada da base financeira', icon: RefreshCw, color: 'var(--orange)', path: '/atualizacao-dados', permission: 'atualizacao_dados' },
     { name: 'Histórico', desc: 'Logs de sincronização', icon: History, color: 'var(--text-secondary)', path: '/historico', permission: 'historico' },
