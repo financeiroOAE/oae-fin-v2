@@ -1,5 +1,7 @@
 "use client";
 
+import { paymentStatusForReport } from "@/lib/paymentCommitment";
+
 import React, { useState, useEffect, useMemo } from "react";
 import {
   RefreshCw, AlertCircle, Activity, FilterX,
@@ -519,7 +521,8 @@ export default function FluxoDeCaixa() {
     "Nome / Pessoa / Fornecedor": item.nome || "-",
     "Projeto / Obra": item.projeto || "-",
     "Conta / Plano": item.contaDescricao || "-",
-    Situação: item.statusExibicao || "-",
+    Documento: item.documento || "-",
+    Situação: paymentStatusForReport(item) || "-",
     Valor: Number(item.valor) || 0,
   }));
 
