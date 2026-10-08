@@ -231,12 +231,6 @@ export async function exportReportToPdf(items, config) {
     pdf.setFontSize(11);
     pdf.text(item.title, margin, y);
     y += 4;
-    pdf.setTextColor(100, 116, 139);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(6.8);
-    const filterLines = pdf.splitTextToSize(`Filtros: ${describeFilters(item.filters)}`, contentWidth);
-    pdf.text(filterLines, margin, y);
-    y += filterLines.length * 3.2 + 2;
     if (config.includeExplanations && item.explanation) {
       const explanationLines = pdf.splitTextToSize(item.explanation, contentWidth);
       pdf.setTextColor(71, 85, 105);
@@ -426,11 +420,11 @@ export async function exportReportToExcel(items, config) {
     ["Gerado em", new Date()],
     ["Blocos", items.length],
     [],
-    ["Ordem", "Bloco", "Origem", "Filtros"],
-    ...items.map((item, index) => [index + 1, item.title, item.page, describeFilters(item.filters)]),
+    ["Ordem", "Bloco", "Origem"],
+    ...items.map((item, index) => [index + 1, item.title, item.page]),
   ];
   const summarySheet = XLSX.utils.aoa_to_sheet(summary);
-  summarySheet["!cols"] = [{ wch: 12 }, { wch: 38 }, { wch: 24 }, { wch: 70 }];
+  summarySheet["!cols"] = [{ wch: 12 }, { wch: 38 }, { wch: 24 }];
   XLSX.utils.book_append_sheet(workbook, summarySheet, "Resumo");
   usedNames.add("resumo");
 
