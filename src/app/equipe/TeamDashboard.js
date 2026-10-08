@@ -1,6 +1,6 @@
 'use client';
 import { applyValidFilterDate } from '@/lib/dateRange';
-import { paymentStatusForReport, isDocumentedPayableCurrentMonth } from '@/lib/paymentCommitment';
+import { paymentStatusForReport, isDocumentedPayableNext30Days } from '@/lib/paymentCommitment';
 
 import { useEffect, useMemo, useState } from 'react';
 import { FileText, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Wallet, CircleDollarSign, Clock3, UsersRound, BriefcaseBusiness, Building2 } from 'lucide-react';
@@ -227,7 +227,8 @@ function PersonModal({ person, onClose }) {
       title:'Evolução mensal',
       componentName:'Evolução mensal da pessoa',
       page:'Equipe',
-      type:'TABLE',
+      type:'CHART',
+      captureId:`equipe-ficha-grafico-${person.key}`,
       filters:{Pessoa:person.name,'Data inicial':startDate,'Data final':endDate},
       data:months.map(({key,...month})=>month),
     },
@@ -303,7 +304,7 @@ function PersonModal({ person, onClose }) {
         <div><span>Lançamentos</span><strong>{rows.length}</strong></div>
       </div>
 
-      <section className="mgmt-subcard">
+      <section id={`equipe-ficha-grafico-${person.key}`} data-report-section className="mgmt-subcard">
         <h3>Pagamentos mensais por plano financeiro</h3>
         <p className="mgmt-muted">Cada cor representa um plano de equipe com lançamentos pagos no CP_GERAL. Valores em aberto são exibidos separadamente.</p>
         <div className="mgmt-chart-sm"><ResponsiveContainer>
@@ -442,7 +443,8 @@ function ProjectSummaryModal({ project, onClose }) {
           componentName="Fluxo Mensal da Equipe por Projeto"
           page="Equipe"
           scope={projectReportScope}
-          type="TABLE"
+          type="CHART"
+          captureId={`equipe-projeto-grafico-${projectCodeLabel(project.name)}`}
           data={monthly}
           filters={{Projeto:project.name,'Data inicial':startDate,'Data final':endDate}}
         />
@@ -458,7 +460,7 @@ function ProjectSummaryModal({ project, onClose }) {
         />
       </div>
 
-      <section className="mgmt-subcard">
+      <section id={`equipe-projeto-grafico-${projectCodeLabel(project.name)}`} data-report-section className="mgmt-subcard">
         <h3>Fluxo mensal de pagamentos · {period}</h3>
         <div className="mgmt-chart-sm"><ResponsiveContainer>
           <BarChart data={monthly}>
@@ -830,7 +832,7 @@ export default function TeamDashboard(){
         <label>A pagar<input type="text" value={rosterOpenFilter} onChange={e=>setRosterOpenFilter(e.target.value)} placeholder="Valor exato"/></label>
       </div>
       <div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Pessoa / empresa</th><th>Cargo / função</th><th>Tipo</th><th>Projetos</th><th>Pago</th><th>A pagar</th></tr></thead><tbody>
-        {visibleRoster.map(item=>{const rows=item.transactions;const rowPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const rowOpen=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const hasCommitment=rows.some(r=>isDocumentedPayableCurrentMonth({...r,natureza:'Saída'}));return <tr key={item.key} onClick={()=>setSelectedPerson(item)}><td><strong>{item.name}</strong></td><td>{item.roles.join(' · ')||'—'}</td><td>{item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe'}</td><td>{item.projects.length}</td><td className="mgmt-value-paid">{brl(rowPaid)}</td><td className="mgmt-value-open">{brl(rowOpen)}{hasCommitment&&<span title="Há documento formal a pagar neste mês" style={{display:'block',fontSize:10,color:'#38bdf8',fontWeight:700}}>Compromisso do mês</span>}</td></tr>})}
+        {visibleRoster.map(item=>{const rows=item.transactions;const rowPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const rowOpen=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const hasCommitment=rows.some(r=>isDocumentedPayableNext30Days({...r,natureza:'Saída'}));return <tr key={item.key} onClick={()=>setSelectedPerson(item)}><td><strong>{item.name}</strong></td><td>{item.roles.join(' · ')||'—'}</td><td>{item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe'}</td><td>{item.projects.length}</td><td className="mgmt-value-paid">{brl(rowPaid)}</td><td className="mgmt-value-open">{brl(rowOpen)}{hasCommitment&&<span title="Há documento formal a pagar neste mês" style={{display:'block',fontSize:10,color:'#38bdf8',fontWeight:700}}>Vence em até 30 dias</span>}</td></tr>})}
       </tbody></table></div>
       <Pager total={rosterFiltered.length} page={rosterPage} setPage={setRosterPage} pageSize={rosterPageSize} setPageSize={setRosterPageSize}/>
     </section>
