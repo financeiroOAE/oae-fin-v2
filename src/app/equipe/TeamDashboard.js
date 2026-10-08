@@ -93,7 +93,12 @@ const inRange = (row,start,end) => {
   if(!key) return false;
   return (!start||key>=start)&&(!end||key<=end);
 };
-const inTeamRelationScope = (_entry,row) => inRange(row,TEAM_PERIOD_START,TEAM_PERIOD_END);
+const inTeamRelationScope = (entry,row) => {
+  const key=getDateKey(row.data);
+  if(!key)return false;
+  if(inRange(row,TEAM_PERIOD_START,TEAM_PERIOD_END))return true;
+  return Boolean(entry?.thirdParty && !row?.paid && key>TEAM_PERIOD_END);
+};
 
 const projectCodeLabel = (value) => {
   const raw=String(value||'').trim();
@@ -175,10 +180,10 @@ function PersonModal({ person, onClose }) {
   const startDate=TEAM_PERIOD_START;
   const endDate=TEAM_PERIOD_END;
   const personReportScope=`equipe:ficha:${person.key}`;
-  const rows=(person.transactions||[]).filter(row=>inRange(row,startDate,endDate));
-  const {plans: financialPlans,months,planKeys}=monthlyByPlan(rows,startDate,endDate);
-  const period=selectedPeriodLabel(startDate,endDate);
-  const includesFutureOpen=false;
+  const rows=person.transactions||[];
+  const {plans: financialPlans,months,planKeys}=monthlyByPlan(rows.filter(row=>inRange(row,startDate,endDate)),startDate,endDate);
+  const period=`${selectedPeriodLabel(startDate,endDate)} + pendências futuras`;
+  const includesFutureOpen=rows.some(row=>!row.paid&&getDateKey(row.data)>TEAM_PERIOD_END);
   const displayPlans=financialPlans.map(item=>item.plan);
   const paid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
   const open=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
@@ -377,8 +382,8 @@ function ProjectSummaryModal({ project, onClose }) {
   const startDate=TEAM_PERIOD_START;
   const endDate=TEAM_PERIOD_END;
   const projectReportScope=`equipe:projeto:${projectCodeLabel(project.name)}`;
-  const rows=(project.rows||[]).filter(row=>inRange(row,startDate,endDate));
-  const period=selectedPeriodLabel(startDate,endDate);
+  const rows=project.rows||[];
+  const period=`${selectedPeriodLabel(startDate,endDate)} + pendências futuras`;
   const monthly=monthKeysBetween(startDate,endDate).map((key)=>{
     const monthRows=rows.filter(r=>getMonth(r.data)===key);
     return {
@@ -539,7 +544,6 @@ export default function TeamDashboard(){
   const relationEntries=useMemo(()=>data.entries.filter(entry=>{
     if(personFilters.length>0&&!personFilters.includes(entry.person))return false;
     const relevantRows=(entry.transactions||[]).filter(row=>inTeamRelationScope(entry,row));
-    if(relevantRows.length===0)return false;
     if(projectFilters.length>0&&!relevantRows.some(row=>projectFilters.includes(row.projeto)))return false;
     if(accountFilters.length>0){
       const hasAccount=relevantRows.some(row=>accountFilters.includes(rowAccountOption(row)));
@@ -814,7 +818,7 @@ export default function TeamDashboard(){
         filters={relationReportFilters}
         style={{float:'right'}}
       />
-      <div className="mgmt-panel-head"><div><h2>Cadastro da equipe</h2><p>Movimentação completa de 2025 e 2026, independentemente do filtro de data do topo.</p></div></div>
+      <div className="mgmt-panel-head"><div><h2>Cadastro da equipe</h2><p>Cadastro completo com movimentações de 2025 e 2026 e pendências futuras registradas, inclusive até 2030.</p></div></div>
       <div className="mgmt-table-filters mgmt-table-filters-six">
         <label>Pessoa / empresa<MultiSelect options={peopleRoster.map(item=>item.name)} selected={rosterNameFilters} onChange={setRosterNameFilters} placeholder="Todas"/></label>
         <label>Cargo / função<MultiSelect options={rosterRoles} selected={rosterRoleFilters} onChange={setRosterRoleFilters} placeholder="Todos"/></label>
@@ -832,7 +836,7 @@ export default function TeamDashboard(){
     <section className="mgmt-panel" data-report-section>
       <ReportAdder sectionKey="equipe:obras-custos" title="Custos por Obra" componentName="Tabela de Custos por Obra" page="Equipe" type="TABLE" data={projectRelationRows.map(p=>({Projeto:p.name,'Pessoas / terceiros':p.peopleCount,Pago:p.paid,'A pagar':p.open,Total:p.total}))} filters={relationReportFilters} style={{float:'right'}}/>
       <h2>Equipe por projeto</h2>
-      <p>Movimentação completa de 2025 e 2026 por projeto, independentemente do filtro de data do topo.</p>
+      <p>Movimentações de 2025 e 2026 por projeto, mantendo também pendências futuras registradas, inclusive até 2030.</p>
       <div className="mgmt-table-filters mgmt-table-filters-five">
         <label>Projeto<MultiSelect options={projectRelationRows.map(item=>item.name)} selected={projectNameFilters} onChange={setProjectNameFilters} placeholder="Todos"/></label>
         <label>Pessoas / terceiros<input type="number" min="0" value={projectPeopleFilter} onChange={e=>setProjectPeopleFilter(e.target.value)} placeholder="Qtd. exata"/></label>
