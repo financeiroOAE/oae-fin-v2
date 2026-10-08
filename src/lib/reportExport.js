@@ -60,7 +60,7 @@ function movementNameValue(row) {
   return fallback ? row[fallback] : undefined;
 }
 
-function columnValue(row, column) {
+export function getReportCellValue(row, column) {
   if (column?.key === MOVEMENT_NAME_KEY) return movementNameValue(row);
   return row?.[column?.key];
 }
@@ -309,8 +309,8 @@ export async function exportReportToPdf(items, config) {
       columns.forEach((column, index) => {
         const explicit = column.format || item.columnFormats?.[column.key];
         const format = inferReportFormat(column.key, explicit);
-        const value = formatReportValue(columnValue(row, column), format);
-        const align = format === "currency" || format === "percent" || typeof columnValue(row, column) === "number" ? "right" : "left";
+        const value = formatReportValue(getReportCellValue(row, column), format);
+        const align = format === "currency" || format === "percent" || typeof getReportCellValue(row, column) === "number" ? "right" : "left";
         const textX = align === "right" ? x + widths[index] - 1 : x + 1;
         pdf.text(truncateText(pdf, value, widths[index] - 2), textX, y + 4.3, { align });
         x += widths[index];
@@ -387,12 +387,12 @@ function createWorksheet(XLSX, item, rows) {
   rows.forEach((row) => {
     aoa.push(columns.map((column) => {
       const format = inferReportFormat(column.key, column.format || item.columnFormats?.[column.key]);
-      return excelCellValue(columnValue(row, column), format);
+      return excelCellValue(getReportCellValue(row, column), format);
     }));
   });
   const worksheet = XLSX.utils.aoa_to_sheet(aoa);
   worksheet["!cols"] = columns.map((column, columnIndex) => {
-    const values = [column.label || column.key, ...rows.slice(0, 100).map((row) => String(columnValue(row, column) ?? ""))];
+    const values = [column.label || column.key, ...rows.slice(0, 100).map((row) => String(getReportCellValue(row, column) ?? ""))];
     return { wch: Math.min(42, Math.max(12, ...values.map((value) => value.length + 2))) };
   });
   if (rows.length > 0 && columns.length > 0) {
