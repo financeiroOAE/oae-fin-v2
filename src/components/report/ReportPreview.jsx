@@ -1,11 +1,13 @@
 "use client";
 
 import React from "react";
+import { sortMovementRowsByDate } from "@/lib/reportMovementOrder.mjs";
 import { formatReportValue, getReportCellValue, getReportColumns, getReportRows, inferReportFormat, isPriorityExportRow } from "@/lib/reportExport";
 
 function ReportTable({ item, rows, title }) {
-  const columns = getReportColumns(item, rows);
-  if (!rows.length || !columns.length) {
+  const orderedRows = /moviment/i.test([item?.title, item?.componentName, item?.sectionKey].join(' ')) ? sortMovementRowsByDate(rows) : rows;
+  const columns = getReportColumns(item, orderedRows);
+  if (!orderedRows.length || !columns.length) {
     return <p className="report-preview-empty">Nenhum dado encontrado para os filtros selecionados.</p>;
   }
 
@@ -19,11 +21,10 @@ function ReportTable({ item, rows, title }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, rowIndex) => (
+          {orderedRows.map((row, rowIndex) => (
             <tr key={`${item.id}-row-${rowIndex}`} className={isPriorityExportRow(row) ? "is-payment-due-soon" : undefined}>
               {columns.map((column) => {
                 const format = inferReportFormat(column.key, column.format || item.columnFormats?.[column.key]);
-                const priority = isPriorityExportRow(row);
                 const classes = [
                   format === "currency" || format === "percent" ? "is-number" : "",
                 ].filter(Boolean).join(" ");

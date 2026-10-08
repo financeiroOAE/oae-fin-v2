@@ -1,3 +1,4 @@
+import { sortMovementRowsByDate } from '@/lib/reportMovementOrder.mjs';
 import { isDocumentedPayableNext30Days } from '@/lib/paymentCommitment';
 import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 const CURRENCY_FORMAT = '[$R$-pt-BR] #,##0.00;[Red]-[$R$-pt-BR] #,##0.00';
@@ -14,7 +15,7 @@ function fileName(value, extension) {
 
 export function getReportRows(item) {
   const rows = item?.dataSets?.[item.detailMode] ?? item?.data;
-  if (Array.isArray(rows)) return rows;
+  if (Array.isArray(rows)) return isMovementReport(item) ? sortMovementRowsByDate(rows) : rows;
   if (rows && typeof rows === "object") return [rows];
   return [];
 }
@@ -158,7 +159,7 @@ function resolveOrientation(items, requested) {
   if (requested === "portrait" || requested === "landscape") return requested;
   const needsLandscape = items.some((item) => {
     const columns = getReportColumns(item);
-    return item.type === "DRE" || columns.length > 7;
+    return item.type === "DRE" || columns.length > 6;
   });
   return needsLandscape ? "landscape" : "portrait";
 }
@@ -241,7 +242,8 @@ export async function exportReportToPdf(items, config) {
     }
   };
 
-  const drawTable = (item, rows, title) => {
+  const drawTable = (item, sourceRows, title) => {
+    const rows = isMovementReport(item) ? sortMovementRowsByDate(sourceRows) : sourceRows;
     if (title) {
       ensureSpace(9);
       pdf.setTextColor(51, 65, 85);
@@ -261,72 +263,88 @@ export async function exportReportToPdf(items, config) {
       return;
     }
 
-    const firstWidth = columns.length > 2 ? Math.min(46, contentWidth * 0.28) : contentWidth / columns.length;
-    const otherWidth = columns.length > 1 ? (contentWidth - firstWidth) / (columns.length - 1) : contentWidth;
-    const widths = columns.map((_, index) => (index === 0 ? firstWidth : otherWidth));
-    const rowHeight = 6.5;
+    const columnWeights = columns.map((column) => {
+      const label = normalizedColumnName(column.label || column.key);
+      if (/^data$|vencimento/.test(label)) return 0.80;
+      if (/pessoa|fornecedor|^nome$|cliente/.test(label)) return 1.70;
+      if (/documento|projeto|obra|plano|conta|descri/.test(label)) return 1.45;
+      if (/situa|status/.test(label)) return 0.95;
+      if (/valor|pago|pagar|total|saldo/.test(label)) return 1.00;
+      return 1.15;
+    });
+    const totalWeight = columnWeights.reduce((sum, value) => sum + value, 0);
+    const widths = columnWeights.map((weight) => contentWidth * weight / totalWeight);
+    const minHeight = 6.5;
+    const paddingY = 1.6;
 
-    const drawColumnDividers = (topY) => {
-      if (normalizedColumnName(item?.page) !== "equipe" || columns.length < 2) return;
-      let dividerX = margin;
-      pdf.setDrawColor(203, 213, 225);
-      pdf.setLineWidth(0.15);
-      for (let index = 0; index < columns.length - 1; index += 1) {
-        dividerX += widths[index];
-        pdf.line(dividerX, topY, dividerX, topY + rowHeight);
-      }
-    };
+    const fontSize = columns.length > 8 ? 5.0 : columns.length > 6 ? 5.7 : 6.5;
+    const lineHeight = Math.max(2.25, fontSize * 0.43);
+    const wrapCell = (value, width) => pdf.splitTextToSize(String(value ?? '—'), Math.max(width - 3, 3));
 
     const drawTableHeader = () => {
-      ensureSpace(rowHeight * 2);
-      const headerY = y;
+      const headerLines = columns.map((col, index) => wrapCell(col.label || col.key, widths[index]));
+      const height = Math.max(minHeight, ...headerLines.map((lines) => lines.length * lineHeight + paddingY * 2));
+      ensureSpace(height + minHeight);
       let x = margin;
       pdf.setFillColor(226, 232, 240);
-      pdf.rect(margin, y, contentWidth, rowHeight, "F");
+      pdf.rect(margin, y, contentWidth, height, "F");
       pdf.setTextColor(51, 65, 85);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(columns.length > 8 ? 5.3 : 6.3);
-      columns.forEach((column, index) => {
-        pdf.text(truncateText(pdf, column.label || column.key, widths[index] - 2), x + 1, y + 4.3);
+      pdf.setFontSize(fontSize);
+      headerLines.forEach((lines, index) => {
+        pdf.text(lines, x + 1.5, y + paddingY + lineHeight * 0.85);
         x += widths[index];
       });
-      drawColumnDividers(headerY);
-      y += rowHeight;
+      y += height;
     };
 
     drawTableHeader();
     rows.forEach((row, rowIndex) => {
-      if (y + rowHeight > maxY) {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(fontSize);
+      const cells = columns.map((column, index) => {
+        const format = inferReportFormat(column.key, column.format || item.columnFormats?.[column.key]);
+        const raw = getReportCellValue(row, column);
+        const value = formatReportValue(raw, format);
+        return {
+          lines: wrapCell(value, widths[index]),
+          align: format === "currency" || format === "percent" || typeof raw === "number" ? "right" : "left",
+        };
+      });
+      const rowHeight = Math.max(minHeight, ...cells.map(({lines}) => lines.length * lineHeight + paddingY * 2));
+      if (rowHeight > maxY - (margin + 28)) {
+        // Extremely long free-form fields are clipped only when one record would
+        // exceed an entire printed page; ordinary names wrap without clipping.
+        const maxLines = Math.floor((maxY - margin - 32 - paddingY * 2) / lineHeight);
+        cells.forEach((cell) => { cell.lines = cell.lines.slice(0, maxLines); });
+      }
+      const finalHeight = Math.max(minHeight, ...cells.map(({lines}) => lines.length * lineHeight + paddingY * 2));
+      if (y + finalHeight > maxY) {
         addPage();
         drawTableHeader();
       }
-      const priority = isPriorityExportRow(row);
-      if (priority) {
+      if (isPriorityExportRow(row)) {
         pdf.setFillColor(225, 242, 251);
-        pdf.rect(margin, y, contentWidth, rowHeight, 'F');
+        pdf.rect(margin, y, contentWidth, finalHeight, 'F');
         pdf.setFillColor(14, 165, 233);
-        pdf.rect(margin, y, 0.85, rowHeight, 'F');
+        pdf.rect(margin, y, 0.85, finalHeight, 'F');
       } else if (rowIndex % 2 === 1) {
         pdf.setFillColor(248, 250, 252);
-        pdf.rect(margin, y, contentWidth, rowHeight, "F");
+        pdf.rect(margin, y, contentWidth, finalHeight, "F");
       }
-      let x = margin;
       pdf.setTextColor(51, 65, 85);
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(columns.length > 8 ? 5.2 : 6.2);
-      columns.forEach((column, index) => {
-        const explicit = column.format || item.columnFormats?.[column.key];
-        const format = inferReportFormat(column.key, explicit);
-        const value = formatReportValue(getReportCellValue(row, column), format);
-        const align = format === "currency" || format === "percent" || typeof getReportCellValue(row, column) === "number" ? "right" : "left";
-        const textX = align === "right" ? x + widths[index] - 1 : x + 1;
-        pdf.text(truncateText(pdf, value, widths[index] - 2), textX, y + 4.3, { align });
+      pdf.setFontSize(fontSize);
+      let x = margin;
+      cells.forEach(({lines, align}, index) => {
+        const textX = align === "right" ? x + widths[index] - 1.5 : x + 1.5;
+        pdf.text(lines, textX, y + paddingY + lineHeight * 0.85, { align });
         x += widths[index];
       });
-      drawColumnDividers(y);
       pdf.setDrawColor(226, 232, 240);
-      pdf.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight);
-      y += rowHeight;
+      pdf.setLineWidth(0.1);
+      pdf.line(margin, y + finalHeight, pageWidth - margin, y + finalHeight);
+      y += finalHeight;
     });
     y += 4;
   };
@@ -511,9 +529,10 @@ export async function exportReportToExcel(items, config) {
   items.forEach((item, index) => {
     // Excel é uma exportação de dados, não uma captura visual. Quando o bloco
     // oferece a relação completa filtrada, ela tem prioridade sobre resumo/visível.
-    const rows = Array.isArray(item?.dataSets?.all)
+    const sourceRows = Array.isArray(item?.dataSets?.all)
       ? item.dataSets.all
       : getReportRows(item);
+    const rows = isMovementReport(item) ? sortMovementRowsByDate(sourceRows) : sourceRows;
     const worksheet = createWorksheet(XLSX, item, rows);
     prioritySheets.push(rows.flatMap((row, rowIndex) => isPriorityExportRow(row) ? [rowIndex] : []));
     XLSX.utils.book_append_sheet(workbook, worksheet, uniqueSheetName(item.title || `Bloco ${index + 1}`, usedNames));
