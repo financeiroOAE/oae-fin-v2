@@ -21,7 +21,6 @@ const OPEN_COLOR = '#f59e0b';
 const PLAN_COLORS = ['#3b82f6','#a855f7','#14b8a6','#f97316','#e11d48','#64748b','#84cc16','#06b6d4'];
 const TEAM_PERIOD_START = '2025-01-01';
 const TEAM_PERIOD_END = '2026-12-31';
-const TEAM_PERIOD_LABEL = '2025-2026';
 const monthKeysBetween = (start=TEAM_PERIOD_START,end=TEAM_PERIOD_END) => {
   const safeStart = /^\d{4}-\d{2}/.test(String(start||'')) ? String(start).slice(0,7) : TEAM_PERIOD_START.slice(0,7);
   const safeEnd = /^\d{4}-\d{2}/.test(String(end||'')) ? String(end).slice(0,7) : TEAM_PERIOD_END.slice(0,7);
@@ -252,7 +251,7 @@ function PersonModal({ person, startDate, endDate, onClose }) {
       componentName:'Movimentações da ficha financeira',
       page:'Equipe',
       type:'TABLE',
-      filters:{Pessoa:person.name,Escopo:person.thirdParty?'2025-2026 + A pagar futuro':'2025-2026'},
+      filters:{Pessoa:person.name,'Data inicial':startDate,'Data final':endDate,Escopo:includesFutureOpen?'Período selecionado + A pagar futuro de terceiros':'Período selecionado'},
       data:reportMovementRows(rows,person.name),
     },
   ];
@@ -449,7 +448,7 @@ function ProjectSummaryModal({ project, startDate, endDate, onClose }) {
           scope={projectReportScope}
           type="TABLE"
           data={reportRows}
-          filters={{Projeto:project.name,Escopo:'2025-2026 + A pagar futuro de terceiros'}}
+          filters={{Projeto:project.name,'Data inicial':startDate,'Data final':endDate}}
         />
       </div>
 
