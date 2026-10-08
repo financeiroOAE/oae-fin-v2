@@ -760,7 +760,7 @@ export default function TeamDashboard(){
 
   return <div className="mgmt">
     <header className="mgmt-header">
-      <div><span className="mgmt-eyebrow">EQUIPE · 2025-2026</span><h1>Equipe</h1><p>Cadastro, pagamentos, pendências e custo de equipe por obra.</p></div>
+      <div><h1>Equipe</h1><p>Cadastro, pagamentos, pendências e custo de equipe por obra.</p></div>
       <div className="mgmt-actions">
         <FinancialRefreshButton onUpdated={reloadTeamData} onError={setError} label="Atualizar dados"/>
         <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Equipe')} className={`btn ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do Modo Relatório':'Gerar Relatório'}</button>
