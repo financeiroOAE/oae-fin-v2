@@ -20,6 +20,7 @@ const PAID_COLOR = '#22c55e';
 const OPEN_COLOR = '#f59e0b';
 const PLAN_COLORS = ['#3b82f6','#a855f7','#14b8a6','#f97316','#e11d48','#64748b','#84cc16','#06b6d4'];
 const TEAM_PERIOD_START = '2025-01-01';
+const TEAM_DEFAULT_START = '2026-01-01';
 const TEAM_PERIOD_END = '2026-12-31';
 const monthKeysBetween = (start=TEAM_PERIOD_START,end=TEAM_PERIOD_END) => {
   const safeStart = /^\d{4}-\d{2}/.test(String(start||'')) ? String(start).slice(0,7) : TEAM_PERIOD_START.slice(0,7);
@@ -478,7 +479,7 @@ function ProjectSummaryModal({ project, startDate, endDate, onClose }) {
 export default function TeamDashboard(){
   const {isReportMode,openReportBuilder,exitReportMode}=useReport();
   const[data,setData]=useState({entries:[],monthly:[]});
-  const[startDate,setStartDate]=useState(TEAM_PERIOD_START);
+  const[startDate,setStartDate]=useState(TEAM_DEFAULT_START);
   const[endDate,setEndDate]=useState(TEAM_PERIOD_END);
   const[personFilters,setPersonFilters]=useState([]);
   const[projectFilters,setProjectFilters]=useState([]);
