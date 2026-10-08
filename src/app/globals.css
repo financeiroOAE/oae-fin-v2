@@ -1378,3 +1378,23 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Exportação e prévia: colunas legíveis, registros inteiros e quebras controladas. */
+.report-preview-table { table-layout: fixed; border-collapse: collapse; }
+.report-preview-table th, .report-preview-table td {
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  vertical-align: top !important;
+  line-height: 1.4 !important;
+  padding: 0.45rem 0.5rem !important;
+}
+.report-preview-table tr { break-inside: avoid; page-break-inside: avoid; }
+.report-preview-table thead { display: table-header-group; }
+.report-preview-section { break-inside: auto; }
+.report-preview-section-title { break-after: avoid; page-break-after: avoid; }
+.report-preview-table .is-number { white-space: nowrap !important; }
+@media print {
+  .report-preview-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .report-preview-table thead { display: table-header-group; }
+}
