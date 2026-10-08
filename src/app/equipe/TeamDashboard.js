@@ -202,7 +202,7 @@ function PersonModal({ person, startDate, endDate, onClose }) {
   const personReportItems=[
     {
       sectionKey:`equipe:export:ficha:${person.key}:resumo`,
-      title:`Resumo financeiro — ${person.name}`,
+      title:'Resumo financeiro',
       componentName:'Resumo da ficha financeira',
       page:'Equipe',
       type:'TABLE',
@@ -221,7 +221,7 @@ function PersonModal({ person, startDate, endDate, onClose }) {
     },
     {
       sectionKey:`equipe:export:ficha:${person.key}:mensal`,
-      title:`Evolução mensal — ${person.name}`,
+      title:'Evolução mensal',
       componentName:'Evolução mensal da pessoa',
       page:'Equipe',
       type:'TABLE',
@@ -230,7 +230,7 @@ function PersonModal({ person, startDate, endDate, onClose }) {
     },
     {
       sectionKey:`equipe:export:ficha:${person.key}:planos`,
-      title:`Divisão por plano financeiro — ${person.name}`,
+      title:'Divisão por plano financeiro',
       componentName:'Pagamentos e pendências por plano financeiro',
       page:'Equipe',
       type:'TABLE',
@@ -239,7 +239,7 @@ function PersonModal({ person, startDate, endDate, onClose }) {
     },
     {
       sectionKey:`equipe:export:ficha:${person.key}:obras`,
-      title:`Resumo por projeto — ${person.name}`,
+      title:'Resumo por projeto',
       componentName:'Resumo da pessoa por projeto',
       page:'Equipe',
       type:'TABLE',
@@ -248,7 +248,7 @@ function PersonModal({ person, startDate, endDate, onClose }) {
     },
     {
       sectionKey:`equipe:export:ficha:${person.key}:movimentos`,
-      title:`Movimentações financeiras — ${person.name}`,
+      title:'Movimentações financeiras',
       componentName:'Movimentações da ficha financeira',
       page:'Equipe',
       type:'TABLE',
@@ -266,7 +266,7 @@ function PersonModal({ person, startDate, endDate, onClose }) {
           <p>{person.roles.join(' · ')||'Sem função informada'} · relatório configurável por blocos e orientação</p>
         </div>
         <div className="mgmt-actions">
-          <button className="btn" onClick={()=>openReportBuilder('Equipe',personReportScope,`Ficha — ${person.name}`)}><FileText size={15}/> Gerar Relatório</button>
+          <button className="btn" onClick={()=>openReportBuilder('Equipe',personReportScope,person.name)}><FileText size={15}/> Gerar Relatório</button>
           <button className="btn" onClick={onClose}><X size={16}/> Fechar</button>
         </div>
       </div>
@@ -350,7 +350,7 @@ function PersonModal({ person, startDate, endDate, onClose }) {
         <div aria-hidden="true" style={{display:'none'}}>
           <ReportAdder
             sectionKey={`equipe:pessoa-projeto:${person.key}:${projectCodeLabel(selectedProject.name)}:resumo`}
-            title={`Resumo — ${person.name} — ${selectedProject.name}`}
+            title="Resumo por projeto"
             componentName="Resumo da Pessoa por Projeto"
             page="Equipe"
             scope={`equipe:pessoa-projeto:${person.key}:${projectCodeLabel(selectedProject.name)}`}
@@ -360,7 +360,7 @@ function PersonModal({ person, startDate, endDate, onClose }) {
           />
           <ReportAdder
             sectionKey={`equipe:pessoa-projeto:${person.key}:${projectCodeLabel(selectedProject.name)}:movimentos`}
-            title={`Movimentações — ${person.name} — ${selectedProject.name}`}
+            title="Movimentações financeiras"
             componentName="Movimentações da Pessoa por Projeto"
             page="Equipe"
             scope={`equipe:pessoa-projeto:${person.key}:${projectCodeLabel(selectedProject.name)}`}
@@ -423,7 +423,7 @@ function ProjectSummaryModal({ project, startDate, endDate, onClose }) {
       <div aria-hidden="true" style={{display:'none'}}>
         <ReportAdder
           sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}:resumo`}
-          title={`Resumo do projeto — ${project.name}`}
+          title="Resumo por projeto"
           componentName="Resumo Financeiro da Equipe por Projeto"
           page="Equipe"
           scope={projectReportScope}
@@ -433,7 +433,7 @@ function ProjectSummaryModal({ project, startDate, endDate, onClose }) {
         />
         <ReportAdder
           sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}:mensal`}
-          title={`Fluxo mensal — ${project.name}`}
+          title="Fluxo mensal"
           componentName="Fluxo Mensal da Equipe por Projeto"
           page="Equipe"
           scope={projectReportScope}
@@ -443,7 +443,7 @@ function ProjectSummaryModal({ project, startDate, endDate, onClose }) {
         />
         <ReportAdder
           sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}:movimentos`}
-          title={`Movimentações do projeto — ${project.name}`}
+          title="Movimentações financeiras"
           componentName="Movimentações da Equipe por Projeto"
           page="Equipe"
           scope={projectReportScope}
