@@ -1,3 +1,4 @@
+import { applyValidFilterDate } from '@/lib/dateRange';
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -1370,13 +1371,13 @@ export default function Projetos() {
 
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Data Inicial</label>
-            <input type="date" value={filterDataInicial} onChange={(e) => setFilterDataInicial(e.target.value)}
+            <input type="date" value={filterDataInicial} onChange={e=>applyValidFilterDate(e.target.value, setFilterDataInicial)}
               style={{ width: '100%', height: '34px', fontSize: '13px', color: 'var(--text-main)', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
 
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Data Final</label>
-            <input type="date" value={filterDataFinal} onChange={(e) => setFilterDataFinal(e.target.value)}
+            <input type="date" value={filterDataFinal} onChange={e=>applyValidFilterDate(e.target.value, setFilterDataFinal)}
               style={{ width: '100%', height: '34px', fontSize: '13px', color: 'var(--text-main)', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
 
@@ -1715,11 +1716,11 @@ export default function Projetos() {
           </div>
           <div>
             <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Vencimento inicial</label>
-            <input type="date" value={nfDueStart} onChange={(e) => setNfDueStart(e.target.value)} style={{ width: '100%', height: '40px', boxSizing: 'border-box' }} />
+            <input type="date" value={nfDueStart} onChange={e=>applyValidFilterDate(e.target.value, setNfDueStart)} style={{ width: '100%', height: '40px', boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Vencimento final</label>
-            <input type="date" value={nfDueEnd} onChange={(e) => setNfDueEnd(e.target.value)} style={{ width: '100%', height: '40px', boxSizing: 'border-box' }} />
+            <input type="date" value={nfDueEnd} onChange={e=>applyValidFilterDate(e.target.value, setNfDueEnd)} style={{ width: '100%', height: '40px', boxSizing: 'border-box' }} />
           </div>
           <div style={{ minWidth: 0 }}>
             <label style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Situação</label>
