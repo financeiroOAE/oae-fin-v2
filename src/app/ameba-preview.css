@@ -1,0 +1,82 @@
+/* Ameba reference: navy shell, white product surfaces, fine borders.
+   Every redesign selector is scoped to the server-authorized attribute. */
+:root[data-design-preview="ameba"][data-design-preview] {
+  --bg-main: #f6f7fb;
+  --bg-sidebar: #00052e;
+  --bg-card: #ffffff;
+  --bg-elevated: #f0f2f8;
+  --bg-card-hover: #f9faff;
+  --text-main: #00052e;
+  --text-secondary: #4f5166;
+  --primary: #0428cb;
+  --primary-hover: #0320a3;
+  --info: #2456c7;
+  --success: #087a53;
+  --danger: #bb2637;
+  --warning: #986200;
+  --purple: #6b46ad;
+  --orange: #bd4b0b;
+  --border-color: #dbdcdf;
+  --border-focus: #0428cb;
+  --glass-bg: rgba(255,255,255,.96);
+  --radius-lg: 8px;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-glow: none;
+  --bg-primary: var(--bg-main);
+  --text-primary: var(--text-main);
+  color-scheme: light;
+}
+:root[data-design-preview="ameba"][data-design-preview] .oae-sidebar {
+  --text-main: #ffffff;
+  --text-secondary: #b8bdd7;
+  --primary: #c8d0ff;
+  --border-color: #252b50;
+  --bg-elevated: #10183f;
+  color: #ffffff;
+  color-scheme: dark;
+}
+:root[data-design-preview="ameba"][data-design-preview] .main-content { padding: 28px 32px; }
+:root[data-design-preview="ameba"][data-design-preview] h1 { font-weight: 300 !important; letter-spacing: -.019em; line-height: 1.25; }
+:root[data-design-preview="ameba"][data-design-preview] h2,
+:root[data-design-preview="ameba"][data-design-preview] h3 { font-weight: 500; letter-spacing: -.015em; }
+:root[data-design-preview="ameba"][data-design-preview] :is(.card,.mgmt-panel,.mgmt-subcard,.mgmt-modal-center) {
+  border-radius: 8px; box-shadow: none; backdrop-filter: none;
+}
+:root[data-design-preview="ameba"][data-design-preview] .card:hover { transform: none; box-shadow: none; }
+:root[data-design-preview="ameba"][data-design-preview] :is(.mgmt-metric-value,.mgmt-kpis strong) {
+  font-weight: 300; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+}
+:root[data-design-preview="ameba"][data-design-preview] :is(.mgmt-eyebrow,th) {
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px; letter-spacing: .07em;
+}
+:root[data-design-preview="ameba"][data-design-preview] :is(th,td) { border-color: #dbdcdf; }
+:root[data-design-preview="ameba"][data-design-preview] td { font-variant-numeric: tabular-nums; }
+:root[data-design-preview="ameba"][data-design-preview] tbody tr:hover { background: #f0f2f8; }
+:root[data-design-preview="ameba"][data-design-preview] :is(input,select,textarea) { color-scheme: light !important; }
+:root[data-design-preview="ameba"][data-design-preview] :is(input,select,textarea,button,a):focus-visible {
+  outline: 2px solid var(--primary); outline-offset: 3px;
+}
+:root[data-design-preview="ameba"][data-design-preview] .btn { border-radius: 8px; box-shadow: none; }
+:root[data-design-preview="ameba"][data-design-preview] .dre-negative-value { color: #bb2637 !important; }
+:root[data-design-preview="ameba"][data-design-preview] .mgmt-value-paid { color: #087a53; }
+:root[data-design-preview="ameba"][data-design-preview] .mgmt-value-open { color: #986200; }
+:root[data-design-preview="ameba"][data-design-preview] .recharts-cartesian-grid line { stroke: #e3e5ed; }
+:root[data-design-preview="ameba"][data-design-preview] .recharts-text { fill: #4f5166; }
+.design-preview-control { padding: 8px; border-top: 1px solid var(--border-color); }
+.design-preview-control button {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+  background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color);
+  padding: 10px; border-radius: 8px; cursor: pointer; font: inherit; text-align: left; font-size: 12px;
+}
+.design-preview-control button:hover { background: var(--bg-elevated); }
+.design-preview-control button:disabled { opacity: .6; cursor: wait; }
+.design-preview-control small { display: block; font-size: 10px; margin-top: 3px; }
+.design-preview-control p { color: var(--danger); font-size: 11px; overflow-wrap: anywhere; margin-top: 6px; }
+@media (max-width: 767px) {
+  :root[data-design-preview="ameba"][data-design-preview] .main-content { padding: 72px 16px 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-design-preview="ameba"][data-design-preview] .fade-in { animation: none; }
+}

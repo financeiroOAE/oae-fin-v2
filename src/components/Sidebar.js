@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import DesignPreviewToggle from '@/components/DesignPreviewToggle';
 import { 
   LayoutDashboard, 
   BarChart3,
@@ -21,7 +22,7 @@ import {
   UserRoundCheck
 } from 'lucide-react';
 
-export default function Sidebar() {
+export default function Sidebar({ canPreview = false, previewActive = false }) {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [logoError, setLogoError] = useState(false);
@@ -123,7 +124,7 @@ export default function Sidebar() {
         <div onClick={() => setCollapsed(true)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 95 }} />
       )}
       
-      <aside style={{
+      <aside className="oae-sidebar" style={{
         width: collapsed && !isMobile ? '72px' : '240px',
         minWidth: collapsed && !isMobile ? '72px' : '240px',
         maxWidth: collapsed && !isMobile ? '72px' : '240px',
@@ -330,6 +331,7 @@ export default function Sidebar() {
         </nav>
 
         {/* Logout */}
+        {canPreview && <DesignPreviewToggle active={previewActive} collapsed={collapsed && !isMobile} />}
         <div style={{ padding: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
           <form action="/api/auth/logout" method="POST">
             <button 

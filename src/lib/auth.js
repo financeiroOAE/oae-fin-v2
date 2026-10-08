@@ -59,4 +59,5 @@ export async function createSession(user) {
 export async function deleteSession() {
   const cookieStore = await cookies();
   cookieStore.delete('oae_session');
+  cookieStore.delete('oae_design_preview');
 }
