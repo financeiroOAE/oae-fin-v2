@@ -4,7 +4,14 @@ import { readCurrentSnapshot } from '@/lib/financialSync';
 import { cpRows, monthOf } from '@/lib/managementSources';
 
 const fail = (error, status = 400) => NextResponse.json({ error }, { status });
-const YEAR = '2026';
+const START_YEAR = '2025';
+const END_YEAR = '2026';
+const START_MONTH = `${START_YEAR}-01`;
+const END_MONTH = `${END_YEAR}-12`;
+
+function isHistoricalTeamMonth(month) {
+  return Boolean(month && month >= START_MONTH && month <= END_MONTH);
+}
 
 function norm(value) {
   return String(value ?? '')
@@ -68,9 +75,9 @@ export async function GET() {
       };
     })
     .filter((row) => {
-      const is2026 = row._month?.startsWith(YEAR);
-      const isFutureOpen = Boolean(!row.paid && row._month && row._month > `${YEAR}-12`);
-      return is2026 || isFutureOpen;
+      const isHistorical = isHistoricalTeamMonth(row._month);
+      const isFutureOpen = Boolean(!row.paid && row._month && row._month > END_MONTH);
+      return isHistorical || isFutureOpen;
     });
 
   // O cadastro EQUIPE informa função e vínculo, mas NÃO limita o plano financeiro.
@@ -100,18 +107,18 @@ export async function GET() {
       if (!matchesParty(item.person, row.nome)) return false;
       if (item.thirdParty && !matchesProject(item.departmentProject, row.projeto)) return false;
 
-      const is2026 = row._month?.startsWith(YEAR);
+      const isHistorical = isHistoricalTeamMonth(row._month);
       const isFutureOpenThirdParty = Boolean(
         item.thirdParty
         && !row.paid
         && row._month
-        && row._month > `${YEAR}-12`
+        && row._month > END_MONTH
       );
 
       // Regra da relação de equipe:
-      // - todos permanecem com movimentos de 2026;
+      // - todos permanecem com movimentos de 2025 e 2026;
       // - somente terceiros mantêm A PAGAR após dez/2026.
-      return is2026 || isFutureOpenThirdParty;
+      return isHistorical || isFutureOpenThirdParty;
     }).map(({ _accountCode, _month, ...row }) => row);
 
     const paid = transactions.filter((row) => row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0);
@@ -135,18 +142,24 @@ export async function GET() {
   const uniqueTx = new Map(allTransactions.map((row) => [row.sourceKey, row]));
   const financialRows = [...uniqueTx.values()];
 
-  const monthly = Array.from({ length: 12 }, (_, i) => {
-    const month = `${YEAR}-${String(i + 1).padStart(2, '0')}`;
-    const rows = financialRows.filter((row) => monthOf(row.data) === month);
-    return {
-      month,
-      paid: Math.round(rows.filter((row) => row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0) * 100) / 100,
-      open: Math.round(rows.filter((row) => !row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0) * 100) / 100,
-    };
-  });
+  const monthly = [];
+  for (let year = Number(START_YEAR); year <= Number(END_YEAR); year += 1) {
+    for (let monthNumber = 1; monthNumber <= 12; monthNumber += 1) {
+      const month = `${year}-${String(monthNumber).padStart(2, '0')}`;
+      const rows = financialRows.filter((row) => monthOf(row.data) === month);
+      monthly.push({
+        month,
+        paid: Math.round(rows.filter((row) => row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0) * 100) / 100,
+        open: Math.round(rows.filter((row) => !row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0) * 100) / 100,
+      });
+    }
+  }
 
     return NextResponse.json({
       year: 2026,
+      years: [2025, 2026],
+      periodStart: `${START_YEAR}-01-01`,
+      periodEnd: `${END_YEAR}-12-31`,
       entries,
       monthly,
       snapshotAt: snapshot?.updatedAt || null,
@@ -155,6 +168,7 @@ export async function GET() {
         sourceRoster: 'EQUIPE (identificação, função e vínculo)',
         sourceFinancial: 'CP_GERAL (todos os planos de equipe por pessoa)',
         accountRule: 'Os planos e valores vêm de cada lançamento de CP_GERAL, nunca do plano ou valor-base do cadastro.',
+        historicalScope: 'Movimentos de 2025 e 2026 disponíveis para consulta na aba Equipe.',
         futureOpenThirdParty: 'A PAGAR após dez/2026 incluído somente para cadastros TERCEIRO (EQUIP. TÉC. / TERCEIROS)',
       },
     }, { headers: { 'Cache-Control': 'private, no-store' } });

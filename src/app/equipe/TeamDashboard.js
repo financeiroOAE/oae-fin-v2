@@ -19,10 +19,29 @@ import './managementExtras.css';
 const PAID_COLOR = '#22c55e';
 const OPEN_COLOR = '#f59e0b';
 const PLAN_COLORS = ['#3b82f6','#a855f7','#14b8a6','#f97316','#e11d48','#64748b','#84cc16','#06b6d4'];
+const TEAM_PERIOD_START = '2025-01-01';
+const TEAM_PERIOD_END = '2026-12-31';
+const TEAM_PERIOD_LABEL = '2025-2026';
+const monthKeysBetween = (start=TEAM_PERIOD_START,end=TEAM_PERIOD_END) => {
+  const safeStart = /^\d{4}-\d{2}/.test(String(start||'')) ? String(start).slice(0,7) : TEAM_PERIOD_START.slice(0,7);
+  const safeEnd = /^\d{4}-\d{2}/.test(String(end||'')) ? String(end).slice(0,7) : TEAM_PERIOD_END.slice(0,7);
+  const [startYear,startMonth]=safeStart.split('-').map(Number);
+  const [endYear,endMonth]=safeEnd.split('-').map(Number);
+  const result=[];
+  let year=startYear;
+  let month=startMonth;
+  while(year<endYear || (year===endYear && month<=endMonth)){
+    result.push(`${year}-${String(month).padStart(2,'0')}`);
+    month+=1;
+    if(month===13){month=1;year+=1}
+  }
+  return result;
+};
+const monthPeriodLabel = (key) => new Intl.DateTimeFormat('pt-BR',{month:'short',year:'2-digit',timeZone:'UTC'}).format(new Date(`${key}-01T12:00:00Z`));
 const financePlan = (row) => accountOptionLabel(row.contaCodigo,row.contaNome||row.contaDescricao);
 const monthlyByPlan = (rows) => {
   const planTotals = new Map();
-  const months = Array.from({length:12},(_,i)=>({month:monthLabel(`2026-${String(i+1).padStart(2,'0')}`),key:`2026-${String(i+1).padStart(2,'0')}`,Pago:0,'A pagar':0}));
+  const months = monthKeysBetween().map((key)=>({month:monthPeriodLabel(key),key,Pago:0,'A pagar':0}));
   const perMonth = new Map(months.map(month=>[month.key,month]));
   (rows||[]).forEach(row=>{
     const key=getMonth(row.data);
@@ -174,7 +193,7 @@ function PersonModal({ person, onClose }) {
       componentName:'Resumo da ficha financeira',
       page:'Equipe',
       type:'TABLE',
-      filters:{Pessoa:person.name,Escopo:person.thirdParty?'2026 + A pagar futuro':'2026'},
+      filters:{Pessoa:person.name,Escopo:person.thirdParty?'2025-2026 + A pagar futuro':'2025-2026'},
       data:[{
         'Pessoa / empresa':person.name,
         'Cargo / função':person.roles.join(' · ')||'—',
@@ -193,7 +212,7 @@ function PersonModal({ person, onClose }) {
       componentName:'Evolução mensal da pessoa',
       page:'Equipe',
       type:'TABLE',
-      filters:{Pessoa:person.name,Ano:2026},
+      filters:{Pessoa:person.name,Período:TEAM_PERIOD_LABEL},
       data:months.map(({key,...month})=>month),
     },
     {
@@ -202,7 +221,7 @@ function PersonModal({ person, onClose }) {
       componentName:'Pagamentos e pendências por plano financeiro',
       page:'Equipe',
       type:'TABLE',
-      filters:{Pessoa:person.name,Ano:2026,Fonte:'CP_GERAL'},
+      filters:{Pessoa:person.name,Período:TEAM_PERIOD_LABEL,Fonte:'CP_GERAL'},
       data:planReportRows,
     },
     {
@@ -220,7 +239,7 @@ function PersonModal({ person, onClose }) {
       componentName:'Movimentações da ficha financeira',
       page:'Equipe',
       type:'TABLE',
-      filters:{Pessoa:person.name,Escopo:person.thirdParty?'2026 + A pagar futuro':'2026'},
+      filters:{Pessoa:person.name,Escopo:person.thirdParty?'2025-2026 + A pagar futuro':'2025-2026'},
       data:reportMovementRows(rows,person.name),
     },
   ];
@@ -229,7 +248,7 @@ function PersonModal({ person, onClose }) {
     <div className="mgmt-modal-center" onMouseDown={(e)=>e.stopPropagation()}>
       <div className="mgmt-panel-head">
         <div>
-          <span className="mgmt-eyebrow">CADASTRO FINANCEIRO · 2026</span>
+          <span className="mgmt-eyebrow">CADASTRO FINANCEIRO · 2025-2026</span>
           <h2>{person.name}</h2>
           <p>{person.roles.join(' · ')||'Sem função informada'} · relatório configurável por blocos e orientação</p>
         </div>
@@ -262,7 +281,7 @@ function PersonModal({ person, onClose }) {
       </div>
 
       <div className="mgmt-kpis">
-        <div><span>Pago em 2026</span><strong className="mgmt-value-paid">{brl(paid)}</strong></div>
+        <div><span>Pago em 2025-2026</span><strong className="mgmt-value-paid">{brl(paid)}</strong></div>
         <div><span>{person.thirdParty?'A pagar · inclui futuro':'A pagar até dez/2026'}</span><strong className="mgmt-value-open">{brl(open)}</strong></div>
         <div><span>Total financeiro</span><strong>{brl(paid+open)}</strong></div>
         <div><span>Lançamentos</span><strong>{rows.length}</strong></div>
@@ -305,7 +324,7 @@ function PersonModal({ person, onClose }) {
     {selectedProject&&<div className="mgmt-overlay mgmt-overlay-center mgmt-overlay-project" onMouseDown={()=>setSelectedProject(null)}>
       <div className="mgmt-modal-center mgmt-project-modal" onMouseDown={(e)=>e.stopPropagation()}>
         <div className="mgmt-panel-head">
-          <div><span className="mgmt-eyebrow">MOVIMENTOS DA OBRA · 2026</span><h2>{selectedProject.name}</h2><p>{person.name} · {selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div>
+          <div><span className="mgmt-eyebrow">MOVIMENTOS DA OBRA · 2025-2026</span><h2>{selectedProject.name}</h2><p>{person.name} · {selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div>
           <div className="mgmt-actions">
             <button className="btn" onClick={()=>openReportBuilder(
               'Equipe',
@@ -348,11 +367,10 @@ function ProjectSummaryModal({ project, onClose }) {
   if(!project) return null;
   const projectReportScope=`equipe:projeto:${projectCodeLabel(project.name)}`;
   const rows=project.rows||[];
-  const monthly=Array.from({length:12},(_,i)=>{
-    const key=`2026-${String(i+1).padStart(2,'0')}`;
+  const monthly=monthKeysBetween().map((key)=>{
     const monthRows=rows.filter(r=>getMonth(r.data)===key);
     return {
-      month:monthLabel(key),
+      month:monthPeriodLabel(key),
       Pago:monthRows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),
       'A pagar':monthRows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0),
     };
@@ -378,7 +396,7 @@ function ProjectSummaryModal({ project, onClose }) {
     <div className="mgmt-modal-center mgmt-project-modal" onMouseDown={(e)=>e.stopPropagation()}>
       <div className="mgmt-panel-head">
         <div>
-          <span className="mgmt-eyebrow">EQUIPE POR PROJETO · 2026 + PENDÊNCIAS FUTURAS</span>
+          <span className="mgmt-eyebrow">EQUIPE POR PROJETO · 2025-2026 + PENDÊNCIAS FUTURAS</span>
           <h2>{project.name}</h2>
           <p>{project.peopleCount} pessoa{project.peopleCount!==1?'s':''} / empresa{project.peopleCount!==1?'s':''} · {rows.length} movimento{rows.length!==1?'s':''} · relatório configurável</p>
         </div>
@@ -397,7 +415,7 @@ function ProjectSummaryModal({ project, onClose }) {
           scope={projectReportScope}
           type="SUMMARY"
           data={[{Projeto:project.name,'Pessoas / empresas':project.peopleCount,Pago:project.paid,'A pagar':project.open,Total:project.total,Lançamentos:rows.length}]}
-          filters={{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'}}
+          filters={{Projeto:project.name,Escopo:'2025-2026 + A pagar futuro de terceiros'}}
         />
         <ReportAdder
           sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}:mensal`}
@@ -407,7 +425,7 @@ function ProjectSummaryModal({ project, onClose }) {
           scope={projectReportScope}
           type="TABLE"
           data={monthly}
-          filters={{Projeto:project.name,Ano:2026}}
+          filters={{Projeto:project.name,Período:TEAM_PERIOD_LABEL}}
         />
         <ReportAdder
           sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}:movimentos`}
@@ -417,12 +435,12 @@ function ProjectSummaryModal({ project, onClose }) {
           scope={projectReportScope}
           type="TABLE"
           data={reportRows}
-          filters={{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'}}
+          filters={{Projeto:project.name,Escopo:'2025-2026 + A pagar futuro de terceiros'}}
         />
       </div>
 
       <section className="mgmt-subcard">
-        <h3>Fluxo mensal de pagamentos · 2026</h3>
+        <h3>Fluxo mensal de pagamentos · 2025-2026</h3>
         <div className="mgmt-chart-sm"><ResponsiveContainer>
           <BarChart data={monthly}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.16}/>
@@ -447,8 +465,8 @@ function ProjectSummaryModal({ project, onClose }) {
 export default function TeamDashboard(){
   const {isReportMode,openReportBuilder,exitReportMode}=useReport();
   const[data,setData]=useState({entries:[],monthly:[]});
-  const[startDate,setStartDate]=useState('2026-01-01');
-  const[endDate,setEndDate]=useState('2026-12-31');
+  const[startDate,setStartDate]=useState(TEAM_PERIOD_START);
+  const[endDate,setEndDate]=useState(TEAM_PERIOD_END);
   const[personFilters,setPersonFilters]=useState([]);
   const[projectFilters,setProjectFilters]=useState([]);
   const[accountFilters,setAccountFilters]=useState([]);
@@ -609,8 +627,7 @@ export default function TeamDashboard(){
     return[...map.values()].map(p=>({...p,peopleCount:p.people.size,total:p.paid+p.open,rows:[...p.rows.values()]})).sort((a,b)=>b.paid-a.paid || b.total-a.total || a.name.localeCompare(b.name,'pt-BR'));
   },[relationEntries,startDate,endDate,projectFilters,accountFilters,statusFilters]);
 
-  const evolutionData=useMemo(()=>Array.from({length:12},(_,i)=>{
-    const key=`2026-${String(i+1).padStart(2,'0')}`;
+  const evolutionData=useMemo(()=>monthKeysBetween(startDate,endDate).map((key)=>{
     const paidMap=new Map();
     const forecastMap=new Map();
 
@@ -630,7 +647,7 @@ export default function TeamDashboard(){
     }));
 
     return{
-      month:monthLabel(key),
+      month:monthPeriodLabel(key),
       'Pago total':[...paidMap.values()].reduce((sum,row)=>sum+Number(row.valor||0),0),
       'Previsão':[...forecastMap.values()].reduce((sum,row)=>sum+Number(row.valor||0),0),
     };
@@ -725,7 +742,7 @@ export default function TeamDashboard(){
 
   return <div className="mgmt">
     <header className="mgmt-header">
-      <div><span className="mgmt-eyebrow">EQUIPE · EXERCÍCIO 2026</span><h1>Equipe</h1><p>Cadastro, pagamentos, pendências e custo de equipe por obra.</p></div>
+      <div><span className="mgmt-eyebrow">EQUIPE · 2025-2026</span><h1>Equipe</h1><p>Cadastro, pagamentos, pendências e custo de equipe por obra.</p></div>
       <div className="mgmt-actions">
         <FinancialRefreshButton onUpdated={reloadTeamData} onError={setError} label="Atualizar dados"/>
         <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Equipe')} className={`btn ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do Modo Relatório':'Gerar Relatório'}</button>
@@ -734,8 +751,8 @@ export default function TeamDashboard(){
     {error&&<div className="mgmt-alert">{error}</div>}
 
     <section className="mgmt-panel"><div className="mgmt-filter-grid mgmt-filter-grid-team">
-      <label>Data inicial<input type="date" min="2026-01-01" max="2026-12-31" value={startDate} onChange={e=>setStartDate(e.target.value)}/></label>
-      <label>Data final<input type="date" min="2026-01-01" max="2026-12-31" value={endDate} onChange={e=>setEndDate(e.target.value)}/></label>
+      <label>Data inicial<input type="date" min={TEAM_PERIOD_START} max={TEAM_PERIOD_END} value={startDate} onChange={e=>setStartDate(e.target.value)}/></label>
+      <label>Data final<input type="date" min={TEAM_PERIOD_START} max={TEAM_PERIOD_END} value={endDate} onChange={e=>setEndDate(e.target.value)}/></label>
       <label>Pessoa<MultiSelect options={people} selected={personFilters} onChange={setPersonFilters} placeholder="Todas as pessoas"/></label>
       <label>Projeto<MultiSelect options={projects} selected={projectFilters} onChange={setProjectFilters} placeholder="Todos os projetos"/></label>
       <label>Conta / Plano<MultiSelect options={accounts} selected={accountFilters} onChange={setAccountFilters} placeholder="Todas as contas"/></label>
@@ -754,7 +771,7 @@ export default function TeamDashboard(){
     <div className="mgmt-flow mgmt-flow-balanced">
       <section id="report-equipe-evolucao" data-report-section className="mgmt-panel">
         <ReportAdder sectionKey="equipe:evolucao" title="Evolução mensal da Equipe" componentName="Gráfico de Evolução Mensal" page="Equipe" type="CHART" data={evolutionData} filters={reportFilters} captureId="report-equipe-evolucao" style={{float:'right'}}/>
-        <h2>Evolução mensal da equipe</h2><p>Total pago e previsão de pagamentos da equipe por mês, incluindo os valores em aberto de outubro, novembro e dezembro quando existentes no sistema.</p>
+        <h2>Evolução mensal da equipe</h2><p>Total pago e previsão de pagamentos da equipe por mês no período selecionado, incluindo o retroativo de 2025.</p>
         <div className="mgmt-chart"><ResponsiveContainer><LineChart data={evolutionData}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago total" stroke={PAID_COLOR} strokeWidth={3} dot={{r:3}} activeDot={{r:5}}/><Line type="monotone" dataKey="Previsão" stroke={OPEN_COLOR} strokeWidth={2.6} strokeDasharray="6 4" dot={{r:3}} activeDot={{r:5}}/></LineChart></ResponsiveContainer></div>
       </section>
 
