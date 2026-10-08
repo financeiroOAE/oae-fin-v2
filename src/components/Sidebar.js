@@ -185,10 +185,10 @@ export default function Sidebar({ canPreview = false, previewActive = false }) {
             ) : (
               <>
                 {!logoError ? (
-                  <div className="sidebar-logo-lockup">
-                    <img src="/logo.png" alt="" onError={() => setLogoError(true)} />
-                    <span><strong>OLIVEIRA ARAÚJO</strong><small>ENGENHARIA</small></span>
-                  </div>
+                  <img src="/logo.png" alt="OAE" className="sidebar-logo"
+                    onError={() => setLogoError(true)}
+                    style={{ objectFit: 'contain', maxHeight: '40px', maxWidth: '160px' }}
+                  />
                 ) : (
                   <div className="logo-fallback-full" style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'flex-start',

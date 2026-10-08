@@ -29,10 +29,10 @@
 }
 :root[data-design-preview="ameba"][data-design-preview] .oae-sidebar {
   --text-main: #ffffff;
-  --text-secondary: #b8bdd7;
+  --text-secondary: #d7deea;
   --primary: #52bdbd;
-  --border-color: rgba(166, 200, 255, .16);
-  --bg-elevated: rgba(57, 96, 198, .18);
+  --border-color: rgba(255, 255, 255, .12);
+  --bg-elevated: #25314d;
   color: #ffffff;
   color-scheme: dark;
 }
@@ -41,52 +41,29 @@
   background: radial-gradient(circle at 85% -10%, rgba(82, 189, 189, .12), transparent 32%), var(--bg-main);
 }
 :root[data-design-preview="ameba"][data-design-preview] .oae-sidebar {
-  background: linear-gradient(180deg, #202d4c 0%, #19233e 64%, #141d34 100%) !important;
+  background: #19233e !important;
 }
-:root[data-design-preview="ameba"][data-design-preview] .sidebar-brand { height: 72px !important; }
-:root[data-design-preview="ameba"][data-design-preview] .sidebar-logo-lockup {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-}
-:root[data-design-preview="ameba"][data-design-preview] .sidebar-logo-lockup img {
-  width: 32px;
-  height: 32px;
-  border-radius: 5px;
-  flex: 0 0 auto;
-}
-:root[data-design-preview="ameba"][data-design-preview] .sidebar-logo-lockup span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-:root[data-design-preview="ameba"][data-design-preview] .sidebar-logo-lockup strong {
-  color: #f7fbff;
-  font-size: 10px;
-  line-height: 1.1;
-  letter-spacing: .035em;
-  white-space: nowrap;
-}
-:root[data-design-preview="ameba"][data-design-preview] .sidebar-logo-lockup small {
-  color: #8998ad;
-  font-size: 8px;
-  line-height: 1;
-  letter-spacing: .22em;
+:root[data-design-preview="ameba"][data-design-preview] .sidebar-brand { height: 64px !important; }
+:root[data-design-preview="ameba"][data-design-preview] .sidebar-logo {
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 4px;
 }
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-nav-link,
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-child-link {
-  border-radius: 8px !important;
-  min-height: 40px;
+  border-radius: 6px !important;
+  min-height: 36px;
+  font-size: 13px !important;
 }
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-nav-link:hover,
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-child-link:hover {
-  background: rgba(82, 189, 189, .08) !important;
+  background: rgba(255, 255, 255, .07) !important;
+  color: #ffffff !important;
 }
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-nav-link.is-active,
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-child-link.is-active {
-  background: linear-gradient(90deg, rgba(82, 189, 189, .16), rgba(82, 189, 189, .04)) !important;
+  color: #7bd3d0 !important;
+  background: #24334f !important;
   box-shadow: inset 2px 0 0 #52bdbd;
 }
 :root[data-design-preview="ameba"][data-design-preview] h1 { font-weight: 300 !important; letter-spacing: -.019em; line-height: 1.25; }
@@ -124,35 +101,81 @@
 :root[data-design-preview="ameba"][data-design-preview] .home-dashboard-content { margin-top: 8px !important; }
 :root[data-design-preview="ameba"][data-design-preview] .home-welcome {
   text-align: left !important;
-  max-width: 100%;
-  margin: 0 !important;
-  padding: 8px 4px 24px;
-  border-bottom: 1px solid var(--border-color);
+  max-width: 1000px;
+  margin: 0 auto 20px !important;
+  padding: 24px 26px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: linear-gradient(120deg, rgba(82,189,189,.10), transparent 52%), var(--bg-card);
 }
-:root[data-design-preview="ameba"][data-design-preview] .home-brand-line {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 22px;
-  color: var(--text-secondary);
-  font: 600 10px/1.2 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
-  letter-spacing: .13em;
-}
-:root[data-design-preview="ameba"][data-design-preview] .home-brand-line img {
-  width: 28px;
-  height: 28px;
+:root[data-design-preview="ameba"][data-design-preview] .home-logo {
+  display: block;
+  width: 38px !important;
+  height: 38px !important;
+  margin: 0 0 16px !important;
   object-fit: contain;
-  border-radius: 4px;
+  border-radius: 5px;
 }
 :root[data-design-preview="ameba"][data-design-preview] .home-logo-fallback {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
+  width: 38px !important;
+  height: 38px !important;
+  margin: 0 0 16px !important;
+  border-radius: 5px;
   color: #19233e;
   background: #52bdbd;
-  font: 700 9px/1 Inter, sans-serif;
+  font: 700 10px/1 Inter, sans-serif;
+}
+:root[data-design-preview="ameba"][data-design-preview] .home-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
+  gap: 9px !important;
+  max-width: 1000px !important;
+  margin: 0 auto !important;
+}
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 72px;
+  gap: 11px !important;
+  padding: 12px 13px !important;
+  color: var(--text-main);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  transition: border-color .16s ease, background-color .16s ease !important;
+}
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card:hover {
+  border-color: rgba(82,189,189,.72) !important;
+  background: var(--bg-card-hover) !important;
+}
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-icon {
+  display: grid;
+  place-items: center;
+  width: 34px !important;
+  height: 34px !important;
+  flex: 0 0 auto;
+  border-radius: 7px !important;
+  color: #2f8989 !important;
+  background: rgba(82,189,189,.12) !important;
+}
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-copy strong { font-size: 13px !important; font-weight: 600; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-copy small { color: var(--text-secondary); font-size: 11px !important; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-arrow { flex: 0 0 auto; color: var(--text-secondary); opacity: .55; }
+:root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] .shortcut-icon {
+  color: #7bd3d0;
+  background: rgba(82,189,189,.14);
 }
 
 /* Alternativa escura: o admin escolhe, a estrutura e os dados permanecem iguais. */
@@ -214,7 +237,10 @@
 }
 @media (max-width: 767px) {
   :root[data-design-preview="ameba"][data-design-preview] .main-content { padding: 72px 16px 24px; }
+  :root[data-design-preview="ameba"][data-design-preview] .home-welcome { padding: 20px; }
+  :root[data-design-preview="ameba"][data-design-preview] .home-shortcuts { grid-template-columns: 1fr !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   :root[data-design-preview="ameba"][data-design-preview] .fade-in { animation: none; }
+  :root[data-design-preview="ameba"][data-design-preview] .shortcut-card { transition: none !important; }
 }
