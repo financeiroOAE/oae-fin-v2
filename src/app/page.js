@@ -82,7 +82,6 @@ export default function Home() {
     ? Boolean(sessionUser && (sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission)))
     : !sessionUser || sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission);
   const canViewAdministrativeGeneral = canAccess('administrativo_geral');
-  const canViewDiretoria = canAccess('administrativo_diretoria');
 
   const homeModules = [
     { name: 'Visão Financeira', desc: 'Resumo consolidado e KPIs', icon: BarChart3, color: 'var(--primary)', path: '/visao-financeira', permission: 'visao_financeira' },
@@ -90,7 +89,7 @@ export default function Home() {
     { name: 'Projetos', desc: 'Contratos e curvas', icon: FolderKanban, color: 'var(--info)', path: '/projetos', permission: 'projetos' },
     { name: 'Equipe', desc: 'Cadastro, pagamentos e custos por obra', icon: UsersRound, color: 'var(--primary)', path: '/equipe', permission: 'equipe_gestao' },
     {
-      name: canViewAdministrativeGeneral ? 'Administrativo' : 'Diretoria',
+      name: canViewAdministrativeGeneral ? 'Administrativo' : 'Diretora',
       desc: canViewAdministrativeGeneral ? 'Receitas, custos e movimentações administrativas' : 'Movimentações financeiras da diretoria',
       icon: UserRoundCheck,
       color: 'var(--warning)',
