@@ -39,9 +39,9 @@ const monthKeysBetween = (start=TEAM_PERIOD_START,end=TEAM_PERIOD_END) => {
 };
 const monthPeriodLabel = (key) => new Intl.DateTimeFormat('pt-BR',{month:'short',year:'2-digit',timeZone:'UTC'}).format(new Date(`${key}-01T12:00:00Z`));
 const financePlan = (row) => accountOptionLabel(row.contaCodigo,row.contaNome||row.contaDescricao);
-const monthlyByPlan = (rows) => {
+const monthlyByPlan = (rows,startDate,endDate) => {
   const planTotals = new Map();
-  const months = monthKeysBetween().map((key)=>({month:monthPeriodLabel(key),key,Pago:0,'A pagar':0}));
+  const months = monthKeysBetween(startDate,endDate).map((key)=>({month:monthPeriodLabel(key),key,Pago:0,'A pagar':0}));
   const perMonth = new Map(months.map(month=>[month.key,month]));
   (rows||[]).forEach(row=>{
     const key=getMonth(row.data);
@@ -80,13 +80,24 @@ const getDateKey = (raw) => {
 };
 const getMonth = (raw) => getDateKey(raw).slice(0,7);
 const monthLabel = (key) => new Intl.DateTimeFormat('pt-BR',{month:'short',timeZone:'UTC'}).format(new Date(`${key}-01T12:00:00Z`));
+const formatPeriodDate = (value) => {
+  const key=String(value||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(key))return key||'—';
+  const [year,month,day]=key.split('-');
+  return `${day}/${month}/${year}`;
+};
+const selectedPeriodLabel = (start,end) => `${formatPeriodDate(start)} a ${formatPeriodDate(end)}`;
+const isFullTeamPeriod = (start,end) => start===TEAM_PERIOD_START&&end===TEAM_PERIOD_END;
 const inRange = (row,start,end) => {
   const key=getDateKey(row.data);
   if(!key) return false;
   return (!start||key>=start)&&(!end||key<=end);
 };
 const inTeamRelationScope = (entry,row,start,end) => {
-  if(entry?.thirdParty && !row?.paid) return true;
+  if(isFullTeamPeriod(start,end)&&entry?.thirdParty&&!row?.paid){
+    const key=getDateKey(row.data);
+    if(key&&key>end)return true;
+  }
   return inRange(row,start,end);
 };
 
@@ -163,13 +174,15 @@ function Pager({ total, page, setPage, pageSize, setPageSize }) {
   </div>;
 }
 
-function PersonModal({ person, onClose }) {
+function PersonModal({ person, startDate, endDate, onClose }) {
   const [selectedProject, setSelectedProject] = useState(null);
   const { openReportBuilder } = useReport();
   if(!person) return null;
   const personReportScope=`equipe:ficha:${person.key}`;
   const rows=person.transactions||[];
-  const {plans: financialPlans,months,planKeys}=monthlyByPlan(rows);
+  const {plans: financialPlans,months,planKeys}=monthlyByPlan(rows,startDate,endDate);
+  const period=selectedPeriodLabel(startDate,endDate);
+  const includesFutureOpen=Boolean(person.thirdParty&&isFullTeamPeriod(startDate,endDate));
   const displayPlans=financialPlans.map(item=>item.plan);
   const paid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
   const open=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
@@ -193,7 +206,7 @@ function PersonModal({ person, onClose }) {
       componentName:'Resumo da ficha financeira',
       page:'Equipe',
       type:'TABLE',
-      filters:{Pessoa:person.name,Escopo:person.thirdParty?'2025-2026 + A pagar futuro':'2025-2026'},
+      filters:{Pessoa:person.name,'Data inicial':startDate,'Data final':endDate,Escopo:includesFutureOpen?'Período selecionado + A pagar futuro de terceiros':'Período selecionado'},
       data:[{
         'Pessoa / empresa':person.name,
         'Cargo / função':person.roles.join(' · ')||'—',
@@ -212,7 +225,7 @@ function PersonModal({ person, onClose }) {
       componentName:'Evolução mensal da pessoa',
       page:'Equipe',
       type:'TABLE',
-      filters:{Pessoa:person.name,Período:TEAM_PERIOD_LABEL},
+      filters:{Pessoa:person.name,'Data inicial':startDate,'Data final':endDate},
       data:months.map(({key,...month})=>month),
     },
     {
@@ -221,7 +234,7 @@ function PersonModal({ person, onClose }) {
       componentName:'Pagamentos e pendências por plano financeiro',
       page:'Equipe',
       type:'TABLE',
-      filters:{Pessoa:person.name,Período:TEAM_PERIOD_LABEL,Fonte:'CP_GERAL'},
+      filters:{Pessoa:person.name,'Data inicial':startDate,'Data final':endDate,Fonte:'CP_GERAL'},
       data:planReportRows,
     },
     {
@@ -248,7 +261,7 @@ function PersonModal({ person, onClose }) {
     <div className="mgmt-modal-center" onMouseDown={(e)=>e.stopPropagation()}>
       <div className="mgmt-panel-head">
         <div>
-          <span className="mgmt-eyebrow">CADASTRO FINANCEIRO · 2025-2026</span>
+          <span className="mgmt-eyebrow">CADASTRO FINANCEIRO · {period}</span>
           <h2>{person.name}</h2>
           <p>{person.roles.join(' · ')||'Sem função informada'} · relatório configurável por blocos e orientação</p>
         </div>
@@ -281,8 +294,8 @@ function PersonModal({ person, onClose }) {
       </div>
 
       <div className="mgmt-kpis">
-        <div><span>Pago em 2025-2026</span><strong className="mgmt-value-paid">{brl(paid)}</strong></div>
-        <div><span>{person.thirdParty?'A pagar · inclui futuro':'A pagar até dez/2026'}</span><strong className="mgmt-value-open">{brl(open)}</strong></div>
+        <div><span>Pago no período</span><strong className="mgmt-value-paid">{brl(paid)}</strong></div>
+        <div><span>{includesFutureOpen?'A pagar · inclui futuro':'A pagar no período'}</span><strong className="mgmt-value-open">{brl(open)}</strong></div>
         <div><span>Total financeiro</span><strong>{brl(paid+open)}</strong></div>
         <div><span>Lançamentos</span><strong>{rows.length}</strong></div>
       </div>
@@ -324,7 +337,7 @@ function PersonModal({ person, onClose }) {
     {selectedProject&&<div className="mgmt-overlay mgmt-overlay-center mgmt-overlay-project" onMouseDown={()=>setSelectedProject(null)}>
       <div className="mgmt-modal-center mgmt-project-modal" onMouseDown={(e)=>e.stopPropagation()}>
         <div className="mgmt-panel-head">
-          <div><span className="mgmt-eyebrow">MOVIMENTOS DA OBRA · 2025-2026</span><h2>{selectedProject.name}</h2><p>{person.name} · {selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div>
+          <div><span className="mgmt-eyebrow">MOVIMENTOS DA OBRA · {period}</span><h2>{selectedProject.name}</h2><p>{person.name} · {selectedProject.rows.length} lançamento{selectedProject.rows.length!==1?'s':''}</p></div>
           <div className="mgmt-actions">
             <button className="btn" onClick={()=>openReportBuilder(
               'Equipe',
@@ -362,12 +375,13 @@ function PersonModal({ person, onClose }) {
   </div>;
 }
 
-function ProjectSummaryModal({ project, onClose }) {
+function ProjectSummaryModal({ project, startDate, endDate, onClose }) {
   const { openReportBuilder } = useReport();
   if(!project) return null;
   const projectReportScope=`equipe:projeto:${projectCodeLabel(project.name)}`;
   const rows=project.rows||[];
-  const monthly=monthKeysBetween().map((key)=>{
+  const period=selectedPeriodLabel(startDate,endDate);
+  const monthly=monthKeysBetween(startDate,endDate).map((key)=>{
     const monthRows=rows.filter(r=>getMonth(r.data)===key);
     return {
       month:monthPeriodLabel(key),
@@ -396,7 +410,7 @@ function ProjectSummaryModal({ project, onClose }) {
     <div className="mgmt-modal-center mgmt-project-modal" onMouseDown={(e)=>e.stopPropagation()}>
       <div className="mgmt-panel-head">
         <div>
-          <span className="mgmt-eyebrow">EQUIPE POR PROJETO · 2025-2026 + PENDÊNCIAS FUTURAS</span>
+          <span className="mgmt-eyebrow">EQUIPE POR PROJETO · {period}</span>
           <h2>{project.name}</h2>
           <p>{project.peopleCount} pessoa{project.peopleCount!==1?'s':''} / empresa{project.peopleCount!==1?'s':''} · {rows.length} movimento{rows.length!==1?'s':''} · relatório configurável</p>
         </div>
@@ -415,7 +429,7 @@ function ProjectSummaryModal({ project, onClose }) {
           scope={projectReportScope}
           type="SUMMARY"
           data={[{Projeto:project.name,'Pessoas / empresas':project.peopleCount,Pago:project.paid,'A pagar':project.open,Total:project.total,Lançamentos:rows.length}]}
-          filters={{Projeto:project.name,Escopo:'2025-2026 + A pagar futuro de terceiros'}}
+          filters={{Projeto:project.name,'Data inicial':startDate,'Data final':endDate}}
         />
         <ReportAdder
           sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}:mensal`}
@@ -425,7 +439,7 @@ function ProjectSummaryModal({ project, onClose }) {
           scope={projectReportScope}
           type="TABLE"
           data={monthly}
-          filters={{Projeto:project.name,Período:TEAM_PERIOD_LABEL}}
+          filters={{Projeto:project.name,'Data inicial':startDate,'Data final':endDate}}
         />
         <ReportAdder
           sectionKey={`equipe:projeto:${projectCodeLabel(project.name)}:movimentos`}
@@ -440,7 +454,7 @@ function ProjectSummaryModal({ project, onClose }) {
       </div>
 
       <section className="mgmt-subcard">
-        <h3>Fluxo mensal de pagamentos · 2025-2026</h3>
+        <h3>Fluxo mensal de pagamentos · {period}</h3>
         <div className="mgmt-chart-sm"><ResponsiveContainer>
           <BarChart data={monthly}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.16}/>
@@ -654,7 +668,7 @@ export default function TeamDashboard(){
   }),[filteredEntries,startDate,endDate,projectFilters,accountFilters,statusFilters]);
 
   const reportFilters={'Data inicial':startDate,'Data final':endDate,Pessoa:personFilters.length?personFilters.join(', '):'Todas',Projeto:projectFilters.length?projectFilters.join(', '):'Todos','Conta / Plano':accountFilters.length?accountFilters.join(', '):'Todas',Situação:statusFilters.length?statusFilters.join(', '):'Todas'};
-  const relationReportFilters={...reportFilters,'Regra A pagar terceiros':'Sem corte de período; inclui pendências futuras após dez/2026'};
+  const relationReportFilters={...reportFilters,'Regra A pagar terceiros':isFullTeamPeriod(startDate,endDate)?'Período completo 2025-2026: inclui pendências futuras':'Período personalizado: respeita integralmente as datas selecionadas'};
   const projectChart=projectRows.slice(0,10).map(p=>({Projeto:projectCodeLabel(p.name),'Obra completa':p.name,Pago:p.paid,'A pagar':p.open}));
   const rosterReport=peopleRoster.map(item=>({'Pessoa / empresa':item.name,'Cargo / função':item.roles.join(' · '),'Tipo':item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe','Projetos':item.projects.length,'Plano(s)':item.accounts.map(planLabel).join(' · '),'Pago':item.transactions.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':item.transactions.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0)}));
   const detailedRosterReport=peopleRoster.flatMap(item=>{
@@ -800,7 +814,7 @@ export default function TeamDashboard(){
         filters={relationReportFilters}
         style={{float:'right'}}
       />
-      <div className="mgmt-panel-head"><div><h2>Cadastro da equipe</h2><p>Ordenado pelo maior valor A pagar. Para terceiros, A pagar inclui também pendências futuras após dez/2026.</p></div></div>
+      <div className="mgmt-panel-head"><div><h2>Cadastro da equipe</h2><p>{isFullTeamPeriod(startDate,endDate)?'Ordenado pelo maior valor A pagar. No período completo 2025-2026, terceiros mantêm pendências futuras.':'Ordenado pelo maior valor A pagar. O intervalo escolhido é respeitado integralmente, inclusive para terceiros.'}</p></div></div>
       <div className="mgmt-table-filters mgmt-table-filters-six">
         <label>Pessoa / empresa<MultiSelect options={peopleRoster.map(item=>item.name)} selected={rosterNameFilters} onChange={setRosterNameFilters} placeholder="Todas"/></label>
         <label>Cargo / função<MultiSelect options={rosterRoles} selected={rosterRoleFilters} onChange={setRosterRoleFilters} placeholder="Todos"/></label>
@@ -818,7 +832,7 @@ export default function TeamDashboard(){
     <section className="mgmt-panel" data-report-section>
       <ReportAdder sectionKey="equipe:obras-custos" title="Custos por Obra" componentName="Tabela de Custos por Obra" page="Equipe" type="TABLE" data={projectRelationRows.map(p=>({Projeto:p.name,'Pessoas / terceiros':p.peopleCount,Pago:p.paid,'A pagar':p.open,Total:p.total}))} filters={relationReportFilters} style={{float:'right'}}/>
       <h2>Equipe por projeto</h2>
-      <p>Ordenado pelo maior valor Pago. Em terceiros, A pagar mantém também as obrigações futuras registradas após dezembro/2026.</p>
+      <p>{isFullTeamPeriod(startDate,endDate)?'Ordenado pelo maior valor Pago. No período completo 2025-2026, terceiros mantêm também obrigações futuras registradas.':'Ordenado pelo maior valor Pago. O intervalo escolhido é respeitado integralmente.'}</p>
       <div className="mgmt-table-filters mgmt-table-filters-five">
         <label>Projeto<MultiSelect options={projectRelationRows.map(item=>item.name)} selected={projectNameFilters} onChange={setProjectNameFilters} placeholder="Todos"/></label>
         <label>Pessoas / terceiros<input type="number" min="0" value={projectPeopleFilter} onChange={e=>setProjectPeopleFilter(e.target.value)} placeholder="Qtd. exata"/></label>
@@ -830,7 +844,7 @@ export default function TeamDashboard(){
       <Pager total={projectFiltered.length} page={projectPage} setPage={setProjectPage} pageSize={projectPageSize} setPageSize={setProjectPageSize}/>
     </section>
 
-    <ProjectSummaryModal project={selectedProjectSummary} onClose={()=>setSelectedProjectSummary(null)}/>
-    <PersonModal person={selectedPerson} onClose={()=>setSelectedPerson(null)}/>
+    <ProjectSummaryModal project={selectedProjectSummary} startDate={startDate} endDate={endDate} onClose={()=>setSelectedProjectSummary(null)}/>
+    <PersonModal person={selectedPerson} startDate={startDate} endDate={endDate} onClose={()=>setSelectedPerson(null)}/>
   </div>;
 }
