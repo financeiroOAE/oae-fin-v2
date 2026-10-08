@@ -1,5 +1,6 @@
 'use client';
 import { applyValidFilterDate } from '@/lib/dateRange';
+import { paymentStatusForReport, isDocumentedPayableCurrentMonth } from '@/lib/paymentCommitment';
 
 import { useEffect, useMemo, useState } from 'react';
 import { FileText, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Wallet, CircleDollarSign, Clock3, UsersRound, BriefcaseBusiness, Building2 } from 'lucide-react';
@@ -138,7 +139,7 @@ const reportMovementRows = (rows, personName) => (rows||[]).map((r)=>({
   Documento:r.documento||r.titulo||'',
   Obra:r.projeto||'',
   Plano:planLabel(r.contaNome||r.contaCodigo),
-  Situação:r.paid?'Pago':'A pagar',
+  Situação:paymentStatusForReport({...r, natureza:'Saída', status:r.paid?'Pago':'A pagar'}),
   Valor:Number(r.valor||0),
 }));
 
@@ -406,7 +407,7 @@ function ProjectSummaryModal({ project, onClose }) {
     'Pessoa / empresa':row.rosterPerson||row.nome,
     Documento:row.documento||row.titulo||'',
     Plano:planLabel(row.contaNome||row.contaCodigo),
-    Situação:row.paid?'Pago':'A pagar',
+    Situação:paymentStatusForReport({...row, natureza:'Saída', status:row.paid?'Pago':'A pagar'}),
     Valor:Number(row.valor||0),
   }));
 
@@ -692,7 +693,7 @@ export default function TeamDashboard(){
       Documento:r.documento||r.titulo||'',
       Obra:r.projeto||'',
       Plano:planLabel(r.contaNome||r.contaCodigo),
-      Situação:r.paid?'Pago':'A pagar',
+      Situação:paymentStatusForReport({...r, natureza:'Saída', status:r.paid?'Pago':'A pagar'}),
       Valor:Number(r.valor||0),
     }));
   });
@@ -829,7 +830,7 @@ export default function TeamDashboard(){
         <label>A pagar<input type="text" value={rosterOpenFilter} onChange={e=>setRosterOpenFilter(e.target.value)} placeholder="Valor exato"/></label>
       </div>
       <div className="mgmt-table-wrap"><table className="mgmt-table mgmt-clickable-table"><thead><tr><th>Pessoa / empresa</th><th>Cargo / função</th><th>Tipo</th><th>Projetos</th><th>Pago</th><th>A pagar</th></tr></thead><tbody>
-        {visibleRoster.map(item=>{const rows=item.transactions;const rowPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const rowOpen=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);return <tr key={item.key} onClick={()=>setSelectedPerson(item)}><td><strong>{item.name}</strong></td><td>{item.roles.join(' · ')||'—'}</td><td>{item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe'}</td><td>{item.projects.length}</td><td className="mgmt-value-paid">{brl(rowPaid)}</td><td className="mgmt-value-open">{brl(rowOpen)}</td></tr>})}
+        {visibleRoster.map(item=>{const rows=item.transactions;const rowPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const rowOpen=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);const hasCommitment=rows.some(r=>isDocumentedPayableCurrentMonth({...r,natureza:'Saída'}));return <tr key={item.key} onClick={()=>setSelectedPerson(item)}><td><strong>{item.name}</strong></td><td>{item.roles.join(' · ')||'—'}</td><td>{item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe'}</td><td>{item.projects.length}</td><td className="mgmt-value-paid">{brl(rowPaid)}</td><td className="mgmt-value-open">{brl(rowOpen)}{hasCommitment&&<span title="Há documento formal a pagar neste mês" style={{display:'block',fontSize:10,color:'#38bdf8',fontWeight:700}}>Compromisso do mês</span>}</td></tr>})}
       </tbody></table></div>
       <Pager total={rosterFiltered.length} page={rosterPage} setPage={setRosterPage} pageSize={rosterPageSize} setPageSize={setRosterPageSize}/>
     </section>

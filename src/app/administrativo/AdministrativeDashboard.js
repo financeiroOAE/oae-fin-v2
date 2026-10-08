@@ -1,5 +1,6 @@
 'use client';
 import { applyValidFilterDate } from '@/lib/dateRange';
+import { paymentStatusForReport } from '@/lib/paymentCommitment';
 
 import { useEffect, useMemo, useState } from 'react';
 import { FileText, FileDown, FileSpreadsheet, ChevronDown, ChevronUp, X, Landmark, CircleDollarSign, Clock3, TrendingUp, Gauge, ReceiptText } from 'lucide-react';
@@ -66,7 +67,7 @@ function MovementModal({title,rows,onClose}){
   const open=rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0);
   const monthly=Array.from({length:12},(_,i)=>{const key=`2026-${String(i+1).padStart(2,'0')}`;const items=rows.filter(r=>monthOf(r.data)===key);return{month:monthLabel(key),Pago:items.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':items.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0)}});
   const tableRows=rows.map(r=>({...r,natureza:'Saída',projeto:r.projeto||'ADMINISTRAÇÃO',contaDescricao:r.contaNome||r.contaCodigo||'',status:r.paid?'Realizado':'A realizar'}));
-  const reportRows=rows.map(r=>({Data:r.data,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Nome:r.nome,Conta:r.contaNome||r.contaCodigo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
+  const reportRows=rows.map(r=>({Data:r.data,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Nome:r.nome,Conta:r.contaNome||r.contaCodigo||'',Situação:paymentStatusForReport({...r,natureza:'Saída',status:r.paid?'Pago':'A pagar'}),Valor:r.valor}));
   const sectionKey=`administrativo:detalhe:${title.replace(/[^a-z0-9]+/gi,'-').toLowerCase()}`;
   const exportItems=[
     {sectionKey:`${sectionKey}:resumo`,title:'Resumo',componentName:'Resumo do detalhamento administrativo',page:'Administrativo',type:'TABLE',filters:{Ano:2026},data:[{Descrição:title,Pago:paid,'A pagar':open,Total:paid+open,Lançamentos:rows.length}]},
@@ -127,7 +128,7 @@ function DirectorProjectModal({ selection, onClose }){
   const {partner,project}=selection;
   const rows=project.rows||[];
   const tableRows=rows.map(r=>({...r,natureza:'Saída',projeto:r.projeto||project.name,contaDescricao:r.contaNome||r.contaCodigo||'',status:r.paid?'Realizado':'A realizar'}));
-  const reportRows=rows.map(r=>({Data:r.data,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Nome:r.nome||partner.name,Projeto:r.projeto||project.name,Conta:r.contaNome||r.contaCodigo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
+  const reportRows=rows.map(r=>({Data:r.data,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Nome:r.nome||partner.name,Projeto:r.projeto||project.name,Conta:r.contaNome||r.contaCodigo||'',Situação:paymentStatusForReport({...r,natureza:'Saída',status:r.paid?'Pago':'A pagar'}),Valor:r.valor}));
   const scope=`administrativo:diretoria:pessoa-projeto:${scopeToken(partner.short)}:${scopeToken(project.name)}`;
 
   return <div className="mgmt-overlay mgmt-overlay-center mgmt-overlay-project" onMouseDown={onClose}>
@@ -327,7 +328,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
     Conta:row.contaNome||row.contaCodigo||'',
     Documento:row.documento||'',
     Lançamento:row.lancamento||row.titulo||'',
-    Situação:row.paid?'Pago':'A pagar',
+    Situação:paymentStatusForReport({...row,natureza:'Saída',status:row.paid?'Pago':'A pagar'}),
     Valor:row.valor,
   })),[directorFinancialRows]);
 
@@ -340,7 +341,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
     'Plano de contas':accountFilters.length?accountFilters.join(', '):'Todos',
     'Situação':statusFilters.length?statusFilters.join(', '):'Todas',
   };
-  const reportMovementRows=adminFinancialRows.map(r=>({Data:r.data,'Nome / fornecedor':r.nome,Conta:r.contaDescricao,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Situação:r.paid?'Pago':'A pagar',Valor:r.valor}));
+  const reportMovementRows=adminFinancialRows.map(r=>({Data:r.data,'Nome / fornecedor':r.nome,Conta:r.contaDescricao,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Situação:paymentStatusForReport({...r,natureza:'Saída',status:r.paid?'Pago':'A pagar'}),Valor:r.valor}));
 
   const partnerSection=<section id="report-adm-socios" data-report-section className="mgmt-panel">
     <ReportAdder sectionKey="administrativo:socios" title="Visão Geral dos Sócios" componentName="Movimentação Geral dos Sócios" page="Administrativo" type="CHART" data={partnerGeneralMonthly} captureId="report-adm-socios" filters={{Ano:2026}} style={{float:'right'}}/>
