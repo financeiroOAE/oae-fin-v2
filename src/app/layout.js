@@ -2,7 +2,7 @@ import "./globals.css";
 import "./ui-fixes.css";
 import "./ameba-preview.css";
 import { cookies } from "next/headers";
-import { getCurrentUser } from "@/lib/authorization";
+import { getCurrentUser, toSafeUser } from "@/lib/authorization";
 import { getSession } from "@/lib/auth";
 import { PREVIEW_COOKIE, isPreviewEnabled } from "@/lib/designPreview";
 import Sidebar from "@/components/Sidebar";
@@ -25,10 +25,11 @@ const PREVIEW_SURFACE_BOOTSTRAP = "try{var s=localStorage.getItem('oae_design_pr
 
 export default async function RootLayout({ children }) {
   const cookieStore = await cookies();
-  // Resolve the current database role rather than trusting a client preference.
+  // Resolve o usuário no servidor para que menus restritos não apareçam com atraso.
   const session = await getSession();
-  const user = session?.user?.role === 'ADMIN' ? await getCurrentUser() : null;
-  const preview = isPreviewEnabled(user, cookieStore.get(PREVIEW_COOKIE)?.value);
+  const currentUser = session?.user ? await getCurrentUser() : null;
+  const safeUser = toSafeUser(currentUser);
+  const preview = isPreviewEnabled(currentUser, cookieStore.get(PREVIEW_COOKIE)?.value);
   return (
     <html lang="pt-BR" data-design-preview={preview ? 'ameba' : undefined} suppressHydrationWarning>
       <head>{preview && <script dangerouslySetInnerHTML={{ __html: PREVIEW_SURFACE_BOOTSTRAP }} />}</head>
@@ -37,7 +38,7 @@ export default async function RootLayout({ children }) {
           <ReportProvider>
             <UiEnhancements />
             <div className="app-layout">
-              <Sidebar canPreview={user?.role === 'ADMIN' && !user.mustChangePass} previewActive={preview} />
+              <Sidebar initialUser={safeUser} canPreview={currentUser?.role === 'ADMIN' && !currentUser.mustChangePass} previewActive={preview} />
               <main className="main-content">{children}</main>
             </div>
             <ReportDrawer />
