@@ -29,10 +29,10 @@
 }
 :root[data-design-preview="ameba"][data-design-preview] .oae-sidebar {
   --text-main: #ffffff;
-  --text-secondary: #d7deea;
+  --text-secondary: #d9e1ec;
   --primary: #52bdbd;
-  --border-color: rgba(255, 255, 255, .12);
-  --bg-elevated: #25314d;
+  --border-color: rgba(194, 218, 235, .16);
+  --bg-elevated: rgba(255, 255, 255, .10);
   color: #ffffff;
   color-scheme: dark;
 }
@@ -41,9 +41,16 @@
   background: radial-gradient(circle at 85% -10%, rgba(82, 189, 189, .12), transparent 32%), var(--bg-main);
 }
 :root[data-design-preview="ameba"][data-design-preview] .oae-sidebar {
-  background: #19233e !important;
+  background: rgba(25,35,62,.84) !important;
+  border-right-color: rgba(213,232,245,.18) !important;
+  box-shadow: 10px 0 28px rgba(8,15,32,.12), inset -1px 0 rgba(255,255,255,.05);
+  backdrop-filter: blur(16px) saturate(112%);
+  -webkit-backdrop-filter: blur(16px) saturate(112%);
 }
-:root[data-design-preview="ameba"][data-design-preview] .sidebar-brand { height: 64px !important; }
+:root[data-design-preview="ameba"][data-design-preview] .sidebar-brand {
+  height: 62px !important;
+  border-bottom-color: rgba(213,232,245,.14) !important;
+}
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-logo {
   width: 30px !important;
   height: 30px !important;
@@ -51,19 +58,19 @@
 }
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-nav-link,
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-child-link {
-  border-radius: 6px !important;
-  min-height: 36px;
+  border-radius: 8px !important;
+  min-height: 37px;
   font-size: 13px !important;
 }
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-nav-link:hover,
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-child-link:hover {
-  background: rgba(255, 255, 255, .07) !important;
+  background: rgba(255, 255, 255, .10) !important;
   color: #ffffff !important;
 }
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-nav-link.is-active,
 :root[data-design-preview="ameba"][data-design-preview] .sidebar-child-link.is-active {
-  color: #7bd3d0 !important;
-  background: #24334f !important;
+  color: #ffffff !important;
+  background: rgba(255,255,255,.11) !important;
   box-shadow: inset 2px 0 0 #52bdbd;
 }
 :root[data-design-preview="ameba"][data-design-preview] h1 { font-weight: 300 !important; letter-spacing: -.019em; line-height: 1.25; }
@@ -129,8 +136,8 @@
 }
 :root[data-design-preview="ameba"][data-design-preview] .home-shortcuts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
-  gap: 9px !important;
+  grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)) !important;
+  gap: 10px !important;
   max-width: 1000px !important;
   margin: 0 auto !important;
 }
@@ -138,9 +145,9 @@
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 72px;
-  gap: 11px !important;
-  padding: 12px 13px !important;
+  min-height: 66px;
+  gap: 10px !important;
+  padding: 10px 12px !important;
   color: var(--text-main);
   text-align: left;
   font: inherit;
@@ -150,19 +157,28 @@
   transition: border-color .16s ease, background-color .16s ease !important;
 }
 :root[data-design-preview="ameba"][data-design-preview] .shortcut-card:hover {
-  border-color: rgba(82,189,189,.72) !important;
-  background: var(--bg-card-hover) !important;
+  border-color: #a9cbc9 !important;
+  background: #ffffff !important;
 }
 :root[data-design-preview="ameba"][data-design-preview] .shortcut-icon {
   display: grid;
   place-items: center;
-  width: 34px !important;
-  height: 34px !important;
+  width: 33px !important;
+  height: 33px !important;
   flex: 0 0 auto;
-  border-radius: 7px !important;
-  color: #2f8989 !important;
-  background: rgba(82,189,189,.12) !important;
+  border-radius: 0 !important;
+  border: 0;
+  color: inherit !important;
+  background: transparent !important;
 }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card:nth-child(1) .shortcut-icon { color: #277cbd !important; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card:nth-child(2) .shortcut-icon { color: #13866d !important; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card:nth-child(3) .shortcut-icon { color: #7862b8 !important; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card:nth-child(4) .shortcut-icon { color: #3e9f9f !important; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card:nth-child(5) .shortcut-icon { color: #b27a22 !important; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card:nth-child(6) .shortcut-icon { color: #6674c2 !important; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card:nth-child(7) .shortcut-icon { color: #bf6b36 !important; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card:nth-child(8) .shortcut-icon { color: #657084 !important; }
 :root[data-design-preview="ameba"][data-design-preview] .shortcut-copy {
   display: flex;
   min-width: 0;
@@ -170,12 +186,11 @@
   flex-direction: column;
   gap: 3px;
 }
-:root[data-design-preview="ameba"][data-design-preview] .shortcut-copy strong { font-size: 13px !important; font-weight: 600; }
-:root[data-design-preview="ameba"][data-design-preview] .shortcut-copy small { color: var(--text-secondary); font-size: 11px !important; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-copy strong { font-size: 12px !important; font-weight: 650; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-copy small { color: var(--text-secondary); font-size: 10px !important; }
 :root[data-design-preview="ameba"][data-design-preview] .shortcut-arrow { flex: 0 0 auto; color: var(--text-secondary); opacity: .55; }
 :root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] .shortcut-icon {
-  color: #7bd3d0;
-  background: rgba(82,189,189,.14);
+  background: transparent !important;
 }
 
 /* Alternativa escura: o admin escolhe, a estrutura e os dados permanecem iguais. */
