@@ -21,6 +21,8 @@ export const metadata = {
   },
 };
 
+const PREVIEW_SURFACE_BOOTSTRAP = "try{var s=localStorage.getItem('oae_design_preview_surface');document.documentElement.setAttribute('data-preview-surface',s==='dark'?'dark':'light')}catch(e){}";
+
 export default async function RootLayout({ children }) {
   const cookieStore = await cookies();
   // Resolve the current database role rather than trusting a client preference.
@@ -29,6 +31,7 @@ export default async function RootLayout({ children }) {
   const preview = isPreviewEnabled(user, cookieStore.get(PREVIEW_COOKIE)?.value);
   return (
     <html lang="pt-BR" data-design-preview={preview ? 'ameba' : undefined} suppressHydrationWarning>
+      <head>{preview && <script dangerouslySetInnerHTML={{ __html: PREVIEW_SURFACE_BOOTSTRAP }} />}</head>
       <body suppressHydrationWarning>
         <ThemeProvider>
           <ReportProvider>

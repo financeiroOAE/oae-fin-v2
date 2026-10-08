@@ -102,7 +102,7 @@ export default function Home() {
   ].filter((item) => canAccess(item.permission));
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+    <div className="home-dashboard" style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
       {error && (
         <div className="fade-in" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--danger)', padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1.5rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
           <AlertCircle size={18} /> <strong>Falha:</strong> {error}
@@ -115,8 +115,8 @@ export default function Home() {
         </div>
       )}
 
-      <div className="fade-in" style={{ marginTop: '2rem' }}>
-        <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
+      <div className="fade-in home-dashboard-content" style={{ marginTop: '2rem' }}>
+        <div className="home-welcome" style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
           {!logoError ? (
             <img
               src="/logo.png"
@@ -138,12 +138,12 @@ export default function Home() {
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem', maxWidth: '1000px', margin: '0 auto' }}>
+        <div className="home-shortcuts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem', maxWidth: '1000px', margin: '0 auto' }}>
           {homeModules.map((item) => {
             const Icon = item.icon;
             return (
-              <div key={item.path} className="card shortcut-card" onClick={() => router.push(item.path)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '1.25rem', gap: '1rem', border: '1px solid var(--border-color)', position: 'relative', overflow: 'hidden' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
+              <button type="button" key={item.path} className="card shortcut-card" onClick={() => router.push(item.path)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '1.25rem', gap: '1rem', border: '1px solid var(--border-color)', position: 'relative', overflow: 'hidden', width: '100%', font: 'inherit', textAlign: 'left', color: 'inherit' }}>
+                <div className="shortcut-icon" style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
                   <Icon size={20} strokeWidth={2} className={item.name === 'Atualização de Dados' && isSyncing ? "spinner" : ""} />
                 </div>
                 <div style={{ flex: 1 }}>
@@ -151,7 +151,7 @@ export default function Home() {
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{item.desc}</p>
                 </div>
                 <ChevronRight size={16} style={{ color: 'var(--text-secondary)', opacity: 0.5 }} />
-              </div>
+              </button>
             );
           })}
         </div>

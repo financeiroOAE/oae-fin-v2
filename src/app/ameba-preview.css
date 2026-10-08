@@ -1,15 +1,15 @@
 /* Ameba reference: navy shell, white product surfaces, fine borders.
    Every redesign selector is scoped to the server-authorized attribute. */
 :root[data-design-preview="ameba"][data-design-preview] {
-  --bg-main: #f6f7fb;
+  --bg-main: #f7f9fc;
   --bg-sidebar: #00052e;
   --bg-card: #ffffff;
   --bg-elevated: #f0f2f8;
   --bg-card-hover: #f9faff;
   --text-main: #00052e;
   --text-secondary: #4f5166;
-  --primary: #0428cb;
-  --primary-hover: #0320a3;
+  --primary: #1768ff;
+  --primary-hover: #0a4ee0;
   --info: #2456c7;
   --success: #087a53;
   --danger: #bb2637;
@@ -17,7 +17,7 @@
   --purple: #6b46ad;
   --orange: #bd4b0b;
   --border-color: #dbdcdf;
-  --border-focus: #0428cb;
+  --border-focus: #1768ff;
   --glass-bg: rgba(255,255,255,.96);
   --radius-lg: 8px;
   --shadow-sm: none;
@@ -30,13 +30,34 @@
 :root[data-design-preview="ameba"][data-design-preview] .oae-sidebar {
   --text-main: #ffffff;
   --text-secondary: #b8bdd7;
-  --primary: #c8d0ff;
-  --border-color: #252b50;
-  --bg-elevated: #10183f;
+  --primary: #65eaff;
+  --border-color: rgba(166, 200, 255, .16);
+  --bg-elevated: rgba(57, 96, 198, .18);
   color: #ffffff;
   color-scheme: dark;
 }
-:root[data-design-preview="ameba"][data-design-preview] .main-content { padding: 28px 32px; }
+:root[data-design-preview="ameba"][data-design-preview] .main-content {
+  padding: 28px 32px;
+  background: radial-gradient(circle at 85% -10%, rgba(78, 142, 255, .13), transparent 32%), var(--bg-main);
+}
+:root[data-design-preview="ameba"][data-design-preview] .oae-sidebar {
+  background: linear-gradient(180deg, #030936 0%, #00052e 62%, #020624 100%) !important;
+}
+:root[data-design-preview="ameba"][data-design-preview] .sidebar-brand { height: 72px !important; }
+:root[data-design-preview="ameba"][data-design-preview] .sidebar-nav-link,
+:root[data-design-preview="ameba"][data-design-preview] .sidebar-child-link {
+  border-radius: 8px !important;
+  min-height: 40px;
+}
+:root[data-design-preview="ameba"][data-design-preview] .sidebar-nav-link:hover,
+:root[data-design-preview="ameba"][data-design-preview] .sidebar-child-link:hover {
+  background: rgba(101, 234, 255, .07) !important;
+}
+:root[data-design-preview="ameba"][data-design-preview] .sidebar-nav-link.is-active,
+:root[data-design-preview="ameba"][data-design-preview] .sidebar-child-link.is-active {
+  background: linear-gradient(90deg, rgba(52, 252, 255, .13), rgba(73, 111, 255, .08)) !important;
+  box-shadow: inset 2px 0 0 #34fcff;
+}
 :root[data-design-preview="ameba"][data-design-preview] h1 { font-weight: 300 !important; letter-spacing: -.019em; line-height: 1.25; }
 :root[data-design-preview="ameba"][data-design-preview] h2,
 :root[data-design-preview="ameba"][data-design-preview] h3 { font-weight: 500; letter-spacing: -.015em; }
@@ -59,11 +80,96 @@
   outline: 2px solid var(--primary); outline-offset: 3px;
 }
 :root[data-design-preview="ameba"][data-design-preview] .btn { border-radius: 8px; box-shadow: none; }
+:root[data-design-preview="ameba"][data-design-preview] .btn-primary {
+  background: linear-gradient(110deg, #1768ff, #515cff) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
 :root[data-design-preview="ameba"][data-design-preview] .dre-negative-value { color: #bb2637 !important; }
 :root[data-design-preview="ameba"][data-design-preview] .mgmt-value-paid { color: #087a53; }
 :root[data-design-preview="ameba"][data-design-preview] .mgmt-value-open { color: #986200; }
 :root[data-design-preview="ameba"][data-design-preview] .recharts-cartesian-grid line { stroke: #e3e5ed; }
 :root[data-design-preview="ameba"][data-design-preview] .recharts-text { fill: #4f5166; }
+:root[data-design-preview="ameba"][data-design-preview] .home-dashboard-content { margin-top: 8px !important; }
+:root[data-design-preview="ameba"][data-design-preview] .home-welcome {
+  text-align: left !important;
+  max-width: 1000px;
+  margin: 0 auto 28px !important;
+  padding: 30px 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: linear-gradient(120deg, rgba(23,104,255,.08), transparent 48%), var(--bg-card);
+  position: relative;
+  overflow: hidden;
+}
+:root[data-design-preview="ameba"][data-design-preview] .home-welcome::after {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  right: -55px;
+  top: -85px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(52,252,255,.18), rgba(23,104,255,.08) 45%, transparent 68%);
+  pointer-events: none;
+}
+:root[data-design-preview="ameba"][data-design-preview] .home-welcome > img { margin: 0 0 24px !important; }
+:root[data-design-preview="ameba"][data-design-preview] .home-shortcuts { gap: 12px !important; }
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card {
+  min-height: 104px;
+  padding: 18px !important;
+  transition: border-color .18s ease, background-color .18s ease, transform .18s ease !important;
+}
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: rgba(23,104,255,.48) !important;
+}
+:root[data-design-preview="ameba"][data-design-preview] .shortcut-icon {
+  border-radius: 8px !important;
+  background: linear-gradient(145deg, rgba(23,104,255,.15), rgba(52,252,255,.09)) !important;
+  color: var(--primary) !important;
+}
+
+/* Alternativa escura: o admin escolhe, a estrutura e os dados permanecem iguais. */
+:root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] {
+  --bg-main: #020624;
+  --bg-card: #080e32;
+  --bg-elevated: #0d153d;
+  --bg-card-hover: #101a48;
+  --text-main: #f4f7ff;
+  --text-secondary: #aab4d1;
+  --primary: #34e8ff;
+  --primary-hover: #64f0ff;
+  --info: #71a3ff;
+  --success: #41d9a4;
+  --danger: #ff7182;
+  --warning: #ffc866;
+  --purple: #b99aff;
+  --orange: #ff9b65;
+  --border-color: rgba(166, 185, 230, .16);
+  --border-focus: #34e8ff;
+  --glass-bg: rgba(8, 14, 50, .94);
+  --bg-primary: var(--bg-main);
+  --text-primary: var(--text-main);
+  color-scheme: dark;
+}
+:root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] .main-content {
+  background: radial-gradient(circle at 82% 0%, rgba(40, 88, 207, .25), transparent 34%), #020624;
+}
+:root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] :is(.card,.mgmt-panel,.mgmt-subcard,.mgmt-modal-center) {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+}
+:root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] :is(input,select,textarea) {
+  color-scheme: dark !important;
+}
+:root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] :is(th,td) { border-color: var(--border-color); }
+:root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] tbody tr:hover { background: #101a48; }
+:root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] .recharts-cartesian-grid line { stroke: rgba(166,185,230,.14); }
+:root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] .recharts-text { fill: #aab4d1; }
+:root[data-design-preview="ameba"][data-design-preview][data-preview-surface="dark"] .btn-primary {
+  background: linear-gradient(110deg, #1ba9e9, #4b63ff) !important;
+}
 .design-preview-control { padding: 8px; border-top: 1px solid var(--border-color); }
 .design-preview-control button {
   display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
@@ -74,9 +180,18 @@
 .design-preview-control button:disabled { opacity: .6; cursor: wait; }
 .design-preview-control small { display: block; font-size: 10px; margin-top: 3px; }
 .design-preview-control p { color: var(--danger); font-size: 11px; overflow-wrap: anywhere; margin-top: 6px; }
+.design-surface-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 7px; }
+.design-surface-picker button { min-width: 0; padding: 8px 6px; gap: 5px; font-size: 11px; }
+.design-surface-picker button.is-active {
+  color: #ffffff;
+  border-color: rgba(101,234,255,.38);
+  background: linear-gradient(110deg, rgba(20,137,207,.7), rgba(63,85,215,.72));
+}
 @media (max-width: 767px) {
   :root[data-design-preview="ameba"][data-design-preview] .main-content { padding: 72px 16px 24px; }
 }
 @media (prefers-reduced-motion: reduce) {
   :root[data-design-preview="ameba"][data-design-preview] .fade-in { animation: none; }
+  :root[data-design-preview="ameba"][data-design-preview] .shortcut-card { transition: none !important; }
+  :root[data-design-preview="ameba"][data-design-preview] .shortcut-card:hover { transform: none !important; }
 }

@@ -143,7 +143,7 @@ export default function Sidebar({ canPreview = false, previewActive = false }) {
         transform: isMobile && collapsed ? 'translateX(-100%)' : 'none',
       }}>
         {/* Logo Area */}
-        <div style={{
+        <div className="sidebar-brand" style={{
           height: '64px',
           display: 'flex',
           alignItems: 'center',
@@ -254,6 +254,7 @@ export default function Sidebar({ canPreview = false, previewActive = false }) {
               return (
                 <li key={item.name}>
                   <MenuLink
+                    className={`sidebar-nav-link${isActive ? ' is-active' : ''}`}
                     {...(isAdministrativeGroup
                       ? { type: 'button', 'aria-expanded': showGroupChildren, 'aria-controls': 'sidebar-administrativo-submenu' }
                       : { href: item.path })}
@@ -316,7 +317,7 @@ export default function Sidebar({ canPreview = false, previewActive = false }) {
                         const childActive = pathname === child.path;
                         return (
                           <li key={child.path}>
-                            <Link href={child.path} prefetch={false} onClick={() => { if (isMobile) setCollapsed(true); }} style={{ display: 'flex', alignItems: 'center', gap: child.subtle ? '0.4rem' : '0.5rem', padding: child.subtle ? '0.38rem 0.5rem' : '0.45rem 0.55rem', borderRadius: '6px', textDecoration: 'none', color: childActive ? 'var(--primary)' : 'var(--text-secondary)', background: childActive ? (child.subtle ? 'rgba(57,198,198,0.05)' : 'rgba(57,198,198,0.09)') : 'transparent', fontSize: child.subtle ? '11px' : '12px', fontWeight: childActive ? (child.subtle ? '600' : '700') : '500', lineHeight: 1.25, opacity: child.subtle && !childActive ? 0.86 : 1 }}>
+                            <Link className={`sidebar-child-link${childActive ? ' is-active' : ''}`} href={child.path} prefetch={false} onClick={() => { if (isMobile) setCollapsed(true); }} style={{ display: 'flex', alignItems: 'center', gap: child.subtle ? '0.4rem' : '0.5rem', padding: child.subtle ? '0.38rem 0.5rem' : '0.45rem 0.55rem', borderRadius: '6px', textDecoration: 'none', color: childActive ? 'var(--primary)' : 'var(--text-secondary)', background: childActive ? (child.subtle ? 'rgba(57,198,198,0.05)' : 'rgba(57,198,198,0.09)') : 'transparent', fontSize: child.subtle ? '11px' : '12px', fontWeight: childActive ? (child.subtle ? '600' : '700') : '500', lineHeight: 1.25, opacity: child.subtle && !childActive ? 0.86 : 1 }}>
                               <ChildIcon size={child.subtle ? 13 : 14} style={{ flexShrink: 0 }} /> <span style={{ whiteSpace: 'normal' }}>{child.name}</span>
                             </Link>
                           </li>
