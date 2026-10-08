@@ -451,7 +451,7 @@ function ProjectSummaryModal({ project, startDate, endDate, onClose }) {
           scope={projectReportScope}
           type="TABLE"
           data={reportRows}
-          filters={{Projeto:project.name,Escopo:'2026 + A pagar futuro de terceiros'}}
+          filters={{Projeto:project.name,'Data inicial':startDate,'Data final':endDate}}
         />
       </div>
 
@@ -481,8 +481,8 @@ function ProjectSummaryModal({ project, startDate, endDate, onClose }) {
 export default function TeamDashboard(){
   const {isReportMode,openReportBuilder,exitReportMode}=useReport();
   const[data,setData]=useState({entries:[],monthly:[]});
-  const[startDate,setStartDate]=useState('2026-01-01');
-  const[endDate,setEndDate]=useState('2026-12-31');
+  const[startDate,setStartDate]=useState(DEFAULT_START_DATE);
+  const[endDate,setEndDate]=useState(DEFAULT_END_DATE);
   const[personFilters,setPersonFilters]=useState([]);
   const[projectFilters,setProjectFilters]=useState([]);
   const[accountFilters,setAccountFilters]=useState([]);
@@ -536,9 +536,9 @@ export default function TeamDashboard(){
     return true;
   }),[data.entries,personFilters,projectFilters,accountFilters,statusFilters,startDate,endDate]);
 
-  // Cadastro da equipe e Equipe por projeto têm uma regra própria:
-  // A PAGAR de terceiros não é cortado pelo período. Isso mantém no financeiro
-  // obrigações com datas provisórias futuras (ex.: 2030/2031).
+  // No período padrão de 2026, mantemos a regra histórica de terceiros:
+  // pendências futuras continuam visíveis. Ao alterar qualquer data, o intervalo
+  // selecionado passa a ser respeitado integralmente em cadastro e projetos.
   const relationEntries=useMemo(()=>data.entries.filter(entry=>{
     if(personFilters.length>0&&!personFilters.includes(entry.person))return false;
     const relevantRows=(entry.transactions||[]).filter(row=>inTeamRelationScope(entry,row,startDate,endDate));
@@ -643,8 +643,7 @@ export default function TeamDashboard(){
     return[...map.values()].map(p=>({...p,peopleCount:p.people.size,total:p.paid+p.open,rows:[...p.rows.values()]})).sort((a,b)=>b.paid-a.paid || b.total-a.total || a.name.localeCompare(b.name,'pt-BR'));
   },[relationEntries,startDate,endDate,projectFilters,accountFilters,statusFilters]);
 
-  const evolutionData=useMemo(()=>Array.from({length:12},(_,i)=>{
-    const key=`2026-${String(i+1).padStart(2,'0')}`;
+  const evolutionData=useMemo(()=>monthKeysBetween(startDate,endDate).map((key)=>{
     const paidMap=new Map();
     const forecastMap=new Map();
 
@@ -664,14 +663,14 @@ export default function TeamDashboard(){
     }));
 
     return{
-      month:monthLabel(key),
+      month:periodMonthLabel(key,startDate,endDate),
       'Pago total':[...paidMap.values()].reduce((sum,row)=>sum+Number(row.valor||0),0),
       'Previsão':[...forecastMap.values()].reduce((sum,row)=>sum+Number(row.valor||0),0),
     };
   }),[filteredEntries,startDate,endDate,projectFilters,accountFilters,statusFilters]);
 
   const reportFilters={'Data inicial':startDate,'Data final':endDate,Pessoa:personFilters.length?personFilters.join(', '):'Todas',Projeto:projectFilters.length?projectFilters.join(', '):'Todos','Conta / Plano':accountFilters.length?accountFilters.join(', '):'Todas',Situação:statusFilters.length?statusFilters.join(', '):'Todas'};
-  const relationReportFilters={...reportFilters,'Regra A pagar terceiros':'Sem corte de período; inclui pendências futuras após dez/2026'};
+  const relationReportFilters={...reportFilters,'Regra A pagar terceiros':isDefault2026Period(startDate,endDate)?'Período padrão 2026: inclui pendências futuras':'Período alterado: respeita integralmente as datas selecionadas'};
   const projectChart=projectRows.slice(0,10).map(p=>({Projeto:projectCodeLabel(p.name),'Obra completa':p.name,Pago:p.paid,'A pagar':p.open}));
   const rosterReport=peopleRoster.map(item=>({'Pessoa / empresa':item.name,'Cargo / função':item.roles.join(' · '),'Tipo':item.thirdParty?'Terceiro':item.fixedMonthly?'Mensal / fixo':'Equipe','Projetos':item.projects.length,'Plano(s)':item.accounts.map(planLabel).join(' · '),'Pago':item.transactions.filter(r=>r.paid).reduce((s,r)=>s+Number(r.valor||0),0),'A pagar':item.transactions.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.valor||0),0)}));
   const detailedRosterReport=peopleRoster.flatMap(item=>{
@@ -759,7 +758,7 @@ export default function TeamDashboard(){
 
   return <div className="mgmt">
     <header className="mgmt-header">
-      <div><span className="mgmt-eyebrow">EQUIPE · EXERCÍCIO 2026</span><h1>Equipe</h1><p>Cadastro, pagamentos, pendências e custo de equipe por obra.</p></div>
+      <div><span className="mgmt-eyebrow">EQUIPE · HISTÓRICO FINANCEIRO</span><h1>Equipe</h1><p>Cadastro, pagamentos, pendências e custo de equipe por obra conforme o período selecionado.</p></div>
       <div className="mgmt-actions">
         <FinancialRefreshButton onUpdated={reloadTeamData} onError={setError} label="Atualizar dados"/>
         <button onClick={()=>isReportMode?exitReportMode():openReportBuilder('Equipe')} className={`btn ${isReportMode?'btn-primary':''}`}><FileText size={14}/>{isReportMode?'Sair do Modo Relatório':'Gerar Relatório'}</button>
@@ -768,8 +767,8 @@ export default function TeamDashboard(){
     {error&&<div className="mgmt-alert">{error}</div>}
 
     <section className="mgmt-panel"><div className="mgmt-filter-grid mgmt-filter-grid-team">
-      <label>Data inicial<input type="date" min="2026-01-01" max="2026-12-31" value={startDate} onChange={e=>setStartDate(e.target.value)}/></label>
-      <label>Data final<input type="date" min="2026-01-01" max="2026-12-31" value={endDate} onChange={e=>setEndDate(e.target.value)}/></label>
+      <label>Data inicial<input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)}/></label>
+      <label>Data final<input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)}/></label>
       <label>Pessoa<MultiSelect options={people} selected={personFilters} onChange={setPersonFilters} placeholder="Todas as pessoas"/></label>
       <label>Projeto<MultiSelect options={projects} selected={projectFilters} onChange={setProjectFilters} placeholder="Todos os projetos"/></label>
       <label>Conta / Plano<MultiSelect options={accounts} selected={accountFilters} onChange={setAccountFilters} placeholder="Todas as contas"/></label>
@@ -788,7 +787,7 @@ export default function TeamDashboard(){
     <div className="mgmt-flow mgmt-flow-balanced">
       <section id="report-equipe-evolucao" data-report-section className="mgmt-panel">
         <ReportAdder sectionKey="equipe:evolucao" title="Evolução mensal da Equipe" componentName="Gráfico de Evolução Mensal" page="Equipe" type="CHART" data={evolutionData} filters={reportFilters} captureId="report-equipe-evolucao" style={{float:'right'}}/>
-        <h2>Evolução mensal da equipe</h2><p>Total pago e previsão de pagamentos da equipe por mês, incluindo os valores em aberto de outubro, novembro e dezembro quando existentes no sistema.</p>
+        <h2>Evolução mensal da equipe</h2><p>Total pago e previsão por mês dentro do período selecionado. O gráfico acompanha inclusive períodos de 2025 ou anteriores quando existirem na base.</p>
         <div className="mgmt-chart"><ResponsiveContainer><LineChart data={evolutionData}><CartesianGrid strokeDasharray="3 3" opacity={0.16}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tickFormatter={compact} tick={{fontSize:10}}/><Tooltip formatter={v=>brl(v)}/><Legend/><Line type="monotone" dataKey="Pago total" stroke={PAID_COLOR} strokeWidth={3} dot={{r:3}} activeDot={{r:5}}/><Line type="monotone" dataKey="Previsão" stroke={OPEN_COLOR} strokeWidth={2.6} strokeDasharray="6 4" dot={{r:3}} activeDot={{r:5}}/></LineChart></ResponsiveContainer></div>
       </section>
 
@@ -817,7 +816,7 @@ export default function TeamDashboard(){
         filters={relationReportFilters}
         style={{float:'right'}}
       />
-      <div className="mgmt-panel-head"><div><h2>Cadastro da equipe</h2><p>Ordenado pelo maior valor A pagar. Para terceiros, A pagar inclui também pendências futuras após dez/2026.</p></div></div>
+      <div className="mgmt-panel-head"><div><h2>Cadastro da equipe</h2><p>{isDefault2026Period(startDate,endDate)?'Ordenado pelo maior valor A pagar. No período padrão de 2026, terceiros também mantêm pendências futuras.':'Ordenado pelo maior valor A pagar. As datas selecionadas são respeitadas integralmente, inclusive para terceiros.'}</p></div></div>
       <div className="mgmt-table-filters mgmt-table-filters-six">
         <label>Pessoa / empresa<MultiSelect options={peopleRoster.map(item=>item.name)} selected={rosterNameFilters} onChange={setRosterNameFilters} placeholder="Todas"/></label>
         <label>Cargo / função<MultiSelect options={rosterRoles} selected={rosterRoleFilters} onChange={setRosterRoleFilters} placeholder="Todos"/></label>
@@ -835,7 +834,7 @@ export default function TeamDashboard(){
     <section className="mgmt-panel" data-report-section>
       <ReportAdder sectionKey="equipe:obras-custos" title="Custos por Obra" componentName="Tabela de Custos por Obra" page="Equipe" type="TABLE" data={projectRelationRows.map(p=>({Projeto:p.name,'Pessoas / terceiros':p.peopleCount,Pago:p.paid,'A pagar':p.open,Total:p.total}))} filters={relationReportFilters} style={{float:'right'}}/>
       <h2>Equipe por projeto</h2>
-      <p>Ordenado pelo maior valor Pago. Em terceiros, A pagar mantém também as obrigações futuras registradas após dezembro/2026.</p>
+      <p>{isDefault2026Period(startDate,endDate)?'Ordenado pelo maior valor Pago. No período padrão de 2026, terceiros mantêm também obrigações futuras registradas.':'Ordenado pelo maior valor Pago. As datas selecionadas são respeitadas integralmente.'}</p>
       <div className="mgmt-table-filters mgmt-table-filters-five">
         <label>Projeto<MultiSelect options={projectRelationRows.map(item=>item.name)} selected={projectNameFilters} onChange={setProjectNameFilters} placeholder="Todos"/></label>
         <label>Pessoas / terceiros<input type="number" min="0" value={projectPeopleFilter} onChange={e=>setProjectPeopleFilter(e.target.value)} placeholder="Qtd. exata"/></label>
@@ -847,7 +846,7 @@ export default function TeamDashboard(){
       <Pager total={projectFiltered.length} page={projectPage} setPage={setProjectPage} pageSize={projectPageSize} setPageSize={setProjectPageSize}/>
     </section>
 
-    <ProjectSummaryModal project={selectedProjectSummary} onClose={()=>setSelectedProjectSummary(null)}/>
-    <PersonModal person={selectedPerson} onClose={()=>setSelectedPerson(null)}/>
+    <ProjectSummaryModal project={selectedProjectSummary} startDate={startDate} endDate={endDate} onClose={()=>setSelectedProjectSummary(null)}/>
+    <PersonModal person={selectedPerson} startDate={startDate} endDate={endDate} onClose={()=>setSelectedPerson(null)}/>
   </div>;
 }
