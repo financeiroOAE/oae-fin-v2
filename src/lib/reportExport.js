@@ -295,6 +295,13 @@ export async function exportReportToPdf(items, config) {
         pdf.text(lines, x + 1.5, y + paddingY + lineHeight * 0.85);
         x += widths[index];
       });
+      pdf.setDrawColor(203, 213, 225);
+      pdf.setLineWidth(0.14);
+      let dividerX = margin;
+      widths.slice(0, -1).forEach((width) => {
+        dividerX += width;
+        pdf.line(dividerX, y, dividerX, y + height);
+      });
       y += height;
     };
 
@@ -341,8 +348,13 @@ export async function exportReportToPdf(items, config) {
         pdf.text(lines, textX, y + paddingY + lineHeight * 0.85, { align });
         x += widths[index];
       });
-      pdf.setDrawColor(226, 232, 240);
-      pdf.setLineWidth(0.1);
+      pdf.setDrawColor(203, 213, 225);
+      pdf.setLineWidth(0.14);
+      let dividerX = margin;
+      widths.slice(0, -1).forEach((width) => {
+        dividerX += width;
+        pdf.line(dividerX, y, dividerX, y + finalHeight);
+      });
       pdf.line(margin, y + finalHeight, pageWidth - margin, y + finalHeight);
       y += finalHeight;
     });
@@ -445,67 +457,106 @@ export const isPriorityExportRow = (row) => isDocumentedPayableNext30Days(row);
 // SheetJS Community não grava a cor de fundo das células. Aplicamos o estilo
 // ao pacote XLSX já gerado, sem modificar valores ou fórmulas da planilha.
 function stylePriorityExcelRows(xlsxBytes, prioritySheets) {
-  if (!prioritySheets.some((rows) => rows.length)) return xlsxBytes;
   const zip = unzipSync(xlsxBytes);
   const stylesPath = 'xl/styles.xml';
   if (!zip[stylesPath]) return xlsxBytes;
   let styles = strFromU8(zip[stylesPath]);
-  const fills = styles.match(/<fills\b[^>]*>[\s\S]*?<\/fills>/);
-  const cellXfs = styles.match(/<cellXfs\b[^>]*>[\s\S]*?<\/cellXfs>/);
-  if (!fills || !cellXfs) return xlsxBytes;
 
-  const currentFillCount = Number(fills[0].match(/\bcount="(\d+)"/)?.[1] || 0);
-  const fillXml = '<fill><patternFill patternType="solid"><fgColor rgb="FFE0F2FE"/><bgColor indexed="64"/></patternFill></fill>';
-  styles = styles.replace(fills[0], fills[0].replace(/<fills\b[^>]*>/, (tag) =>
-    tag.replace(/count="\d+"/, 'count="' + (currentFillCount + 1) + '"'))
-    .replace('</fills>', fillXml + '</fills>'));
+  const fillsMatch = styles.match(/<fills\b[^>]*>[\s\S]*?<\/fills>/);
+  const fontsMatch = styles.match(/<fonts\b[^>]*>[\s\S]*?<\/fonts>/);
+  const bordersMatch = styles.match(/<borders\b[^>]*>[\s\S]*?<\/borders>/);
+  const xfsMatch = styles.match(/<cellXfs\b[^>]*>[\s\S]*?<\/cellXfs>/);
+  if (!fillsMatch || !fontsMatch || !bordersMatch || !xfsMatch) return xlsxBytes;
 
-  let xfsBlock = cellXfs[0];
-  const xfs = [...xfsBlock.matchAll(/<xf\b[^>]*\/>/g)].map((match) => match[0]);
+  const appendStyles = (match, name, additions) => {
+    const count = Number(match[0].match(/\bcount="(\d+)"/)?.[1] || 0);
+    const revised = match[0].replace(new RegExp('<' + name + '\\b[^>]*>'), tag =>
+      tag.replace(/count="\d+"/, 'count="' + (count + additions.length) + '"'))
+      .replace('</' + name + '>', additions.join('') + '</' + name + '>');
+    styles = styles.replace(match[0], revised);
+    return count;
+  };
+
+  const fillBase = appendStyles(fillsMatch, 'fills', [
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF143456"/><bgColor indexed="64"/></patternFill></fill>',
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFF0F5FA"/><bgColor indexed="64"/></patternFill></fill>',
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFE0F2FE"/><bgColor indexed="64"/></patternFill></fill>',
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFE8F1F9"/><bgColor indexed="64"/></patternFill></fill>'
+  ]);
+  const fontBase = appendStyles(fontsMatch, 'fonts', [
+    '<font><sz val="10"/><name val="Aptos"/><b/><color rgb="FFFFFFFF"/></font>',
+    '<font><sz val="10"/><name val="Aptos"/><color rgb="FF233952"/></font>',
+    '<font><sz val="11"/><name val="Aptos Display"/><b/><color rgb="FFFFFFFF"/></font>'
+  ]);
+  const borderBase = appendStyles(bordersMatch, 'borders', [
+    '<border><left style="thin"><color rgb="FFD6E0EA"/></left><right style="thin"><color rgb="FFD6E0EA"/></right><top style="thin"><color rgb="FFD6E0EA"/></top><bottom style="thin"><color rgb="FFD6E0EA"/></bottom><diagonal/></border>'
+  ]);
+
+  const xfs = [...xfsMatch[0].matchAll(/<xf\b[^>]*\/>/g)].map(match => match[0]);
   if (!xfs.length) return xlsxBytes;
-  const priorityStyles = new Map();
-  const additions = [];
-  const priorityStyleId = (original) => {
-    const base = Number(original) || 0;
-    if (priorityStyles.has(base)) return priorityStyles.get(base);
-    const template = xfs[base] || xfs[0];
-    let next = template.replace(/\bfillId="\d+"/, 'fillId="' + currentFillCount + '"');
-    if (!/\bfillId=/.test(next)) next = next.replace(/\/>$/, ' fillId="' + currentFillCount + '"/>');
-    if (/\bapplyFill=/.test(next)) next = next.replace(/\bapplyFill="\d+"/, 'applyFill="1"');
-    else next = next.replace(/\/>$/, ' applyFill="1"/>');
-    const id = xfs.length + additions.length;
-    additions.push(next);
-    priorityStyles.set(base, id);
+  const newXfs = [];
+  const styleCache = new Map();
+  const getStyledId = (originalId, role) => {
+    const original = Number(originalId) || 0;
+    const key = original + ':' + role;
+    if (styleCache.has(key)) return styleCache.get(key);
+    const base = xfs[original] || xfs[0];
+    const roleFill = role === 'header' || role === 'summaryTitle' ? fillBase :
+      role === 'priority' ? fillBase + 2 : role === 'stripe' ? fillBase + 1 : fillBase + 3;
+    const roleFont = role === 'header' ? fontBase : role === 'summaryTitle' ? fontBase + 2 : fontBase + 1;
+    let next = base;
+    for (const [attribute, value] of Object.entries({fillId:roleFill,fontId:roleFont,borderId:borderBase})) {
+      if (new RegExp('\\b' + attribute + '="\\d+"').test(next))
+        next = next.replace(new RegExp('\\b' + attribute + '="\\d+"'), attribute + '="' + value + '"');
+      else next = next.replace(/\/>$/, ' ' + attribute + '="' + value + '"/>');
+    }
+    for (const attribute of ['applyFill','applyFont','applyBorder']) {
+      if (new RegExp('\\b' + attribute + '="\\d+"').test(next))
+        next = next.replace(new RegExp('\\b' + attribute + '="\\d+"'), attribute + '="1"');
+      else next = next.replace(/\/>$/, ' ' + attribute + '="1"/>');
+    }
+    const id = xfs.length + newXfs.length;
+    newXfs.push(next);
+    styleCache.set(key,id);
     return id;
   };
 
-  prioritySheets.forEach((rows, index) => {
-    if (!rows.length) return;
-    const sheetPath = 'xl/worksheets/sheet' + (index + 2) + '.xml';
-    if (!zip[sheetPath]) return;
-    let sheet = strFromU8(zip[sheetPath]);
-    const rowNumbers = new Set(rows.map((index) => index + 2));
-    sheet = sheet.replace(/<row\b[^>]*>[\s\S]*?<\/row>/g, (rowXml) => {
-      const index = Number(rowXml.match(/<row\b[^>]*\br="(\d+)"/)?.[1] || 0);
-      if (!rowNumbers.has(index)) return rowXml;
-      return rowXml.replace(/<c\b[^>]*>/g, (cell) => {
+  // "Resumo" e a primeira planilha; as demais seguem a ordem de criação.
+  const sheetFiles = Object.keys(zip).filter(path => /^xl\/worksheets\/sheet\d+\.xml$/.test(path))
+    .sort((a,b) => Number(a.match(/sheet(\d+)/)[1]) - Number(b.match(/sheet(\d+)/)[1]));
+  for (let sheetIndex = 0; sheetIndex < sheetFiles.length; sheetIndex++) {
+    const path = sheetFiles[sheetIndex];
+    const highlighted = new Set((prioritySheets[sheetIndex - 1] || []).map(idx => idx + 2));
+    let xml = strFromU8(zip[path]);
+    xml = xml.replace(/<row\b[^>]*>[\s\S]*?<\/row>/g, rowXml => {
+      const rowNumber = Number(rowXml.match(/<row\b[^>]*\br="(\d+)"/)?.[1] || 0);
+      if (!rowNumber) return rowXml;
+      const role = sheetIndex === 0
+        ? ([1,5].includes(rowNumber) ? 'summaryTitle' : 'plain')
+        : rowNumber === 1 ? 'header' : highlighted.has(rowNumber) ? 'priority'
+        : rowNumber % 2 === 0 ? 'plain' : 'stripe';
+      return rowXml.replace(/<c\b[^>]*>/g, cell => {
         const oldStyle = Number(cell.match(/\bs="(\d+)"/)?.[1] || 0);
-        const newStyle = priorityStyleId(oldStyle);
+        const id = getStyledId(oldStyle,role);
         return /\bs="\d+"/.test(cell)
-          ? cell.replace(/\bs="\d+"/, 's="' + newStyle + '"')
-          : cell.replace(/>$/, ' s="' + newStyle + '">');
+          ? cell.replace(/\bs="\d+"/,'s="' + id + '"')
+          : cell.replace(/>$/,' s="' + id + '">');
       });
     });
-    zip[sheetPath] = strToU8(sheet);
-  });
+    if (sheetIndex !== 0) {
+      const sheetViews = '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+      xml = xml.replace(/<sheetViews\b[^>]*>[\s\S]*?<\/sheetViews>/,sheetViews);
+      xml = xml.replace(/<row\b[^>]*\br="1"[^>]*>/, tag => tag.replace(/>$/, ' ht="26" customHeight="1">'));
+    }
+    zip[path] = strToU8(xml);
+  }
 
-  if (!additions.length) return xlsxBytes;
-  xfsBlock = xfsBlock.replace(/<cellXfs\b[^>]*>/, (tag) =>
-    tag.replace(/count="\d+"/, 'count="' + (xfs.length + additions.length) + '"'))
-    .replace('</cellXfs>', additions.join('') + '</cellXfs>');
-  styles = styles.replace(cellXfs[0], xfsBlock);
+  const xfsRevised = xfsMatch[0].replace(/<cellXfs\b[^>]*>/, tag =>
+    tag.replace(/count="\d+"/,'count="' + (xfs.length + newXfs.length) + '"'))
+    .replace('</cellXfs>',newXfs.join('') + '</cellXfs>');
+  styles = styles.replace(xfsMatch[0],xfsRevised);
   zip[stylesPath] = strToU8(styles);
-  return zipSync(zip, { level: 6 });
+  return zipSync(zip,{level:6});
 }
 
 export async function exportReportToExcel(items, config) {
