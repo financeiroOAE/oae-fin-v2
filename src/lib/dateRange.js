@@ -15,7 +15,7 @@ export function getRolling30DayRange() {
 // Accept only complete, real calendar dates before updating filters.
 // Browsers emit transient empty values while users edit native date fields.
 export function isValidFilterDate(value) {
-  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);
   if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1) return false;
   const date = new Date(Date.UTC(year, month - 1, day));
