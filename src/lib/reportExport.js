@@ -1,4 +1,5 @@
 import { isDocumentedPayableNext30Days } from '@/lib/paymentCommitment';
+import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 const CURRENCY_FORMAT = '[$R$-pt-BR] #,##0.00;[Red]-[$R$-pt-BR] #,##0.00';
 
 function fileName(value, extension) {
@@ -420,6 +421,76 @@ function createWorksheet(XLSX, item, rows) {
   return worksheet;
 }
 
+
+const isPriorityExportRow = (row) => isDocumentedPayableNext30Days(row)
+  || /VENCE EM AT[EÉ] 30 DIAS/i.test(String(row?.['Situação'] ?? row?.Situacao ?? ''));
+
+// SheetJS Community não grava a cor de fundo das células. Aplicamos o estilo
+// ao pacote XLSX já gerado, sem modificar valores ou fórmulas da planilha.
+function stylePriorityExcelRows(xlsxBytes, prioritySheets) {
+  if (!prioritySheets.some((rows) => rows.length)) return xlsxBytes;
+  const zip = unzipSync(xlsxBytes);
+  const stylesPath = 'xl/styles.xml';
+  if (!zip[stylesPath]) return xlsxBytes;
+  let styles = strFromU8(zip[stylesPath]);
+  const fills = styles.match(/<fills\b[^>]*>[\s\S]*?<\/fills>/);
+  const cellXfs = styles.match(/<cellXfs\b[^>]*>[\s\S]*?<\/cellXfs>/);
+  if (!fills || !cellXfs) return xlsxBytes;
+
+  const currentFillCount = Number(fills[0].match(/\bcount="(\d+)"/)?.[1] || 0);
+  const fillXml = '<fill><patternFill patternType="solid"><fgColor rgb="FFE0F2FE"/><bgColor indexed="64"/></patternFill></fill>';
+  styles = styles.replace(fills[0], fills[0].replace(/<fills\b[^>]*>/, (tag) =>
+    tag.replace(/count="\d+"/, 'count="' + (currentFillCount + 1) + '"'))
+    .replace('</fills>', fillXml + '</fills>'));
+
+  let xfsBlock = cellXfs[0];
+  const xfs = [...xfsBlock.matchAll(/<xf\b[^>]*\/>/g)].map((match) => match[0]);
+  if (!xfs.length) return xlsxBytes;
+  const priorityStyles = new Map();
+  const additions = [];
+  const priorityStyleId = (original) => {
+    const base = Number(original) || 0;
+    if (priorityStyles.has(base)) return priorityStyles.get(base);
+    const template = xfs[base] || xfs[0];
+    let next = template.replace(/\bfillId="\d+"/, 'fillId="' + currentFillCount + '"');
+    if (!/\bfillId=/.test(next)) next = next.replace(/\/>$/, ' fillId="' + currentFillCount + '"/>');
+    if (/\bapplyFill=/.test(next)) next = next.replace(/\bapplyFill="\d+"/, 'applyFill="1"');
+    else next = next.replace(/\/>$/, ' applyFill="1"/>');
+    const id = xfs.length + additions.length;
+    additions.push(next);
+    priorityStyles.set(base, id);
+    return id;
+  };
+
+  prioritySheets.forEach((rows, index) => {
+    if (!rows.length) return;
+    const sheetPath = 'xl/worksheets/sheet' + (index + 2) + '.xml';
+    if (!zip[sheetPath]) return;
+    let sheet = strFromU8(zip[sheetPath]);
+    const rowNumbers = new Set(rows.map((index) => index + 2));
+    sheet = sheet.replace(/<row\b[^>]*>[\s\S]*?<\/row>/g, (rowXml) => {
+      const index = Number(rowXml.match(/<row\b[^>]*\br="(\d+)"/)?.[1] || 0);
+      if (!rowNumbers.has(index)) return rowXml;
+      return rowXml.replace(/<c\b[^>]*>/g, (cell) => {
+        const oldStyle = Number(cell.match(/\bs="(\d+)"/)?.[1] || 0);
+        const newStyle = priorityStyleId(oldStyle);
+        return /\bs="\d+"/.test(cell)
+          ? cell.replace(/\bs="\d+"/, 's="' + newStyle + '"')
+          : cell.replace(/>$/, ' s="' + newStyle + '">');
+      });
+    });
+    zip[sheetPath] = strToU8(sheet);
+  });
+
+  if (!additions.length) return xlsxBytes;
+  xfsBlock = xfsBlock.replace(/<cellXfs\b[^>]*>/, (tag) =>
+    tag.replace(/count="\d+"/, 'count="' + (xfs.length + additions.length) + '"'))
+    .replace('</cellXfs>', additions.join('') + '</cellXfs>');
+  styles = styles.replace(cellXfs[0], xfsBlock);
+  zip[stylesPath] = strToU8(styles);
+  return zipSync(zip, { level: 6 });
+}
+
 export async function exportReportToExcel(items, config) {
   const XLSX = await import("xlsx");
   const workbook = XLSX.utils.book_new();
@@ -437,6 +508,7 @@ export async function exportReportToExcel(items, config) {
   XLSX.utils.book_append_sheet(workbook, summarySheet, "Resumo");
   usedNames.add("resumo");
 
+  const prioritySheets = [];
   items.forEach((item, index) => {
     // Excel é uma exportação de dados, não uma captura visual. Quando o bloco
     // oferece a relação completa filtrada, ela tem prioridade sobre resumo/visível.
@@ -444,14 +516,25 @@ export async function exportReportToExcel(items, config) {
       ? item.dataSets.all
       : getReportRows(item);
     const worksheet = createWorksheet(XLSX, item, rows);
+    prioritySheets.push(rows.flatMap((row, rowIndex) => isPriorityExportRow(row) ? [rowIndex] : []));
     XLSX.utils.book_append_sheet(workbook, worksheet, uniqueSheetName(item.title || `Bloco ${index + 1}`, usedNames));
     if (item.includePending && Array.isArray(item.pendingData) && item.pendingData.length > 0) {
       const pendingSheet = createWorksheet(XLSX, { ...item, columns: undefined }, item.pendingData);
+      prioritySheets.push(item.pendingData.flatMap((row, rowIndex) => isPriorityExportRow(row) ? [rowIndex] : []));
       XLSX.utils.book_append_sheet(workbook, pendingSheet, uniqueSheetName(`Pendências ${item.title}`, usedNames));
     }
   });
 
-  XLSX.writeFile(workbook, fileName(config.title, "xlsx"), { cellDates: true });
+  const original = XLSX.write(workbook, { bookType: "xlsx", type: "array", cellDates: true });
+  const styled = stylePriorityExcelRows(new Uint8Array(original), prioritySheets);
+  const url = URL.createObjectURL(new Blob([styled], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName(config.title, "xlsx");
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 export function estimateReportPages(items, config) {
