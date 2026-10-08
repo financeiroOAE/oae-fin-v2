@@ -1,3 +1,4 @@
+import { applyValidFilterDate } from '@/lib/dateRange';
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -30,7 +31,7 @@ const monthKeysBetween = (start=TEAM_PERIOD_START,end=TEAM_PERIOD_END) => {
   const result=[];
   let year=startYear;
   let month=startMonth;
-  while(year<endYear || (year===endYear && month<=endMonth)){
+  while(result.length < 36 && (year<endYear || (year===endYear && month<=endMonth))){
     result.push(`${year}-${String(month).padStart(2,'0')}`);
     month+=1;
     if(month===13){month=1;year+=1}
@@ -769,8 +770,8 @@ export default function TeamDashboard(){
     {error&&<div className="mgmt-alert">{error}</div>}
 
     <section className="mgmt-panel"><div className="mgmt-filter-grid mgmt-filter-grid-team">
-      <label>Data inicial<input type="date" min={TEAM_PERIOD_START} max={TEAM_PERIOD_END} value={startDate} onChange={e=>{const value=e.target.value;if(/^\d{4}-\d{2}-\d{2}$/.test(value))setStartDate(value)}}/></label>
-      <label>Data final<input type="date" min={TEAM_PERIOD_START} max={TEAM_PERIOD_END} value={endDate} onChange={e=>{const value=e.target.value;if(/^\d{4}-\d{2}-\d{2}$/.test(value))setEndDate(value)}}/></label>
+      <label>Data inicial<input type="date" min={TEAM_PERIOD_START} max={TEAM_PERIOD_END} value={startDate} onChange={e=>applyValidFilterDate(e.target.value, setStartDate)}/></label>
+      <label>Data final<input type="date" min={TEAM_PERIOD_START} max={TEAM_PERIOD_END} value={endDate} onChange={e=>applyValidFilterDate(e.target.value, setEndDate)}/></label>
       <label>Pessoa<MultiSelect options={people} selected={personFilters} onChange={setPersonFilters} placeholder="Todas as pessoas"/></label>
       <label>Projeto<MultiSelect options={projects} selected={projectFilters} onChange={setProjectFilters} placeholder="Todos os projetos"/></label>
       <label>Conta / Plano<MultiSelect options={accounts} selected={accountFilters} onChange={setAccountFilters} placeholder="Todas as contas"/></label>
