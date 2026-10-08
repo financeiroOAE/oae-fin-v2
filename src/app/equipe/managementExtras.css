@@ -110,7 +110,7 @@
 .mgmt-metric-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .mgmt-metric-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary)}
 .mgmt-metric-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);font-weight:650}
-.mgmt-metric-value{display:block;font-size:clamp(17px,1.6vw,23px);margin-top:6px;color:var(--text-main);font-variant-numeric:tabular-nums;letter-spacing:-.025em;overflow-wrap:anywhere}
+.mgmt-metric-value{display:block;font-size:clamp(15px,1.35vw,20px);margin-top:6px;color:var(--text-main);font-variant-numeric:tabular-nums;letter-spacing:-.035em;white-space:nowrap}
 .mgmt-metric-card.tone-success{border-top-color:var(--success)}.mgmt-metric-card.tone-success .mgmt-metric-icon{color:var(--success);background:rgba(16,185,129,.12)}
 .mgmt-metric-card.tone-warning{border-top-color:var(--warning)}.mgmt-metric-card.tone-warning .mgmt-metric-icon{color:var(--warning);background:rgba(245,158,11,.12)}
 .mgmt-metric-card.tone-danger{border-top-color:var(--danger)}.mgmt-metric-card.tone-danger .mgmt-metric-icon{color:var(--danger);background:rgba(239,68,68,.12)}
