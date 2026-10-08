@@ -79,6 +79,8 @@ export default function ReportPreview({ items, config }) {
               {item.capturedImage && !item.restoredWithoutImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={item.capturedImage} alt={item.title} className="report-preview-chart" />
+              ) : item.type === "CHART" ? (
+                <p className="report-preview-empty">Gráfico ainda não capturado. Abra a página e gere novamente a prévia.</p>
               ) : item.type === "SUMMARY" && rows.length === 1 ? (
                 <ReportSummary item={item} rows={rows} />
               ) : (
