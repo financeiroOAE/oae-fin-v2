@@ -852,6 +852,10 @@ tbody tr:hover {
   padding: 0.24rem !important;
 }
 .report-preview-table .is-number { font-variant-numeric: tabular-nums; font-size: 7px; }
+.report-preview-table.is-team-report th:not(:last-child),
+.report-preview-table.is-team-report td:not(:last-child) {
+  border-right: 1px solid #d7e0e8;
+}
 
 @media (max-width: 820px) {
   .projects-executive-table thead { display: none; }
