@@ -1,3 +1,4 @@
+import { isDocumentedPayableCurrentMonth } from '@/lib/paymentCommitment';
 const CURRENCY_FORMAT = '[$R$-pt-BR] #,##0.00;[Red]-[$R$-pt-BR] #,##0.00';
 
 function fileName(value, extension) {
@@ -298,7 +299,13 @@ export async function exportReportToPdf(items, config) {
         addPage();
         drawTableHeader();
       }
-      if (rowIndex % 2 === 1) {
+      const priority = isDocumentedPayableCurrentMonth(row) || /COMPROMISSO DO M[EÊ]S/i.test(String(row?.['Situação'] ?? ''));
+      if (priority) {
+        pdf.setFillColor(225, 242, 251);
+        pdf.rect(margin, y, contentWidth, rowHeight, 'F');
+        pdf.setFillColor(14, 165, 233);
+        pdf.rect(margin, y, 0.85, rowHeight, 'F');
+      } else if (rowIndex % 2 === 1) {
         pdf.setFillColor(248, 250, 252);
         pdf.rect(margin, y, contentWidth, rowHeight, "F");
       }
