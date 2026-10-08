@@ -755,6 +755,26 @@ tbody tr:hover {
 .report-preview-table th { min-width: 0; padding: 0.35rem; overflow: hidden; resize: none; color: #334155; background: #e2e8f0; border-color: #cbd5e1; text-align: left; }
 .report-preview-table td { padding: 0.35rem; color: #334155; border-bottom: 1px solid #e2e8f0; }
 .report-preview-table tbody tr:nth-child(even) { background: #f8fafc; }
+/* Alerta apenas na prévia do relatório; nenhuma alteração nas tabelas do painel. */
+.report-preview-table tbody tr.is-payment-due-soon,
+.report-preview-table tbody tr.is-payment-due-soon td {
+  background-color: #e0f2fe !important;
+}
+.report-preview-table tbody tr.is-payment-due-soon td:first-child {
+  box-shadow: inset 3px 0 0 #0284c7;
+}
+.report-preview-table tbody tr.is-payment-due-soon td.is-payment-due-status {
+  color: #075985;
+  font-weight: 700;
+}
+@media print {
+  .report-preview-table tbody tr.is-payment-due-soon,
+  .report-preview-table tbody tr.is-payment-due-soon td {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 .report-preview-table .is-number { text-align: right; white-space: nowrap; }
 .report-preview-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(34mm, 1fr)); gap: 0.55rem; margin-top: 0.7rem; }
 .report-preview-summary-card { min-width: 0; padding: 0.65rem; border: 1px solid #dbe4ec; border-left: 3px solid #138b8b; border-radius: 5px; background: #f8fafc; }
