@@ -1,3 +1,4 @@
+import { applyValidFilterDate } from '@/lib/dateRange';
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -452,8 +453,8 @@ export default function AdministrativeDashboard({ view = 'overview' }){
         <div><h2>Período de análise</h2><p>Selecione o intervalo dentro do exercício de 2026.</p></div>
       </div>
       <div className="mgmt-filter-grid mgmt-admin-filter-grid">
-        <label>Data inicial<input type="date" min="2026-01-01" max="2026-12-31" value={startDate} onChange={e=>setStartDate(e.target.value)}/></label>
-        <label>Data final<input type="date" min="2026-01-01" max="2026-12-31" value={endDate} onChange={e=>setEndDate(e.target.value)}/></label>
+        <label>Data inicial<input type="date" min="2026-01-01" max="2026-12-31" value={startDate} onChange={e=>applyValidFilterDate(e.target.value, setStartDate)}/></label>
+        <label>Data final<input type="date" min="2026-01-01" max="2026-12-31" value={endDate} onChange={e=>applyValidFilterDate(e.target.value, setEndDate)}/></label>
         <label>Pessoa / fornecedor<MultiSelect options={peopleOptions} selected={personFilters} onChange={setPersonFilters} placeholder="Todas as pessoas"/></label>
         <label>Plano de contas<MultiSelect options={accountOptions} selected={accountFilters} onChange={setAccountFilters} placeholder="Todos os planos"/></label>
         <label>Situação<MultiSelect options={['Pago','A pagar']} selected={statusFilters} onChange={setStatusFilters} placeholder="Todas as situações"/></label>
