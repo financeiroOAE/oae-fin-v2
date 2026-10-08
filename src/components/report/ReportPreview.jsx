@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { formatReportValue, getReportColumns, getReportRows, inferReportFormat } from "@/lib/reportExport";
+import { formatReportValue, getReportCellValue, getReportColumns, getReportRows, inferReportFormat } from "@/lib/reportExport";
 
 function ReportTable({ item, rows, title }) {
   const columns = getReportColumns(item, rows);
@@ -23,7 +23,7 @@ function ReportTable({ item, rows, title }) {
             <tr key={`${item.id}-row-${rowIndex}`}>
               {columns.map((column) => {
                 const format = inferReportFormat(column.key, column.format || item.columnFormats?.[column.key]);
-                return <td key={column.key} className={format === "currency" || format === "percent" ? "is-number" : ""}>{formatReportValue(row?.[column.key], format)}</td>;
+                return <td key={column.key} className={format === "currency" || format === "percent" ? "is-number" : ""}>{formatReportValue(getReportCellValue(row, column), format)}</td>;
               })}
             </tr>
           ))}
