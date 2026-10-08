@@ -8,7 +8,7 @@ export const MENU_DEFINITIONS = [
   { key: 'projetos', label: 'Projetos', path: '/projetos' },
   { key: 'equipe_gestao', label: 'Equipe', path: '/equipe' },
   { key: 'administrativo_geral', label: 'Visão Geral', group: 'Administrativo', path: '/administrativo' },
-  { key: 'administrativo_diretoria', label: 'Diretoria', group: 'Administrativo', path: '/administrativo/socios' },
+  { key: 'administrativo_diretoria', label: 'Diretora', group: 'Administrativo', path: '/administrativo/socios' },
   { key: 'dre', label: 'DRE Gerencial', path: '/dre' },
   { key: 'configuracoes', label: 'Configurações', path: '/configuracoes' },
   { key: 'atualizacao_dados', label: 'Atualização de Dados', path: '/atualizacao-dados' },
