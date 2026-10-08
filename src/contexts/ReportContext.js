@@ -184,7 +184,10 @@ export function ReportProvider({ children }) {
   }, [templates]);
 
   const openReportBuilder = useCallback((page, scope = null, scopeLabel = "") => {
-    if (page) setActiveReportPage(page);
+    if (page) {
+      setActiveReportPage(page);
+      setReportConfig((current) => ({ ...current, title: String(page).trim() || defaultConfig.title }));
+    }
     setActiveReportScope(scope || null);
     setActiveReportScopeLabel(scopeLabel || "");
     setIsReportMode(true);
@@ -195,7 +198,10 @@ export function ReportProvider({ children }) {
     setIsReportMode((current) => {
       const next = !current;
       if (next) {
-        if (page) setActiveReportPage(page);
+        if (page) {
+          setActiveReportPage(page);
+          setReportConfig((current) => ({ ...current, title: String(page).trim() || defaultConfig.title }));
+        }
         setActiveReportScope(scope || null);
         setActiveReportScopeLabel(scopeLabel || "");
         setIsDrawerOpen(true);
