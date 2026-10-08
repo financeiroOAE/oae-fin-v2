@@ -61,11 +61,12 @@ export default function Sidebar({ initialUser = null, canPreview = false, previe
   }, [pathname, isMobile]);
 
   useEffect(() => {
+    if (initialUser) return;
     fetch('/api/session', { cache: 'no-store' })
       .then((response) => response.json())
       .then((result) => setSessionUser(result.user || null))
       .catch(() => setSessionUser(null));
-  }, [pathname]);
+  }, [initialUser]);
 
   const handleToggle = () => {
     const newState = !collapsed;
@@ -334,7 +335,7 @@ export default function Sidebar({ initialUser = null, canPreview = false, previe
                         const childActive = pathname === child.path;
                         return (
                           <li key={child.path}>
-                            <Link className={`sidebar-child-link${childActive ? ' is-active' : ''}`} href={child.path} prefetch={false} onClick={() => { if (isMobile) setCollapsed(true); }} style={{ display: 'flex', alignItems: 'center', gap: child.subtle ? '0.4rem' : '0.5rem', padding: child.subtle ? '0.38rem 0.5rem' : '0.45rem 0.55rem', borderRadius: '6px', textDecoration: 'none', color: childActive ? 'var(--primary)' : 'var(--text-secondary)', background: childActive ? (child.subtle ? 'rgba(57,198,198,0.05)' : 'rgba(57,198,198,0.09)') : 'transparent', fontSize: child.subtle ? '11px' : '12px', fontWeight: childActive ? (child.subtle ? '600' : '700') : '500', lineHeight: 1.25, opacity: child.subtle && !childActive ? 0.86 : 1 }}>
+                            <Link className={`sidebar-child-link${childActive ? ' is-active' : ''}`} href={child.path} prefetch={isAdministrativeGroup ? true : false} onClick={() => { if (isMobile) setCollapsed(true); }} style={{ display: 'flex', alignItems: 'center', gap: child.subtle ? '0.4rem' : '0.5rem', padding: child.subtle ? '0.38rem 0.5rem' : '0.45rem 0.55rem', borderRadius: '6px', textDecoration: 'none', color: childActive ? 'var(--primary)' : 'var(--text-secondary)', background: childActive ? (child.subtle ? 'rgba(57,198,198,0.05)' : 'rgba(57,198,198,0.09)') : 'transparent', fontSize: child.subtle ? '11px' : '12px', fontWeight: childActive ? (child.subtle ? '600' : '700') : '500', lineHeight: 1.25, opacity: child.subtle && !childActive ? 0.86 : 1 }}>
                               <ChildIcon size={child.subtle ? 13 : 14} style={{ flexShrink: 0 }} /> <span style={{ whiteSpace: 'normal' }}>{child.name}</span>
                             </Link>
                           </li>
