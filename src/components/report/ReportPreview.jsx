@@ -12,7 +12,7 @@ function ReportTable({ item, rows, title }) {
   return (
     <div className="report-preview-table-wrap">
       {title && <h4 className="report-preview-subtitle">{title}</h4>}
-      <table className="report-preview-table">
+      <table className={`report-preview-table ${item.page === "Equipe" ? "is-team-report" : ""}`}>
         <thead>
           <tr>
             {columns.map((column) => <th key={column.key}>{column.label || column.key}</th>)}
