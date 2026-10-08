@@ -16,6 +16,23 @@ import { exportReportToExcel, exportReportToPdf } from '@/lib/reportExport';
 import '../equipe/management.css';
 import '../equipe/managementExtras.css';
 
+let administrativeDataCache = null;
+let administrativeDataPromise = null;
+
+async function loadAdministrativeData({ force = false } = {}) {
+  if (!force && administrativeDataCache) return administrativeDataCache;
+  if (!force && administrativeDataPromise) return administrativeDataPromise;
+  administrativeDataPromise = requestJson('/api/administrativo')
+    .then((result) => {
+      administrativeDataCache = result;
+      return result;
+    })
+    .finally(() => {
+      administrativeDataPromise = null;
+    });
+  return administrativeDataPromise;
+}
+
 const COLORS={received:'#2563eb',paidExpense:'#ef4444',open:'#f59e0b',franFixed:'#8b5cf6',franWithdrawal:'#ec4899',pauloFixed:'#06b6d4',pauloWithdrawal:'#eab308'};
 const brl=(n)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n)||0);
 const compact=(n)=>new Intl.NumberFormat('pt-BR',{notation:'compact',maximumFractionDigits:1}).format(Number(n)||0);
@@ -150,7 +167,7 @@ function DirectorProjectModal({ selection, onClose }){
 
 export default function AdministrativeDashboard({ view = 'overview' }){
   const {isReportMode,openReportBuilder,exitReportMode}=useReport();
-  const[data,setData]=useState({revenue:[],expenses:[],adminTeamRows:[],partnerRows:[],monthly:[]});
+  const[data,setData]=useState(()=>administrativeDataCache || {revenue:[],expenses:[],adminTeamRows:[],partnerRows:[],monthly:[]});
   const[startDate,setStartDate]=useState('2026-01-01');
   const[endDate,setEndDate]=useState('2026-12-31');
   const[personFilters,setPersonFilters]=useState([]);
@@ -163,13 +180,23 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   const[error,setError]=useState('');
 
   const reloadAdministrativeData=async()=>{
-    const result=await requestJson('/api/administrativo');
+    const result=await loadAdministrativeData({force:true});
     setData(result);
     setError('');
     return result;
   };
 
-  useEffect(()=>{let active=true;requestJson('/api/administrativo').then(result=>{if(active){setData(result);setError('')}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[]);
+  useEffect(()=>{
+    if(administrativeDataCache){
+      setData(administrativeDataCache);
+      return;
+    }
+    let active=true;
+    loadAdministrativeData()
+      .then(result=>{if(active){setData(result);setError('')}})
+      .catch(e=>{if(active)setError(e.message)});
+    return()=>{active=false};
+  },[]);
 
   const peopleOptions=useMemo(()=>[...new Set((data.expenses||[]).map(r=>r.nome).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),[data.expenses]);
   const accountOptions=useMemo(()=>[...new Set((data.expenses||[]).map(accountOption).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')),[data.expenses]);
