@@ -521,6 +521,7 @@ export default function TeamDashboard(){
   const filteredEntries=useMemo(()=>data.entries.filter(entry=>{
     if(personFilters.length>0&&!personFilters.includes(entry.person))return false;
     const relevantRows=(entry.transactions||[]).filter(r=>inRange(r,startDate,endDate));
+    if(relevantRows.length===0)return false;
     if(projectFilters.length>0&&!relevantRows.some(r=>projectFilters.includes(r.projeto)))return false;
     if(accountFilters.length>0){
       const hasAccount=relevantRows.some(row=>accountFilters.includes(rowAccountOption(row)));
@@ -539,6 +540,7 @@ export default function TeamDashboard(){
   const relationEntries=useMemo(()=>data.entries.filter(entry=>{
     if(personFilters.length>0&&!personFilters.includes(entry.person))return false;
     const relevantRows=(entry.transactions||[]).filter(row=>inTeamRelationScope(entry,row,startDate,endDate));
+    if(relevantRows.length===0)return false;
     if(projectFilters.length>0&&!relevantRows.some(row=>projectFilters.includes(row.projeto)))return false;
     if(accountFilters.length>0){
       const hasAccount=relevantRows.some(row=>accountFilters.includes(rowAccountOption(row)));
@@ -581,7 +583,7 @@ export default function TeamDashboard(){
         if(accountFilters.length>0&&!accountFilters.includes(rowAccountOption(row)))return;
         if(statusFilters.length>0&&!statusFilters.includes(row.paid?'Pago':'A pagar'))return;
         if(row.contaNome||row.contaCodigo)item.accounts.add(row.contaNome||row.contaCodigo);
-        item.transactions.set(row.sourceKey,row);
+        item.transactions.set(row.sourceKey,{...row,rosterPerson:entry.person});
       });
       map.set(key,item);
     });
