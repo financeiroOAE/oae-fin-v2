@@ -1,4 +1,4 @@
-import { isDocumentedPayableCurrentMonth } from '@/lib/paymentCommitment';
+import { isDocumentedPayableNext30Days } from '@/lib/paymentCommitment';
 const CURRENCY_FORMAT = '[$R$-pt-BR] #,##0.00;[Red]-[$R$-pt-BR] #,##0.00';
 
 function fileName(value, extension) {
@@ -299,7 +299,7 @@ export async function exportReportToPdf(items, config) {
         addPage();
         drawTableHeader();
       }
-      const priority = isDocumentedPayableCurrentMonth(row) || /COMPROMISSO DO M[EÊ]S/i.test(String(row?.['Situação'] ?? ''));
+      const priority = isDocumentedPayableNext30Days(row) || /VENCE EM AT[EÉ] 30 DIAS/i.test(String(row?.['Situação'] ?? ''));
       if (priority) {
         pdf.setFillColor(225, 242, 251);
         pdf.rect(margin, y, contentWidth, rowHeight, 'F');
