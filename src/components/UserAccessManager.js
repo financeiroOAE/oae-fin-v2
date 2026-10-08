@@ -18,7 +18,7 @@ function PermissionGrid({ menus, permissions, onChange, disabled = false }) {
           <label key={menu.key} className={`permission-option ${checked ? 'is-checked' : ''}`}>
             <input type="checkbox" checked={checked} disabled={disabled} onChange={() => onChange(togglePermission(menu.key))} />
             <span className="permission-check">{checked && <Check size={12} />}</span>
-            <span>{menu.label}</span>
+            <span>{menu.group ? `${menu.group} · ${menu.label}` : menu.label}</span>
           </label>
         );
       })}
