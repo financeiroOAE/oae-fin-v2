@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireMenuAccess } from '@/lib/authorization';
+import { hasMenuAccess, requireAnyMenuAccess } from '@/lib/authorization';
 import { readCurrentSnapshot } from '@/lib/financialSync';
 import { cpRows, monthOf, revenueTitles } from '@/lib/managementSources';
 
@@ -56,9 +56,11 @@ function adminType(row) {
 }
 
 export async function GET() {
-  const access = await requireMenuAccess('administrativo');
+  const access = await requireAnyMenuAccess(['administrativo_geral', 'administrativo_diretoria']);
   if (!access.ok) return fail(access.error, access.status);
 
+  const canViewGeneral = hasMenuAccess(access.user, 'administrativo_geral');
+  const canViewDiretoria = hasMenuAccess(access.user, 'administrativo_diretoria');
   const snapshot = await readCurrentSnapshot();
 
   const roster = snapshot?.payload?.equipe || [];
@@ -113,11 +115,11 @@ export async function GET() {
 
   return NextResponse.json({
     year: 2026,
-    revenue,
-    expenses,
-    adminTeamRows,
-    partnerRows,
-    monthly,
+    revenue: canViewGeneral ? revenue : [],
+    expenses: canViewGeneral ? expenses : [],
+    adminTeamRows: canViewGeneral ? adminTeamRows : [],
+    partnerRows: canViewDiretoria ? partnerRows : [],
+    monthly: canViewGeneral ? monthly : [],
     snapshotAt: snapshot?.updatedAt || null,
     rules: {
       revenueAdministrative: '20% da coluna K para receitas de projeto; receitas avulsas sem projeto e com centro de custo ADMINISTRAÇÃO entram 100% no Administrativo',
