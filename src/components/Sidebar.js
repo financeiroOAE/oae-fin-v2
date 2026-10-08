@@ -22,12 +22,12 @@ import {
   UserRoundCheck
 } from 'lucide-react';
 
-export default function Sidebar({ canPreview = false, previewActive = false }) {
+export default function Sidebar({ initialUser = null, canPreview = false, previewActive = false }) {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const [iconError, setIconError] = useState(false);
-  const [sessionUser, setSessionUser] = useState(null);
+  const [sessionUser, setSessionUser] = useState(initialUser);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [administrativeOpen, setAdministrativeOpen] = useState(null);
   const pathname = usePathname();
@@ -253,27 +253,23 @@ export default function Sidebar({ canPreview = false, previewActive = false }) {
               const showGroupChildren = isAdministrativeGroup ? showAdministrativeChildren : showSettingsChildren;
               const isActive = pathname === item.path || visibleChildren.some((child) => pathname === child.path);
               const Icon = item.icon;
-              const MenuLink = isAdministrativeGroup ? 'button' : Link;
+              const MenuLink = Link;
               return (
                 <li key={item.name}>
                   <MenuLink
                     className={`sidebar-nav-link${isActive ? ' is-active' : ''}`}
-                    {...(isAdministrativeGroup
-                      ? { type: 'button', 'aria-expanded': showGroupChildren, 'aria-controls': 'sidebar-administrativo-submenu' }
-                      : { href: item.path })}
+                    href={item.path}
                     onClick={() => {
                       if (isAdministrativeGroup) {
                         if (collapsed && !isMobile) {
                           setCollapsed(false);
                           localStorage.setItem('sidebar_collapsed', 'false');
-                          setAdministrativeOpen(true);
-                        } else {
-                          setAdministrativeOpen((open) => !(open ?? isAdministrativePath));
                         }
-                      } else {
-                        if (isGroup) setSettingsOpen(true);
-                        if (isMobile) setCollapsed(true);
+                        setAdministrativeOpen(true);
+                      } else if (isGroup) {
+                        setSettingsOpen(true);
                       }
+                      if (isMobile) setCollapsed(true);
                     }}
                     style={{
                     display: 'flex',
@@ -284,7 +280,7 @@ export default function Sidebar({ canPreview = false, previewActive = false }) {
                     backgroundColor: isActive ? 'rgba(57, 198, 198, 0.1)' : 'transparent',
                     borderRadius: '6px',
                     border: 'none',
-                    width: isAdministrativeGroup ? '100%' : undefined,
+                    width: '100%',
                     font: 'inherit',
                     textAlign: 'left',
                     cursor: 'pointer',
@@ -303,13 +299,31 @@ export default function Sidebar({ canPreview = false, previewActive = false }) {
                     {!(collapsed && !isMobile) && (
                       <>
                         <span style={{ fontSize: '14px', fontWeight: isActive ? '600' : '500', marginLeft: '0.6rem', flex: 1 }}>{item.name}</span>
-                        {isGroup && (isAdministrativeGroup ? (
-                          <ChevronDown size={14} aria-hidden="true" style={{ transform: showGroupChildren ? 'rotate(180deg)' : 'none' }} />
-                        ) : (
-                          <span role="button" tabIndex={0} aria-label={showGroupChildren ? 'Recolher submenu' : 'Expandir submenu'} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setSettingsOpen((open) => !open); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setSettingsOpen((open) => !open); } }} style={{ display: 'flex', padding: '2px', color: 'inherit', cursor: 'pointer' }}>
+                        {isGroup && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label={showGroupChildren ? 'Recolher submenu' : 'Expandir submenu'}
+                            aria-expanded={showGroupChildren}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              if (isAdministrativeGroup) setAdministrativeOpen((open) => !(open ?? isAdministrativePath));
+                              else setSettingsOpen((open) => !open);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (isAdministrativeGroup) setAdministrativeOpen((open) => !(open ?? isAdministrativePath));
+                                else setSettingsOpen((open) => !open);
+                              }
+                            }}
+                            style={{ display: 'flex', padding: '2px', color: 'inherit', cursor: 'pointer' }}
+                          >
                             <ChevronDown size={14} style={{ transform: showGroupChildren ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                           </span>
-                        ))}
+                        )}
                       </>
                     )}
                   </MenuLink>
