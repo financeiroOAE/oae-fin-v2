@@ -186,7 +186,8 @@ export function ReportProvider({ children }) {
   const openReportBuilder = useCallback((page, scope = null, scopeLabel = "") => {
     if (page) {
       setActiveReportPage(page);
-      setReportConfig((current) => ({ ...current, title: String(page).trim() || defaultConfig.title }));
+      const headerTitle = String(scopeLabel || page).trim() || defaultConfig.title;
+      setReportConfig((current) => ({ ...current, title: headerTitle }));
     }
     setActiveReportScope(scope || null);
     setActiveReportScopeLabel(scopeLabel || "");
@@ -200,7 +201,8 @@ export function ReportProvider({ children }) {
       if (next) {
         if (page) {
           setActiveReportPage(page);
-          setReportConfig((current) => ({ ...current, title: String(page).trim() || defaultConfig.title }));
+          const headerTitle = String(scopeLabel || page).trim() || defaultConfig.title;
+          setReportConfig((current) => ({ ...current, title: headerTitle }));
         }
         setActiveReportScope(scope || null);
         setActiveReportScopeLabel(scopeLabel || "");
