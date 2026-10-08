@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { describeFilters, formatReportValue, getReportColumns, getReportRows, inferReportFormat } from "@/lib/reportExport";
+import { formatReportValue, getReportColumns, getReportRows, inferReportFormat } from "@/lib/reportExport";
 
 function ReportTable({ item, rows, title }) {
   const columns = getReportColumns(item, rows);
@@ -75,7 +75,6 @@ export default function ReportPreview({ items, config }) {
           return (
             <section key={item.id} className="report-preview-section">
               <div className="report-preview-section-title"><span>{String(index + 1).padStart(2, '0')}</span><h2>{item.title}</h2></div>
-              <p className="report-preview-filter"><strong>Filtros:</strong> {describeFilters(item.filters)}</p>
               {config.includeExplanations && item.explanation && <p className="report-preview-explanation">{item.explanation}</p>}
               {item.capturedImage && !item.restoredWithoutImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
