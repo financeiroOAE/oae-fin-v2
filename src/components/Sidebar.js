@@ -47,14 +47,17 @@ export default function Sidebar({ canPreview = false, previewActive = false }) {
   }, []);
 
   useEffect(() => {
-    if (pathname === '/') {
-      setCollapsed(true);
-    } else if (!isMobile) {
-      const savedState = localStorage.getItem('sidebar_collapsed');
-      if (savedState !== null) {
-        setCollapsed(JSON.parse(savedState));
+    const timer = window.setTimeout(() => {
+      if (pathname === '/') {
+        setCollapsed(true);
+      } else if (!isMobile) {
+        const savedState = localStorage.getItem('sidebar_collapsed');
+        if (savedState !== null) {
+          setCollapsed(JSON.parse(savedState));
+        }
       }
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [pathname, isMobile]);
 
   useEffect(() => {
@@ -182,10 +185,10 @@ export default function Sidebar({ canPreview = false, previewActive = false }) {
             ) : (
               <>
                 {!logoError ? (
-                  <img src="/logo.png" alt="OAE" className="sidebar-logo" 
-                    onError={() => setLogoError(true)}
-                    style={{ objectFit: 'contain', maxHeight: '40px', maxWidth: '160px' }} 
-                  />
+                  <div className="sidebar-logo-lockup">
+                    <img src="/logo.png" alt="" onError={() => setLogoError(true)} />
+                    <span><strong>OLIVEIRA ARAÚJO</strong><small>ENGENHARIA</small></span>
+                  </div>
                 ) : (
                   <div className="logo-fallback-full" style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
