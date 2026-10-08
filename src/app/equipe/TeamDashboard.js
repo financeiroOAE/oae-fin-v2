@@ -285,6 +285,7 @@ function PersonModal({ person, onClose }) {
             page={item.page}
             scope={personReportScope}
             type={item.type}
+            captureId={item.captureId}
             data={item.data}
             filters={item.filters}
           />
