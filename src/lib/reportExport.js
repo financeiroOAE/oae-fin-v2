@@ -270,8 +270,20 @@ export async function exportReportToPdf(items, config) {
     const widths = columns.map((_, index) => (index === 0 ? firstWidth : otherWidth));
     const rowHeight = 6.5;
 
+    const drawColumnDividers = (topY) => {
+      if (normalizedColumnName(item?.page) !== "equipe" || columns.length < 2) return;
+      let dividerX = margin;
+      pdf.setDrawColor(203, 213, 225);
+      pdf.setLineWidth(0.15);
+      for (let index = 0; index < columns.length - 1; index += 1) {
+        dividerX += widths[index];
+        pdf.line(dividerX, topY, dividerX, topY + rowHeight);
+      }
+    };
+
     const drawTableHeader = () => {
       ensureSpace(rowHeight * 2);
+      const headerY = y;
       let x = margin;
       pdf.setFillColor(226, 232, 240);
       pdf.rect(margin, y, contentWidth, rowHeight, "F");
@@ -282,6 +294,7 @@ export async function exportReportToPdf(items, config) {
         pdf.text(truncateText(pdf, column.label || column.key, widths[index] - 2), x + 1, y + 4.3);
         x += widths[index];
       });
+      drawColumnDividers(headerY);
       y += rowHeight;
     };
 
@@ -308,6 +321,7 @@ export async function exportReportToPdf(items, config) {
         pdf.text(truncateText(pdf, value, widths[index] - 2), textX, y + 4.3, { align });
         x += widths[index];
       });
+      drawColumnDividers(y);
       pdf.setDrawColor(226, 232, 240);
       pdf.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight);
       y += rowHeight;
