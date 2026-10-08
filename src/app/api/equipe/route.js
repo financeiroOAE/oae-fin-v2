@@ -4,7 +4,6 @@ import { readCurrentSnapshot } from '@/lib/financialSync';
 import { cpRows, monthOf } from '@/lib/managementSources';
 
 const fail = (error, status = 400) => NextResponse.json({ error }, { status });
-const YEAR = '2026';
 
 function norm(value) {
   return String(value ?? '')
@@ -67,11 +66,7 @@ export async function GET() {
         _month: rowMonth,
       };
     })
-    .filter((row) => {
-      const is2026 = row._month?.startsWith(YEAR);
-      const isFutureOpen = Boolean(!row.paid && row._month && row._month > `${YEAR}-12`);
-      return is2026 || isFutureOpen;
-    });
+    .filter((row) => Boolean(row._month));
 
   // O cadastro EQUIPE informa função e vínculo, mas NÃO limita o plano financeiro.
   // Um profissional pode ter pagamentos em Coordenação, Arquitetura e outros
@@ -99,19 +94,7 @@ export async function GET() {
     const transactions = candidates.filter((row) => {
       if (!matchesParty(item.person, row.nome)) return false;
       if (item.thirdParty && !matchesProject(item.departmentProject, row.projeto)) return false;
-
-      const is2026 = row._month?.startsWith(YEAR);
-      const isFutureOpenThirdParty = Boolean(
-        item.thirdParty
-        && !row.paid
-        && row._month
-        && row._month > `${YEAR}-12`
-      );
-
-      // Regra da relação de equipe:
-      // - todos permanecem com movimentos de 2026;
-      // - somente terceiros mantêm A PAGAR após dez/2026.
-      return is2026 || isFutureOpenThirdParty;
+      return true;
     }).map(({ _accountCode, _month, ...row }) => row);
 
     const paid = transactions.filter((row) => row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0);
@@ -135,27 +118,41 @@ export async function GET() {
   const uniqueTx = new Map(allTransactions.map((row) => [row.sourceKey, row]));
   const financialRows = [...uniqueTx.values()];
 
-  const monthly = Array.from({ length: 12 }, (_, i) => {
-    const month = `${YEAR}-${String(i + 1).padStart(2, '0')}`;
-    const rows = financialRows.filter((row) => monthOf(row.data) === month);
-    return {
-      month,
-      paid: Math.round(rows.filter((row) => row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0) * 100) / 100,
-      open: Math.round(rows.filter((row) => !row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0) * 100) / 100,
-    };
-  });
+  const years = [...new Set(financialRows
+    .map((row) => monthOf(row.data)?.slice(0, 4))
+    .filter(Boolean))]
+    .sort();
+
+  const monthly = financialRows.reduce((map, row) => {
+    const month = monthOf(row.data);
+    if (!month) return map;
+    if (!map.has(month)) map.set(month, { month, paid: 0, open: 0 });
+    const item = map.get(month);
+    item[row.paid ? 'paid' : 'open'] += Number(row.valor || 0);
+    return map;
+  }, new Map());
+
+  const monthlyRows = [...monthly.values()]
+    .map((item) => ({
+      ...item,
+      paid: Math.round(item.paid * 100) / 100,
+      open: Math.round(item.open * 100) / 100,
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
 
     return NextResponse.json({
-      year: 2026,
+      defaultYear: 2026,
+      availableYears: years,
       entries,
-      monthly,
+      monthly: monthlyRows,
       snapshotAt: snapshot?.updatedAt || null,
       rules: {
         zeroContractValue: 'MENSAL_FIXO',
         sourceRoster: 'EQUIPE (identificação, função e vínculo)',
         sourceFinancial: 'CP_GERAL (todos os planos de equipe por pessoa)',
         accountRule: 'Os planos e valores vêm de cada lançamento de CP_GERAL, nunca do plano ou valor-base do cadastro.',
-        futureOpenThirdParty: 'A PAGAR após dez/2026 incluído somente para cadastros TERCEIRO (EQUIP. TÉC. / TERCEIROS)',
+        periodFiltering: 'A API entrega o histórico financeiro disponível; o período é aplicado na tela da Equipe.',
+        futureOpenThirdParty: 'No período padrão de 2026, terceiros mantêm pendências futuras. Ao alterar as datas, o filtro selecionado passa a ser respeitado integralmente.',
       },
     }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
