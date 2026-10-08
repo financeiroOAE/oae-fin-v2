@@ -422,7 +422,7 @@ function createWorksheet(XLSX, item, rows) {
 }
 
 
-const isPriorityExportRow = (row) => isDocumentedPayableNext30Days(row)
+export const isPriorityExportRow = (row) => isDocumentedPayableNext30Days(row)
   || /VENCE EM AT[EÉ] 30 DIAS/i.test(String(row?.['Situação'] ?? row?.Situacao ?? ''));
 
 // SheetJS Community não grava a cor de fundo das células. Aplicamos o estilo
