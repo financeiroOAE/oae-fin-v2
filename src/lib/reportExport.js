@@ -343,6 +343,8 @@ export async function exportReportToPdf(items, config) {
       } catch {
         drawTable(item, getReportRows(item));
       }
+    } else if (item.type === "CHART") {
+      throw new Error(`Gráfico “${item.title}” sem imagem. Atualize a captura antes de exportar.`);
     } else {
       drawTable(item, getReportRows(item));
     }

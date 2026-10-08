@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useReport } from "@/contexts/ReportContext";
 import { LoaderCircle, PlusCircle } from "lucide-react";
+import { captureReportSection } from "@/lib/reportCapture";
 
 export default function ReportAdder({
   sectionKey,
@@ -24,7 +25,7 @@ export default function ReportAdder({
   presetTags = [],
   style = {},
 }) {
-  const { isReportMode, activeReportPage, activeReportScope, addReportItem, reportItems, registerSection, unregisterSection } = useReport();
+  const { isReportMode, activeReportPage, activeReportScope, addReportItem, reportItems, registerSection, unregisterSection, setStatusMessage } = useReport();
   const [isPreparing, setIsPreparing] = useState(false);
   const normalizedKey = sectionKey || `${page}:${title}`;
 
@@ -98,30 +99,20 @@ export default function ReportAdder({
     if (isPreparing) return;
 
     setIsPreparing(true);
-    let capturedImage;
-
     try {
-      const target = captureId
-        ? document.getElementById(captureId)
-        : event.currentTarget.closest("[data-report-section]");
-
-      if (target && (type === "CHART" || captureId)) {
-        const html2canvas = (await import("html2canvas")).default;
-        const canvas = await html2canvas(target, {
-          scale: Math.min(window.devicePixelRatio || 1, 1.75),
-          useCORS: true,
-          logging: false,
-          backgroundColor: null,
-          ignoreElements: (element) => element.hasAttribute?.("data-report-control"),
-        });
-        capturedImage = canvas.toDataURL("image/png", 0.94);
+      const capturedImage = type === "CHART" || captureId
+        ? await captureReportSection(section, event.currentTarget)
+        : undefined;
+      if (type === "CHART" && !capturedImage) {
+        setStatusMessage(`Não foi possível capturar “${title}”. Aguarde o gráfico carregar e tente novamente.`);
+        return;
       }
+      addReportItem({ ...section, capturedImage, restoredWithoutImage: false });
     } catch {
-      // Dados estruturados continuam disponíveis se a captura visual falhar.
+      setStatusMessage(`Falha ao capturar “${title}”. Tente novamente quando o gráfico estiver visível.`);
+    } finally {
+      setIsPreparing(false);
     }
-
-    addReportItem({ ...section, capturedImage });
-    setIsPreparing(false);
   };
 
   return (
