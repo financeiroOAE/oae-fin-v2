@@ -1,3 +1,4 @@
+import { applyValidFilterDate } from '@/lib/dateRange';
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -654,11 +655,11 @@ export default function VisaoFinanceira() {
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Data Inicial</label>
-            <input type="date" value={filterDataInicial} onChange={(e) => setFilterDataInicial(e.target.value)} style={{ width: '100%', height: '34px', fontSize: '13px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', padding: '0 0.5rem' }} />
+            <input type="date" value={filterDataInicial} onChange={e=>applyValidFilterDate(e.target.value, setFilterDataInicial)} style={{ width: '100%', height: '34px', fontSize: '13px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Data Final</label>
-            <input type="date" value={filterDataFinal} onChange={(e) => setFilterDataFinal(e.target.value)} style={{ width: '100%', height: '34px', fontSize: '13px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', padding: '0 0.5rem' }} />
+            <input type="date" value={filterDataFinal} onChange={e=>applyValidFilterDate(e.target.value, setFilterDataFinal)} style={{ width: '100%', height: '34px', fontSize: '13px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '6px', padding: '0 0.5rem' }} />
           </div>
           <div style={{ flex: '2 1 220px', minWidth: 0 }}>
             <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><Building2 size={12}/> Projeto / Obra</label>
