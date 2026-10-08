@@ -73,10 +73,13 @@ export default function Sidebar() {
 
   if (pathname === '/login') return null;
 
-  const restrictedManagementMenus = ['equipe_gestao', 'administrativo'];
-  const canAccess = (permission) => restrictedManagementMenus.includes(permission)
-    ? Boolean(sessionUser && (sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission)))
-    : !sessionUser || sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission);
+  const restrictedManagementMenus = ['equipe_gestao', 'administrativo_geral', 'administrativo_diretoria'];
+  const canAccess = (permission) => {
+    if (!permission) return false;
+    return restrictedManagementMenus.includes(permission)
+      ? Boolean(sessionUser && (sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission)))
+      : !sessionUser || sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission);
+  };
   const isSettingsPath = ['/configuracoes', '/atualizacao-dados', '/historico'].some((path) => pathname.startsWith(path));
   const isAdministrativePath = pathname.startsWith('/administrativo');
   const showSettingsChildren = settingsOpen || isSettingsPath;
@@ -88,10 +91,10 @@ export default function Sidebar() {
     { name: 'Projetos', path: '/projetos', icon: FolderKanban, permission: 'projetos' },
     { name: 'Equipe', path: '/equipe', icon: UsersRound, permission: 'equipe_gestao' },
     {
-      name: 'Administrativo', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo',
+      name: 'Administrativo', path: '/administrativo', icon: UserRoundCheck, permission: null,
       children: [
-        { name: 'Visão Geral', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo' },
-        { name: 'Diretora', path: '/administrativo/socios', icon: UsersRound, permission: 'administrativo', subtle: true },
+        { name: 'Visão Geral', path: '/administrativo', icon: UserRoundCheck, permission: 'administrativo_geral' },
+        { name: 'Diretoria', path: '/administrativo/socios', icon: UsersRound, permission: 'administrativo_diretoria', subtle: true },
       ],
     },
     { name: 'DRE Gerencial', path: '/dre', icon: ChartColumn, permission: 'dre' },
