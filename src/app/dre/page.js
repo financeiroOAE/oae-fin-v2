@@ -1,3 +1,4 @@
+import { applyValidFilterDate } from '@/lib/dateRange';
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -910,11 +911,11 @@ export default function Dre() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem", minWidth: "140px" }}>
             <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>Data Inicial</label>
-            <input type="date" value={effectiveDataInicial} onChange={e => setFilterDataInicial(e.target.value)} style={{ height: "38px", padding: "0 0.75rem", background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-main)", fontSize: "13px", opacity: 1 }} />
+            <input type="date" value={effectiveDataInicial} onChange={e=>applyValidFilterDate(e.target.value, setFilterDataInicial)} style={{ height: "38px", padding: "0 0.75rem", background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-main)", fontSize: "13px", opacity: 1 }} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem", minWidth: "140px" }}>
             <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>Data Final</label>
-            <input type="date" value={effectiveDataFinal} onChange={e => setFilterDataFinal(e.target.value)} style={{ height: "38px", padding: "0 0.75rem", background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-main)", fontSize: "13px", opacity: 1 }} />
+            <input type="date" value={effectiveDataFinal} onChange={e=>applyValidFilterDate(e.target.value, setFilterDataFinal)} style={{ height: "38px", padding: "0 0.75rem", background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: "6px", color: "var(--text-main)", fontSize: "13px", opacity: 1 }} />
           </div>
           <div style={{ flex: "1 1 200px", display: "flex", flexDirection: "column", gap: "0.375rem" }}>
             <label style={{ fontSize: "11px", fontWeight: "600", color: "var(--text-secondary)", textTransform: "uppercase" }}>Projeto / Obra</label>
