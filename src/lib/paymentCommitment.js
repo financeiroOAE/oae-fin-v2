@@ -63,5 +63,5 @@ export function isDocumentedPayableNext30Days(row, today = new Date()) {
 
 export function paymentStatusForReport(row) {
   const status = row?.['Situação'] ?? row?.Situacao ?? row?.statusExibicao ?? row?.status ?? '';
-  return isDocumentedPayableNext30Days(row) ? 'A pagar · vence em até 30 dias' : status;
+  return status;
 }

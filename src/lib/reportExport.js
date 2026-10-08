@@ -300,7 +300,7 @@ export async function exportReportToPdf(items, config) {
         addPage();
         drawTableHeader();
       }
-      const priority = isDocumentedPayableNext30Days(row) || /VENCE EM AT[EÉ] 30 DIAS/i.test(String(row?.['Situação'] ?? ''));
+      const priority = isPriorityExportRow(row);
       if (priority) {
         pdf.setFillColor(225, 242, 251);
         pdf.rect(margin, y, contentWidth, rowHeight, 'F');
@@ -422,8 +422,7 @@ function createWorksheet(XLSX, item, rows) {
 }
 
 
-const isPriorityExportRow = (row) => isDocumentedPayableNext30Days(row)
-  || /VENCE EM AT[EÉ] 30 DIAS/i.test(String(row?.['Situação'] ?? row?.Situacao ?? ''));
+export const isPriorityExportRow = (row) => isDocumentedPayableNext30Days(row);
 
 // SheetJS Community não grava a cor de fundo das células. Aplicamos o estilo
 // ao pacote XLSX já gerado, sem modificar valores ou fórmulas da planilha.

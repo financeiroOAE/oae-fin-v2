@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { formatReportValue, getReportCellValue, getReportColumns, getReportRows, inferReportFormat } from "@/lib/reportExport";
+import { formatReportValue, getReportCellValue, getReportColumns, getReportRows, inferReportFormat, isPriorityExportRow } from "@/lib/reportExport";
 
 function ReportTable({ item, rows, title }) {
   const columns = getReportColumns(item, rows);
@@ -20,10 +20,14 @@ function ReportTable({ item, rows, title }) {
         </thead>
         <tbody>
           {rows.map((row, rowIndex) => (
-            <tr key={`${item.id}-row-${rowIndex}`}>
+            <tr key={`${item.id}-row-${rowIndex}`} className={isPriorityExportRow(row) ? "is-payment-due-soon" : undefined}>
               {columns.map((column) => {
                 const format = inferReportFormat(column.key, column.format || item.columnFormats?.[column.key]);
-                return <td key={column.key} className={format === "currency" || format === "percent" ? "is-number" : ""}>{formatReportValue(getReportCellValue(row, column), format)}</td>;
+                const priority = isPriorityExportRow(row);
+                const classes = [
+                  format === "currency" || format === "percent" ? "is-number" : "",
+                ].filter(Boolean).join(" ");
+                return <td key={column.key} className={classes}>{formatReportValue(getReportCellValue(row, column), format)}</td>;
               })}
             </tr>
           ))}
