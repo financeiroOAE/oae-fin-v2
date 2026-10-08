@@ -24,10 +24,8 @@ function ReportTable({ item, rows, title }) {
               {columns.map((column) => {
                 const format = inferReportFormat(column.key, column.format || item.columnFormats?.[column.key]);
                 const priority = isPriorityExportRow(row);
-                const isStatus = /situa[cç][aã]o|status/i.test(String(column.label || column.key));
                 const classes = [
                   format === "currency" || format === "percent" ? "is-number" : "",
-                  priority && isStatus ? "is-payment-due-status" : "",
                 ].filter(Boolean).join(" ");
                 return <td key={column.key} className={classes}>{formatReportValue(getReportCellValue(row, column), format)}</td>;
               })}
