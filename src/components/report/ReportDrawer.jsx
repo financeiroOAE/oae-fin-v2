@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { useReport } from "@/contexts/ReportContext";
 import ReportPreview from "./ReportPreview";
+import { captureReportSection } from "@/lib/reportCapture";
 import { estimateReportPages, exportReportToExcel, exportReportToPdf, reportNeedsLandscape } from "@/lib/reportExport";
 import {
   ArrowDown,
@@ -54,6 +55,7 @@ export default function ReportDrawer() {
   const [isExporting, setIsExporting] = useState("");
   const [preparingSection, setPreparingSection] = useState("");
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [previewItems, setPreviewItems] = useState(null);
 
   const pageItems = useMemo(
     () => reportItems.filter((item) => {
@@ -86,11 +88,40 @@ export default function ReportDrawer() {
     });
   };
 
+  const refreshChartCaptures = async () => {
+    const ready = [];
+    for (const item of pageItems) {
+      if (item.type !== "CHART") {
+        ready.push(item);
+        continue;
+      }
+      // Recria a imagem com os filtros atuais, inclusive apos restaurar itens salvos.
+      const image = await captureReportSection(item);
+      if (!image) throw new Error(`O gráfico “${item.title}” não está disponível para captura. Abra a página correspondente e aguarde carregar.`);
+      ready.push({ ...item, capturedImage: image, restoredWithoutImage: false });
+    }
+    return ready;
+  };
+
+  const openPreview = async () => {
+    setIsExporting("preview");
+    try {
+      const ready = await refreshChartCaptures();
+      setPreviewItems(ready);
+      setIsPreviewOpen(true);
+      setStatusMessage("");
+    } catch (error) {
+      setStatusMessage(error.message);
+    } finally {
+      setIsExporting("");
+    }
+  };
+
   const runExport = async (kind) => {
     setIsExporting(kind);
     setStatusMessage(kind === "pdf" ? "Gerando PDF..." : "Gerando Excel...");
     try {
-      if (kind === "pdf") await exportReportToPdf(pageItems, reportConfig);
+      if (kind === "pdf") await exportReportToPdf(await refreshChartCaptures(), reportConfig);
       else await exportReportToExcel(pageItems, reportConfig);
       setStatusMessage(kind === "pdf" ? "PDF gerado com sucesso." : "Excel gerado com sucesso.");
     } catch {
@@ -103,25 +134,18 @@ export default function ReportDrawer() {
   const addAvailableSection = async (section) => {
     if (pageItems.some((item) => item.sectionKey === section.sectionKey)) return;
     setPreparingSection(section.sectionKey);
-    let capturedImage;
     try {
-      const target = section.captureId ? document.getElementById(section.captureId) : null;
-      if (target && section.type === "CHART") {
-        const html2canvas = (await import("html2canvas")).default;
-        const canvas = await html2canvas(target, {
-          scale: Math.min(window.devicePixelRatio || 1, 1.75),
-          useCORS: true,
-          logging: false,
-          backgroundColor: null,
-          ignoreElements: (element) => element.hasAttribute?.("data-report-control"),
-        });
-        capturedImage = canvas.toDataURL("image/png", 0.94);
+      const capturedImage = section.type === "CHART" ? await captureReportSection(section) : undefined;
+      if (section.type === "CHART" && !capturedImage) {
+        setStatusMessage(`Não foi possível capturar “${section.title}”. Aguarde carregar o gráfico.`);
+        return;
       }
+      addReportItem({ ...section, capturedImage, restoredWithoutImage: false });
     } catch {
-      // A tabela de dados continua disponível caso a captura do gráfico falhe.
+      setStatusMessage(`Falha ao capturar “${section.title}”.`);
+    } finally {
+      setPreparingSection("");
     }
-    addReportItem({ ...section, capturedImage });
-    setPreparingSection("");
   };
 
   return (
@@ -250,7 +274,7 @@ export default function ReportDrawer() {
             <button type="button" onClick={exitReportMode}>Sair do relatório</button>
           </div>
           {statusMessage && <p className="report-status" role="status">{statusMessage}</p>}
-          <button type="button" className="report-preview-button" disabled={pageItems.length === 0} onClick={() => setIsPreviewOpen(true)}><Eye size={17} /> Visualizar prévia A4</button>
+          <button type="button" className="report-preview-button" disabled={pageItems.length === 0 || Boolean(isExporting)} onClick={openPreview}><Eye size={17} /> Visualizar prévia A4</button>
           <div className="report-export-actions">
             <button type="button" disabled={pageItems.length === 0 || Boolean(isExporting)} onClick={() => runExport("pdf")}>
               {isExporting === "pdf" ? <LoaderCircle size={17} className="report-spin" /> : <FileDown size={17} />} PDF
@@ -277,7 +301,7 @@ export default function ReportDrawer() {
               <button type="button" onClick={() => setIsPreviewOpen(false)}><X size={18} /> Fechar</button>
             </div>
           </header>
-          <main><ReportPreview items={pageItems} config={reportConfig} /></main>
+          <main><ReportPreview items={previewItems || pageItems} config={reportConfig} /></main>
         </div>
       )}
     </>
