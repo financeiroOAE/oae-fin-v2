@@ -513,18 +513,18 @@ function stylePriorityExcelRows(xlsxBytes, prioritySheets) {
   };
 
   const fillBase = appendStyles(fillsMatch, 'fills', [
-    '<fill><patternFill patternType="solid"><fgColor rgb="FF143456"/><bgColor indexed="64"/></patternFill></fill>',
-    '<fill><patternFill patternType="solid"><fgColor rgb="FFF0F5FA"/><bgColor indexed="64"/></patternFill></fill>',
-    '<fill><patternFill patternType="solid"><fgColor rgb="FFE0F2FE"/><bgColor indexed="64"/></patternFill></fill>',
-    '<fill><patternFill patternType="solid"><fgColor rgb="FFE8F1F9"/><bgColor indexed="64"/></patternFill></fill>'
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF245A89"/><bgColor indexed="64"/></patternFill></fill>',
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFF4F7FA"/><bgColor indexed="64"/></patternFill></fill>',
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFE0EDF8"/><bgColor indexed="64"/></patternFill></fill>',
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFEAF1F9"/><bgColor indexed="64"/></patternFill></fill>'
   ]);
   const fontBase = appendStyles(fontsMatch, 'fonts', [
     '<font><sz val="10"/><name val="Aptos"/><b/><color rgb="FFFFFFFF"/></font>',
-    '<font><sz val="10"/><name val="Aptos"/><color rgb="FF233952"/></font>',
+    '<font><sz val="10"/><name val="Aptos"/><color rgb="FF142B45"/></font>',
     '<font><sz val="11"/><name val="Aptos Display"/><b/><color rgb="FFFFFFFF"/></font>'
   ]);
   const borderBase = appendStyles(bordersMatch, 'borders', [
-    '<border><left style="thin"><color rgb="FFD6E0EA"/></left><right style="thin"><color rgb="FFD6E0EA"/></right><top style="thin"><color rgb="FFD6E0EA"/></top><bottom style="thin"><color rgb="FFD6E0EA"/></bottom><diagonal/></border>'
+    '<border><left style="thin"><color rgb="FFD9E2EC"/></left><right style="thin"><color rgb="FFD9E2EC"/></right><top style="thin"><color rgb="FFD9E2EC"/></top><bottom style="thin"><color rgb="FFD9E2EC"/></bottom><diagonal/></border>'
   ]);
 
   const xfs = [...xfsMatch[0].matchAll(/<xf\b[^>]*\/>/g)].map(match => match[0]);
