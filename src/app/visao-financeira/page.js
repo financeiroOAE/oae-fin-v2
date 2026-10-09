@@ -1,5 +1,6 @@
 "use client";
 import { applyValidFilterDate } from '@/lib/dateRange';
+import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
 
 import { useState, useEffect, useMemo } from "react";
 import { RefreshCw, AlertCircle, TrendingUp, TrendingDown, LayoutDashboard, Calendar, DollarSign, Database, ChevronLeft, ChevronRight, Building2, Activity, FilterX, Landmark, FileText, CheckCircle, Target, ArrowDownCircle, ArrowUpCircle, ArrowDown, ArrowUp, X } from "lucide-react";
@@ -104,6 +105,8 @@ export default function VisaoFinanceira() {
       setIsSyncing(false);
     }
   };
+
+  useFinancialSnapshotUpdate(() => fetchDados(false, false, false));
 
   useEffect(() => {
     const timeoutId = setTimeout(() => fetchDados(false, false, false), 0);
