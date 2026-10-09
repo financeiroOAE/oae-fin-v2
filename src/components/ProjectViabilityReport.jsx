@@ -60,7 +60,7 @@ const costCategory = (item) => {
   if (/\b(ISS|INSS|PIS|COFINS|CSLL|IRRF|IMPOST|TRIBUTO|RETENCAO|RETENCOES)\b/.test(text)) {
     return "Tributos e retenções";
   }
-  if (/(ADMINISTRA|RATEIO|C\.D\.A|CUSTO ADMIN)/.test(text)) return "Administração / rateio";
+  if (/(ADMINISTRA|RATEIO|C\.D\.A|CUSTO ADMIN)/.test(text)) return "Custos administrativos";
   if (/(FORNECEDOR|SERVICO|MATERIAL|DESLOCAMENTO|VIAGEM|HOSPEDAGEM|ALIMENTACAO)/.test(text)) {
     return "Custos diretos diversos";
   }
@@ -341,6 +341,7 @@ export default function ProjectViabilityReport({
               <div>
                 <div className={styles.sectionHeading}><div><span>02</span><h2>Composição dos custos</h2></div><p>Pagos e compromissos conhecidos.</p></div>
                 <CostTable rows={analysis.costRows} total={analysis.knownCost} />
+                <p className={styles.costNote}>Custos administrativos: saídas classificadas por conta ou plano financeiro como administração ou rateio. Não representam automaticamente o rateio de receita do faturamento.</p>
               </div>
               <div>
                 <div className={styles.sectionHeading}><div><span>03</span><h2>Pontos de atenção</h2></div><p>Itens que podem alterar o parecer.</p></div>
@@ -355,24 +356,54 @@ export default function ProjectViabilityReport({
             <section className={styles.section}>
               <div className={styles.sectionHeading}>
                 <div><span>04</span><h2>Evolução do caixa realizado</h2></div>
-                <p>Receitas e custos efetivamente realizados por mês.</p>
+                <p>Recebimentos e pagamentos por mês, com resultado e margem.</p>
               </div>
               {analysis.monthRows.length ? (
-                <div className={styles.timeline}>
-                  {analysis.monthRows.map((row) => (
-                    <div className={styles.month} key={row.key}>
-                      <div className={styles.monthValues}><span>{currency(row.received)}</span><span>{currency(row.paid)}</span></div>
-                      <div className={styles.monthBars}>
-                        <i className={styles.monthRevenue} style={{ height: `${Math.max((row.received / analysis.maxMonthly) * 100, row.received ? 3 : 0)}%` }} />
-                        <i className={styles.monthCost} style={{ height: `${Math.max((row.paid / analysis.maxMonthly) * 100, row.paid ? 3 : 0)}%` }} />
-                      </div>
-                      <strong>{new Intl.DateTimeFormat("pt-BR", { month: "short", year: "2-digit" }).format(row.date).replace(" de ", "/")}</strong>
-                      <small>{row.received > 0 ? `${share(row.received - row.paid, row.received)} margem` : "—"}</small>
+                <div className={styles.cashEvolution}>
+                  <div className={styles.cashOverview}>
+                    <div><span>Recebimentos no histórico</span><strong>{currency(analysis.monthRows.reduce((sum, row) => sum + row.received, 0))}</strong></div>
+                    <div><span>Pagamentos no histórico</span><strong>{currency(analysis.monthRows.reduce((sum, row) => sum + row.paid, 0))}</strong></div>
+                    <div><span>Resultado acumulado</span><strong>{currency(analysis.monthRows.reduce((sum, row) => sum + row.received - row.paid, 0))}</strong></div>
+                    <div><span>Margem acumulada</span><strong>{share(
+                      analysis.monthRows.reduce((sum, row) => sum + row.received - row.paid, 0),
+                      analysis.monthRows.reduce((sum, row) => sum + row.received, 0)
+                    )}</strong></div>
+                  </div>
+                  <div className={styles.cashTable} role="table" aria-label="Evolução financeira mensal do projeto">
+                    <div className={[styles.cashRow, styles.cashHeader].join(" ")} role="row">
+                      <span role="columnheader">Mês</span>
+                      <span role="columnheader">Comparativo do caixa</span>
+                      <span role="columnheader">Recebido</span>
+                      <span role="columnheader">Pago</span>
+                      <span role="columnheader">Resultado</span>
+                      <span role="columnheader">Margem</span>
                     </div>
-                  ))}
+                    {analysis.monthRows.map((row) => {
+                      const result = row.received - row.paid;
+                      const marginLabel = row.received > 0 ? percentage(result / row.received) : "—";
+                      const monthLabel = new Intl.DateTimeFormat("pt-BR", { month: "short", year: "numeric" })
+                        .format(row.date).replace(" de ", "/").replace(".", "");
+                      return (
+                        <div className={[styles.cashRow, "project-viability-month-row"].join(" ")} role="row" key={row.key}>
+                          <strong className={styles.cashMonth} role="cell">{monthLabel}</strong>
+                          <div className={styles.cashTracks} role="cell" aria-label={"Recebido " + currency(row.received) + "; pago " + currency(row.paid)}>
+                            <div className={styles.cashTrack}><i className={styles.cashBarRevenue} style={{ width: String(Math.max(0, Math.min(100, (row.received / analysis.maxMonthly) * 100))) + "%" }} /></div>
+                            <div className={styles.cashTrack}><i className={styles.cashBarCost} style={{ width: String(Math.max(0, Math.min(100, (row.paid / analysis.maxMonthly) * 100))) + "%" }} /></div>
+                          </div>
+                          <span className={styles.cashAmount} role="cell">{currency(row.received)}</span>
+                          <span className={styles.cashAmount} role="cell">{currency(row.paid)}</span>
+                          <strong className={[styles.cashResult, result < 0 ? styles.cashNegative : ""].join(" ")} role="cell">{currency(result)}</strong>
+                          <span className={[styles.cashMargin, result < 0 ? styles.cashNegative : ""].join(" ")} role="cell">{marginLabel}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className={styles.cashFoot}>
+                    <div className={styles.cashLegend}><span><i className={styles.cashBarRevenue} />Receita recebida</span><span><i className={styles.cashBarCost} />Custos pagos</span></div>
+                    <p>Barras na mesma escala para todos os meses. Margem = resultado ÷ receita recebida; sem recebimento, não se aplica.</p>
+                  </div>
                 </div>
-              ) : <div className={styles.emptyState}>Não há movimentações realizadas com data válida no período selecionado.</div>}
-              <div className={styles.chartLegend}><span><i className={styles.dotReceived} />Receita recebida</span><span><i className={styles.dotCost} />Custos pagos</span></div>
+              ) : <div className={styles.emptyState}>Não há movimentações realizadas com data válida na base do projeto.</div>}
             </section>
           </div>
 
