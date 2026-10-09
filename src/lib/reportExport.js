@@ -227,18 +227,40 @@ export async function exportReportToPdf(items, config) {
     if (y + height > maxY) addPage();
   };
 
+  // Hierarquia padrão para todas as seções exportadas:
+  // título 10,5 pt em negrito; explicação 7,5 pt regular.
+  // Calcular as quebras com a fonte correta evita subtítulos enormes
+  // e mantém título + subtítulo juntos na mesma página.
   const drawSectionTitle = (item) => {
-    ensureSpace(18);
+    const title = String(item.title || "Seção");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10.5);
+    const titleLines = pdf.splitTextToSize(title, contentWidth);
+    const explanation = config.includeExplanations ? String(item.explanation || "").trim() : "";
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7.5);
+    const explanationLines = explanation ? pdf.splitTextToSize(explanation, contentWidth) : [];
+    const titleLineHeight = 4.2;
+    const explanationLineHeight = 3.4;
+    const sectionHeight = titleLines.length * titleLineHeight
+      + (explanationLines.length ? 2 + explanationLines.length * explanationLineHeight : 0)
+      + 4;
+    ensureSpace(sectionHeight);
+
     pdf.setTextColor(30, 58, 138);
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
-    pdf.text(item.title, margin, y);
-    y += 4;
-    if (config.includeExplanations && item.explanation) {
-      const explanationLines = pdf.splitTextToSize(item.explanation, contentWidth);
+    pdf.setFontSize(10.5);
+    pdf.text(titleLines, margin, y);
+    y += titleLines.length * titleLineHeight;
+    if (explanationLines.length) {
+      y += 1.5;
       pdf.setTextColor(71, 85, 105);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7.5);
       pdf.text(explanationLines, margin, y);
-      y += explanationLines.length * 3.2 + 2;
+      y += explanationLines.length * explanationLineHeight + 1.5;
+    } else {
+      y += 2;
     }
   };
 
