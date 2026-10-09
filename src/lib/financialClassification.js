@@ -117,7 +117,7 @@ export function isCapitalEntry(item) {
 export function isPartnerWithdrawal(item) {
   const code = normalizeAccountCode(item);
   const text = accountText(item);
-  return code === '2050101' || /\bRETIRAD(?:A|AS)\b.*\bSOCIOS?\b/.test(text);
+  return code === '2010522' || code === '2050101' || /\bRETIRAD(?:A|AS)\b.*\bSOCIOS?\b/.test(text);
 }
 
 export function isTeamExpense(item) {

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { hasMenuAccess, requireAnyMenuAccess } from '@/lib/authorization';
 import { readCurrentSnapshot } from '@/lib/financialSync';
 import { cpRows, monthOf, revenueTitles } from '@/lib/managementSources';
+import { isPartnerWithdrawal } from '@/lib/financialClassification';
+import { reconcilePartnerWithdrawals, partnerIdForRow } from '@/lib/partnerWithdrawals';
 
 const YEAR = '2026';
 const fail = (error, status = 400) => NextResponse.json({ error }, { status });
@@ -15,7 +17,7 @@ function norm(value) {
 
 function isPartner(row) {
   const name = norm(row.nome);
-  return name.includes('FRANCIELLE PAIVA') || name.includes('PAULO HENRIQUE');
+  return Boolean(partnerIdForRow(row));
 }
 function rosterAliases(value) {
   const raw = norm(value).replace(/^\d{2}[.\s]?\d{3}[.\s]?\d{3}\s+/, '').trim();
@@ -48,7 +50,7 @@ function isExcludedAdminEntity(name) {
 function adminType(row) {
   const code = String(row.contaCodigo || '').replace(/\D/g, '');
   const account = norm(row.contaNome);
-  if (isPartner(row) && (code === '2010522' || account.includes('RETIRAD') && account.includes('SOCIO'))) return 'RETIRADA';
+  if (isPartner(row) && isPartnerWithdrawal(row)) return 'RETIRADA';
   if (isPartner(row) && (code === '2010302' || account.includes('EQUIP') && account.includes('ADM'))) return 'EQUIPE_ADM_SOCIO';
   if (isPartner(row)) return 'OUTRO_PAGAMENTO_SOCIO';
   if (code === '2010302' || account.includes('EQUIP') && account.includes('ADM')) return 'EQUIPE_ADM';
@@ -65,6 +67,7 @@ export async function GET() {
 
   const roster = snapshot?.payload?.equipe || [];
   const allCp2026 = cpRows(snapshot).filter((row) => monthOf(row.data)?.startsWith(YEAR));
+  const partnerWithdrawalReconciliation = reconcilePartnerWithdrawals(allCp2026);
 
   const expenses = allCp2026
     .filter((row) => norm(row.projeto) === 'ADMINISTRACAO')
@@ -86,7 +89,7 @@ export async function GET() {
     .filter((row) => isPartner(row))
     .filter((row) => {
       const code = String(row.contaCodigo || '').replace(/\D/g, '');
-      return code === '2010302' || code === '2010522';
+      return code === '2010302' || isPartnerWithdrawal(row);
     })
     .map((row) => ({ ...row, type: adminType(row), adminTeamEntity: true }));
 
@@ -119,12 +122,13 @@ export async function GET() {
     expenses: canViewGeneral ? expenses : [],
     adminTeamRows: canViewGeneral ? adminTeamRows : [],
     partnerRows: canViewDiretoria ? partnerRows : [],
+    partnerWithdrawalReconciliation: canViewDiretoria ? partnerWithdrawalReconciliation : null,
     monthly: canViewGeneral ? monthly : [],
     snapshotAt: snapshot?.updatedAt || null,
     rules: {
       revenueAdministrative: '20% da coluna K para receitas de projeto; receitas avulsas sem projeto e com centro de custo ADMINISTRAÇÃO entram 100% no Administrativo',
       expenseScope: 'Centro de custo ADMINISTRAÇÃO',
-      partnerScope: 'Francielle/Paulo: todos os lançamentos de 2026 no CP_GERAL, classificados em Equipe ADM, Retirada e Outros pagamentos',
+      partnerScope: 'Retiradas: todos os lançamentos da conta 2010522 no CP_GERAL em 2026, discriminando favorecidos identificados e não atribuídos; Equipe ADM separada',
     },
   }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
