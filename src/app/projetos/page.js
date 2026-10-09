@@ -274,6 +274,8 @@ export default function Projetos() {
   // Drawer e Toggle
   const [selectedProject, setSelectedProject] = useState(null);
   const [isViabilityReportOpen, setIsViabilityReportOpen] = useState(false);
+  const [isViabilityPickerOpen, setIsViabilityPickerOpen] = useState(false);
+  const [viabilityProjectKey, setViabilityProjectKey] = useState("");
   const [canIssueViabilityReport, setCanIssueViabilityReport] = useState(false);
   const [incluirRateioAdm, setIncluirRateioAdm] = useState(true);
 
@@ -1143,13 +1145,14 @@ export default function Projetos() {
   // A viabilidade sempre usa a vida financeira completa do projeto. Os filtros
   // temporais da tela continuam valendo para o drawer e para o extrato comum,
   // mas não podem esconder custos futuros ou recebimentos históricos do parecer.
+  const viabilitySelection = useMemo(() => projetosCruzados.find((project) => project.projectKey === viabilityProjectKey) || null, [projetosCruzados, viabilityProjectKey]);
   const selectedProjectViability = useMemo(() => {
-    if (!selectedProject) return { project: null, movements: [] };
+    if (!viabilitySelection) return { project: null, movements: [] };
     const movements = baseData.filter((item) => {
       const itemProjectKey = item.natureza === 'Entrada' && isProjectRelatedRevenueEntry(item)
         ? getFinancialRevenueProjectIdentity(item).projectKey
         : getProjectKey(item.projeto);
-      return itemProjectKey === selectedProject.projectKey;
+      return itemProjectKey === viabilitySelection.projectKey;
     });
 
     const totals = movements.reduce((acc, item) => {
@@ -1174,12 +1177,12 @@ export default function Projetos() {
     return {
       movements,
       project: {
-        ...selectedProject,
+        ...viabilitySelection,
         ...totals,
         resultadoCaixa: totals.recebido - totals.pago,
       },
     };
-  }, [selectedProject, baseData]);
+  }, [viabilitySelection, baseData]);
 
   const projectReportFileName = useCallback(() => {
     const base = String(selectedProject?.nome || 'projeto')
@@ -1365,7 +1368,12 @@ export default function Projetos() {
           <h1 style={{ fontSize: '26px', fontWeight: '600', marginBottom: '0.25rem', color: 'var(--text-main)', letterSpacing: '-0.5px' }}>Projetos</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Acompanhamento executivo da carteira de obras</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {canIssueViabilityReport && (
+            <button type="button" onClick={() => { setViabilityProjectKey(""); setIsViabilityPickerOpen(true); }} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
+              <Activity size={15} /> Análise de viabilidade
+            </button>
+          )}
           <button onClick={() => isReportMode ? exitReportMode() : openReportBuilder('Projetos')} className={`btn ${isReportMode ? 'btn-primary' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px', background: isReportMode ? 'var(--primary)' : 'var(--bg-elevated)', color: isReportMode ? '#fff' : 'var(--text-main)', border: '1px solid var(--border-color)' }}>
             <FileText size={14} /> {isReportMode ? 'Sair do Modo Relatório' : 'Gerar Relatório'}
           </button>
@@ -1983,11 +1991,6 @@ export default function Projetos() {
                 <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--primary)' }}>{selectedProject.nome}</h2>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                {canIssueViabilityReport && (
-                  <button onClick={() => setIsViabilityReportOpen(true)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', borderRadius: '6px', whiteSpace: 'nowrap' }}>
-                    <Activity size={14} /> Análise de viabilidade
-                  </button>
-                )}
                 <button onClick={() => isReportMode ? exitReportMode() : openReportBuilder('Projetos')} className={`btn ${isReportMode ? 'btn-primary' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: isReportMode ? 'var(--primary)' : 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: isReportMode ? '#fff' : 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                   <FileText size={14} /> {isReportMode ? 'Sair do Modo Relatório' : 'Gerar Relatório'}
                 </button>
@@ -2106,7 +2109,27 @@ export default function Projetos() {
         </div>
       )}
 
-      {selectedProject && canIssueViabilityReport && isViabilityReportOpen && (
+      {canIssueViabilityReport && isViabilityPickerOpen && (
+        <div role="dialog" aria-modal="true" aria-label="Selecionar projeto para análise de viabilidade" style={{ position: 'fixed', inset: 0, zIndex: 11990, background: 'rgba(3,15,30,0.75)', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div className="card" style={{ width: 'min(560px, 100%)', padding: '1.5rem', display: 'grid', gap: '1rem', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 12 }}>
+              <div><h2 style={{ margin: 0, fontSize: 19, color: 'var(--text-main)' }}>Análise de viabilidade</h2><p style={{ marginTop: 6, color: 'var(--text-secondary)', fontSize: 12 }}>Selecione o projeto para emitir sua análise financeira completa.</p></div>
+              <button type="button" aria-label="Fechar" className="btn" onClick={() => setIsViabilityPickerOpen(false)}><X size={18} /></button>
+            </div>
+            <label htmlFor="viability-project-select" style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Projeto / Obra</label>
+            <select id="viability-project-select" value={viabilityProjectKey} onChange={(event) => setViabilityProjectKey(event.target.value)} style={{ width: '100%', minHeight: 45, color: 'var(--text-main)', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 6, padding: '0 12px', fontSize: 13 }}>
+              <option value="">Selecione um projeto</option>
+              {[...projetosCruzados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((project) => <option key={project.projectKey} value={project.projectKey}>{project.nome} · {project.empresa}</option>)}
+            </select>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button type="button" className="btn" onClick={() => setIsViabilityPickerOpen(false)}>Cancelar</button>
+              <button type="button" className="btn btn-primary" disabled={!viabilitySelection} onClick={() => { setIsViabilityPickerOpen(false); setIsViabilityReportOpen(true); }} style={{ opacity: viabilitySelection ? 1 : 0.5 }}>Visualizar análise</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viabilitySelection && canIssueViabilityReport && isViabilityReportOpen && (
         <ProjectViabilityReport
           project={selectedProjectViability.project}
           movements={selectedProjectViability.movements}
