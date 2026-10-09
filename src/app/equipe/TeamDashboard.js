@@ -1,5 +1,6 @@
 'use client';
 import { applyValidFilterDate } from '@/lib/dateRange';
+import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
 import { paymentStatusForReport } from '@/lib/paymentCommitment';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -520,6 +521,8 @@ export default function TeamDashboard(){
     setError('');
     return result;
   };
+
+  useFinancialSnapshotUpdate(reloadTeamData);
 
   useEffect(()=>{let active=true;requestJson('/api/equipe').then(result=>{if(active){setData(result);setError('')}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[]);
 
