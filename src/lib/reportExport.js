@@ -182,7 +182,7 @@ function truncateText(pdf, value, width) {
 export async function exportReportToPdf(items, config) {
   const { jsPDF } = await import("jspdf");
   const orientation = resolveOrientation(items, config.orientation);
-  const pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
+  const pdf = new jsPDF({ orientation, unit: "mm", format: "a4", compress: true });
   const margin = 12;
   const footerHeight = 10;
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -192,29 +192,35 @@ export async function exportReportToPdf(items, config) {
   const logo = await imageFromUrl("/logo.png");
   let y = margin;
 
+  // Cabeçalho editorial adotado da análise de viabilidade.
   const drawHeader = () => {
+    pdf.setFillColor("#245a89");
+    pdf.rect(0, 0, pageWidth, 4, "F");
+    const title = String(config.title || "Relatório Financeiro");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    const titleLines = pdf.splitTextToSize(title, contentWidth - 42);
+    const titleHeight = titleLines.length * 5.8;
+    pdf.setTextColor("#245a89");
+    pdf.setFontSize(8);
+    pdf.text("OAE_FIN  /  RELATÓRIO EXECUTIVO", margin, y + 4);
+    pdf.setTextColor("#142b45");
+    pdf.setFontSize(16);
+    pdf.text(titleLines, margin, y + 13);
     if (logo) {
       const ratio = logo.naturalWidth / Math.max(logo.naturalHeight, 1);
-      pdf.addImage(logo, "PNG", margin, y, Math.min(28, 10 * ratio), 10);
-    } else {
-      pdf.setTextColor(30, 58, 138);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(15);
-      pdf.text("OAE_FIN", margin, y + 7);
+      const logoWidth = Math.min(28, 10 * ratio);
+      pdf.addImage(logo, "PNG", pageWidth - margin - logoWidth, y + 2, logoWidth, 10);
     }
-    pdf.setTextColor(30, 41, 59);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(12);
-    pdf.text(config.title || "Relatório Financeiro", pageWidth - margin, y + 4, { align: "right" });
-    pdf.setTextColor(100, 116, 139);
     pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(7.5);
-    pdf.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, pageWidth - margin, y + 9, { align: "right" });
-    y += 15;
-    pdf.setDrawColor(30, 58, 138);
-    pdf.setLineWidth(0.6);
+    pdf.setFontSize(8);
+    pdf.setTextColor("#52647a");
+    pdf.text("Emitido em " + new Date().toLocaleString("pt-BR"), margin, y + 15 + titleHeight);
+    y += 20 + titleHeight;
+    pdf.setDrawColor("#d9e2ec");
+    pdf.setLineWidth(0.3);
     pdf.line(margin, y, pageWidth - margin, y);
-    y += 7;
+    y += 8;
   };
 
   const addPage = () => {
@@ -231,11 +237,12 @@ export async function exportReportToPdf(items, config) {
   // título 10,5 pt em negrito; explicação 7,5 pt regular.
   // Calcular as quebras com a fonte correta evita subtítulos enormes
   // e mantém título + subtítulo juntos na mesma página.
+  let sectionIndex = 0;
   const drawSectionTitle = (item) => {
     const title = String(item.title || "Seção");
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(10.5);
-    const titleLines = pdf.splitTextToSize(title, contentWidth);
+    const titleLines = pdf.splitTextToSize(title, contentWidth - 14);
     const explanation = config.includeExplanations ? String(item.explanation || "").trim() : "";
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7.5);
@@ -247,14 +254,20 @@ export async function exportReportToPdf(items, config) {
       + 4;
     ensureSpace(sectionHeight);
 
-    pdf.setTextColor(30, 58, 138);
+    sectionIndex += 1;
+    pdf.setFillColor("#eaf1f9");
+    pdf.rect(margin, y - 3.4, 9, 8, "F");
+    pdf.setTextColor("#245a89");
     pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8.5);
+    pdf.text(String(sectionIndex).padStart(2, "0"), margin + 1.4, y + 1.5);
+    pdf.setTextColor("#142b45");
     pdf.setFontSize(10.5);
-    pdf.text(titleLines, margin, y);
+    pdf.text(titleLines, margin + 12, y);
     y += titleLines.length * titleLineHeight;
     if (explanationLines.length) {
       y += 1.5;
-      pdf.setTextColor(71, 85, 105);
+      pdf.setTextColor("#52647a");
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(7.5);
       pdf.text(explanationLines, margin, y);
@@ -268,7 +281,7 @@ export async function exportReportToPdf(items, config) {
     const rows = isMovementReport(item) ? sortMovementRowsByDate(sourceRows) : sourceRows;
     if (title) {
       ensureSpace(9);
-      pdf.setTextColor(51, 65, 85);
+      pdf.setTextColor("#142b45");
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(8);
       pdf.text(title, margin, y);
@@ -277,7 +290,7 @@ export async function exportReportToPdf(items, config) {
     const columns = getReportColumns(item, rows);
     if (columns.length === 0 || rows.length === 0) {
       ensureSpace(8);
-      pdf.setTextColor(100, 116, 139);
+      pdf.setTextColor("#52647a");
       pdf.setFont("helvetica", "italic");
       pdf.setFontSize(8);
       pdf.text("Nenhum dado encontrado para os filtros selecionados.", margin, y);
@@ -308,16 +321,16 @@ export async function exportReportToPdf(items, config) {
       const height = Math.max(minHeight, ...headerLines.map((lines) => lines.length * lineHeight + paddingY * 2));
       ensureSpace(height + minHeight);
       let x = margin;
-      pdf.setFillColor(226, 232, 240);
+      pdf.setFillColor("#eaf1f9");
       pdf.rect(margin, y, contentWidth, height, "F");
-      pdf.setTextColor(51, 65, 85);
+      pdf.setTextColor("#142b45");
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(fontSize);
       headerLines.forEach((lines, index) => {
         pdf.text(lines, x + 1.5, y + paddingY + lineHeight * 0.85);
         x += widths[index];
       });
-      pdf.setDrawColor(203, 213, 225);
+      pdf.setDrawColor("#d9e2ec");
       pdf.setLineWidth(0.14);
       let dividerX = margin;
       widths.slice(0, -1).forEach((width) => {
@@ -353,15 +366,15 @@ export async function exportReportToPdf(items, config) {
         drawTableHeader();
       }
       if (isPriorityExportRow(row)) {
-        pdf.setFillColor(225, 242, 251);
+        pdf.setFillColor("#e0edf8");
         pdf.rect(margin, y, contentWidth, finalHeight, 'F');
-        pdf.setFillColor(14, 165, 233);
+        pdf.setFillColor("#245a89");
         pdf.rect(margin, y, 0.85, finalHeight, 'F');
       } else if (rowIndex % 2 === 1) {
-        pdf.setFillColor(248, 250, 252);
+        pdf.setFillColor("#f4f7fa");
         pdf.rect(margin, y, contentWidth, finalHeight, "F");
       }
-      pdf.setTextColor(51, 65, 85);
+      pdf.setTextColor("#142b45");
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(fontSize);
       let x = margin;
@@ -370,7 +383,7 @@ export async function exportReportToPdf(items, config) {
         pdf.text(lines, textX, y + paddingY + lineHeight * 0.85, { align });
         x += widths[index];
       });
-      pdf.setDrawColor(203, 213, 225);
+      pdf.setDrawColor("#d9e2ec");
       pdf.setLineWidth(0.14);
       let dividerX = margin;
       widths.slice(0, -1).forEach((width) => {
@@ -412,12 +425,12 @@ export async function exportReportToPdf(items, config) {
   const totalPages = pdf.getNumberOfPages();
   for (let page = 1; page <= totalPages; page += 1) {
     pdf.setPage(page);
-    pdf.setDrawColor(226, 232, 240);
+    pdf.setDrawColor("#d9e2ec");
     pdf.line(margin, pageHeight - 11, pageWidth - margin, pageHeight - 11);
-    pdf.setTextColor(100, 116, 139);
+    pdf.setTextColor("#52647a");
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7);
-    pdf.text("OAE_FIN • Documento interno e confidencial", margin, pageHeight - 6);
+    pdf.text("OAE_FIN  ·  Documento interno e confidencial", margin, pageHeight - 6);
     pdf.text(`Página ${page} de ${totalPages}`, pageWidth - margin, pageHeight - 6, { align: "right" });
   }
 
