@@ -2130,9 +2130,9 @@ export default function Projetos() {
             />
             <div id="viability-project-results" role="listbox" aria-label="Resultados de projetos" style={{ maxHeight: 250, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 6, background: 'var(--bg-main)' }}>
               {(() => {
-                const term = viabilityProjectSearch.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim();
+                const term = viabilityProjectSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
                 const projects = [...projetosCruzados]
-                  .filter((p) => !term || [p.nome, p.empresa, p.projectKey].join(' ').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().includes(term))
+                  .filter((p) => !term || [p.nome, p.empresa, p.projectKey].join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(term))
                   .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
                 if (!projects.length) return <p style={{ padding: '0.8rem', fontSize: 12, color: 'var(--text-secondary)' }}>Nenhum projeto encontrado.</p>;
                 return projects.slice(0, 70).map((project) => (
