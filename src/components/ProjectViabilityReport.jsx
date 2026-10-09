@@ -107,7 +107,7 @@ export default function ProjectViabilityReport({
     setExportError("");
     try {
       const { exportProjectViabilityPdf } = await import("@/lib/projectViabilityPdf");
-      await exportProjectViabilityPdf(reportRef.current, project?.nome);
+      await exportProjectViabilityPdf({ project, analysis, periodLabel, includeAdminAllocation });
     } catch (error) {
       setExportError(error?.message || "Não foi possível gerar o PDF.");
     } finally {
