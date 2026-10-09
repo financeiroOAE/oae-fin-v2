@@ -1,5 +1,6 @@
 'use client';
 import { applyValidFilterDate } from '@/lib/dateRange';
+import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
 import { paymentStatusForReport } from '@/lib/paymentCommitment';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -188,13 +189,11 @@ export default function AdministrativeDashboard({ view = 'overview' }){
     return result;
   };
 
+  useFinancialSnapshotUpdate(reloadAdministrativeData);
+
   useEffect(()=>{
-    if(administrativeDataCache){
-      setData(administrativeDataCache);
-      return;
-    }
     let active=true;
-    loadAdministrativeData()
+    loadAdministrativeData({force:true})
       .then(result=>{if(active){setData(result);setError('')}})
       .catch(e=>{if(active)setError(e.message)});
     return()=>{active=false};
