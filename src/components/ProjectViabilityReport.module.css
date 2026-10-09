@@ -234,3 +234,68 @@
 .month > small { font-size: 9px; color: var(--report-teal); font-weight: 700; }
 .costRow > :last-child { text-align: right; }
 @media print { .month > small { font-size: 8px; } }
+
+/* Identidade editorial OAE: azul-marinho, azul e dourado. Sem verde no relatório. */
+.overlay {
+  --report-ink: #142b45;
+  --report-muted: #52647a;
+  --report-line: #d9e2ec;
+  --report-teal: #245a89;
+  --report-teal-soft: #e9f1fa;
+  --report-sage: #829fb8;
+  --report-gold: #c19a54;
+  --report-navy: #142b45;
+  background: #eef2f6;
+}
+.report { background: #ffffff; }
+.overlay .report h1, .overlay .report h2, .overlay .report h3 {
+  color: #142b45 !important;
+}
+.overlay .report span, .overlay .report p, .overlay .report td,
+.overlay .report th, .overlay .report strong, .overlay .report small {
+  opacity: 1;
+}
+.overlay .report .scenarioTable,
+.overlay .report .scenarioTable thead,
+.overlay .report .scenarioTable tbody,
+.overlay .report .scenarioTable tr,
+.overlay .report .scenarioTable th,
+.overlay .report .scenarioTable td {
+  background: #ffffff !important;
+  color: #1c3047 !important;
+  border-color: #d9e2ec !important;
+}
+.overlay .report .scenarioTable th {
+  background: #edf2f8 !important;
+  color: #334c66 !important;
+  font-weight: 800;
+}
+.overlay .report .scenarioTable td:nth-last-child(2) {
+  color: #1c5b90 !important;
+  font-weight: 800;
+}
+.overlay .report .scenarioTable tr:hover,
+.overlay .report .scenarioTable tr:hover td { background: #ffffff !important; }
+.overlay .report .status { background: #f7f2e7; border-left-color: #b28b4f; }
+.overlay .report .status.positive, .overlay .report .verdictPositive {
+  background: #eaf1f9;
+  border-color: #c9d9e9;
+}
+.overlay .report .status.positive { border-left-color: #245a89; }
+.overlay .report .verdict { background: #f7f2e7; border-color: #e5d7bd; }
+.overlay .report .verdictPositive { background: #eaf1f9; border-color: #c9d9e9; }
+.overlay .report .verdict > span,
+.overlay .report .eyebrow { color: #245a89 !important; }
+.overlay .report .kpiPositive > strong { color: #245a89; }
+.overlay .report .kpiNegative > strong { color: #9e453a; }
+.overlay .report .receivedBar, .overlay .report .dotReceived,
+.overlay .report .monthRevenue { background: #245a89; }
+.overlay .report .receivableBar, .overlay .report .dotReceivable { background: #829fb8; }
+.overlay .report .pendingBar, .overlay .report .dotPending { background: #c19a54; }
+.overlay .report .month > small { color: #245a89; }
+.overlay .report .costRow { grid-template-columns: minmax(155px, 1.5fr) repeat(3, minmax(105px, .9fr)) minmax(80px, .55fr); }
+.overlay .report .kpi > strong { white-space: normal; overflow-wrap: anywhere; }
+.exportError { color: #a7362c; padding: 8px 20px; background: #fff1f0; font-size: 12px; margin: 0; border-bottom: 1px solid #efc0bc; }
+@media print {
+  .overlay .report .costRow { grid-template-columns: minmax(175px, 1.5fr) repeat(3, minmax(125px, .9fr)) minmax(78px, .55fr); }
+}

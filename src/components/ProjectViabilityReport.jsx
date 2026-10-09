@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Printer, X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import { isTeamExpense } from "@/lib/financialClassification";
 import styles from "./ProjectViabilityReport.module.css";
 
@@ -74,7 +74,7 @@ function CostTable({ rows, total }) {
         <span>Categoria</span><span>Pago</span><span>A pagar</span><span>Total</span><span>% dos custos</span>
       </div>
       {rows.map((row) => (
-        <div className={styles.costRow} key={row.name}>
+        <div className={`${styles.costRow} project-viability-cost-row`} key={row.name}>
           <span className={styles.costName}>{row.name}</span>
           <span>{currency(row.paid)}</span>
           <span>{currency(row.scheduled)}</span>
@@ -97,6 +97,23 @@ export default function ProjectViabilityReport({
   onClose,
 }) {
   const [portalTarget, setPortalTarget] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+  const reportRef = useRef(null);
+
+  const handleExport = async () => {
+    if (isExporting || !reportRef.current) return;
+    setIsExporting(true);
+    setExportError("");
+    try {
+      const { exportProjectViabilityPdf } = await import("@/lib/projectViabilityPdf");
+      await exportProjectViabilityPdf(reportRef.current, project?.nome);
+    } catch (error) {
+      setExportError(error?.message || "Não foi possível gerar o PDF.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   useEffect(() => {
     setPortalTarget(document.body);
@@ -227,14 +244,15 @@ export default function ProjectViabilityReport({
           <button type="button" className={styles.secondaryButton} onClick={onClose}>
             <X size={16} /> Fechar
           </button>
-          <button type="button" className={styles.primaryButton} onClick={() => window.print()}>
-            <Printer size={16} /> Exportar análise (PDF)
+          <button type="button" className={styles.primaryButton} disabled={isExporting} onClick={handleExport}>
+            <Download size={16} /> {isExporting ? "Gerando PDF..." : "Exportar análise (PDF)"}
           </button>
         </div>
       </div>
 
+      {exportError && <p role="alert" className={styles.exportError}>{exportError}</p>}
       <div className={styles.viewport}>
-        <article className={styles.report}>
+        <article ref={reportRef} className={styles.report}>
           <header className={styles.reportHeader}>
             <div className={styles.headerIdentity}>
               <span className={styles.eyebrow}>Resultado financeiro e viabilidade</span>
@@ -310,9 +328,9 @@ export default function ProjectViabilityReport({
                 <table className={styles.scenarioTable}>
                   <thead><tr><th>Cenário</th><th>Receita</th><th>Custo</th><th>Resultado</th><th>Margem</th></tr></thead>
                   <tbody>
-                    <tr><td>Realizado</td><td>{currency(analysis.received)}</td><td>{currency(analysis.paid)}</td><td>{currency(analysis.realizedResult)}</td><td>{percentage(analysis.realizedMargin)}</td></tr>
-                    <tr><td>Realizado + programado</td><td>{currency(analysis.knownRevenue)}</td><td>{currency(analysis.knownCost)}</td><td>{currency(analysis.projectedResult)}</td><td>{percentage(analysis.projectedMargin)}</td></tr>
-                    <tr><td>Teto contratual*</td><td>{currency(analysis.contract)}</td><td>{currency(analysis.knownCost)}</td><td>{currency(analysis.ceilingResult)}</td><td>{percentage(analysis.ceilingMargin)}</td></tr>
+                    <tr className="project-viability-scenario-row"><td>Realizado</td><td>{currency(analysis.received)}</td><td>{currency(analysis.paid)}</td><td>{currency(analysis.realizedResult)}</td><td>{percentage(analysis.realizedMargin)}</td></tr>
+                    <tr className="project-viability-scenario-row"><td>Realizado + programado</td><td>{currency(analysis.knownRevenue)}</td><td>{currency(analysis.knownCost)}</td><td>{currency(analysis.projectedResult)}</td><td>{percentage(analysis.projectedMargin)}</td></tr>
+                    <tr className="project-viability-scenario-row"><td>Teto contratual*</td><td>{currency(analysis.contract)}</td><td>{currency(analysis.knownCost)}</td><td>{currency(analysis.ceilingResult)}</td><td>{percentage(analysis.ceilingMargin)}</td></tr>
                   </tbody>
                 </table>
                 <p className={styles.assumption}>* O teto contratual presume o recebimento integral do contrato e nenhum custo adicional além dos compromissos já cadastrados. Não representa projeção definitiva de lucro.</p>

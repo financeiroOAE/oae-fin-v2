@@ -276,6 +276,7 @@ export default function Projetos() {
   const [isViabilityReportOpen, setIsViabilityReportOpen] = useState(false);
   const [isViabilityPickerOpen, setIsViabilityPickerOpen] = useState(false);
   const [viabilityProjectKey, setViabilityProjectKey] = useState("");
+  const [viabilityProjectSearch, setViabilityProjectSearch] = useState("");
   const [canIssueViabilityReport, setCanIssueViabilityReport] = useState(false);
   const [incluirRateioAdm, setIncluirRateioAdm] = useState(true);
 
@@ -1370,7 +1371,7 @@ export default function Projetos() {
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
           {canIssueViabilityReport && (
-            <button type="button" onClick={() => { setViabilityProjectKey(""); setIsViabilityPickerOpen(true); }} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
+            <button type="button" onClick={() => { setViabilityProjectKey(""); setViabilityProjectSearch(""); setIsViabilityPickerOpen(true); }} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
               <Activity size={15} /> Análise de viabilidade
             </button>
           )}
@@ -2116,11 +2117,39 @@ export default function Projetos() {
               <div><h2 style={{ margin: 0, fontSize: 19, color: 'var(--text-main)' }}>Análise de viabilidade</h2><p style={{ marginTop: 6, color: 'var(--text-secondary)', fontSize: 12 }}>Selecione o projeto para emitir sua análise financeira completa.</p></div>
               <button type="button" aria-label="Fechar" className="btn" onClick={() => setIsViabilityPickerOpen(false)}><X size={18} /></button>
             </div>
-            <label htmlFor="viability-project-select" style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Projeto / Obra</label>
-            <select id="viability-project-select" value={viabilityProjectKey} onChange={(event) => setViabilityProjectKey(event.target.value)} style={{ width: '100%', minHeight: 45, color: 'var(--text-main)', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 6, padding: '0 12px', fontSize: 13 }}>
-              <option value="">Selecione um projeto</option>
-              {[...projetosCruzados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((project) => <option key={project.projectKey} value={project.projectKey}>{project.nome} · {project.empresa}</option>)}
-            </select>
+            <label htmlFor="viability-project-search" style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Pesquisar projeto / obra</label>
+            <input
+              id="viability-project-search"
+              type="search"
+              autoComplete="off"
+              placeholder="Digite o número, nome ou empresa do projeto..."
+              value={viabilityProjectSearch}
+              onChange={(event) => { setViabilityProjectSearch(event.target.value); setViabilityProjectKey(""); }}
+              aria-controls="viability-project-results"
+              style={{ width: '100%', minHeight: 45, color: 'var(--text-main)', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 6, padding: '0 12px', fontSize: 13 }}
+            />
+            <div id="viability-project-results" role="listbox" aria-label="Resultados de projetos" style={{ maxHeight: 250, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 6, background: 'var(--bg-main)' }}>
+              {(() => {
+                const term = viabilityProjectSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                const projects = [...projetosCruzados]
+                  .filter((p) => !term || [p.nome, p.empresa, p.projectKey].join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(term))
+                  .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+                if (!projects.length) return <p style={{ padding: '0.8rem', fontSize: 12, color: 'var(--text-secondary)' }}>Nenhum projeto encontrado.</p>;
+                return projects.slice(0, 70).map((project) => (
+                  <button
+                    key={project.projectKey}
+                    type="button"
+                    role="option"
+                    aria-selected={viabilityProjectKey === project.projectKey}
+                    onClick={() => { setViabilityProjectKey(project.projectKey); setViabilityProjectSearch(project.nome); }}
+                    style={{ display: 'block', width: '100%', padding: '0.7rem 0.8rem', border: 0, borderBottom: '1px solid var(--border-color)', background: viabilityProjectKey === project.projectKey ? 'var(--bg-elevated)' : 'transparent', textAlign: 'left', cursor: 'pointer', color: 'var(--text-main)', fontSize: 13 }}
+                  >
+                    <strong style={{ display: 'block', fontWeight: 650 }}>{project.nome}</strong>
+                    <small style={{ display: 'block', color: 'var(--text-secondary)', marginTop: 4 }}>{project.empresa}</small>
+                  </button>
+                ));
+              })()}
+            </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button type="button" className="btn" onClick={() => setIsViabilityPickerOpen(false)}>Cancelar</button>
               <button type="button" className="btn btn-primary" disabled={!viabilitySelection} onClick={() => { setIsViabilityPickerOpen(false); setIsViabilityReportOpen(true); }} style={{ opacity: viabilitySelection ? 1 : 0.5 }}>Visualizar análise</button>
