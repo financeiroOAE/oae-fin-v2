@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
 import { isTeamExpense } from "@/lib/financialClassification";
 import styles from "./ProjectViabilityReport.module.css";
@@ -25,6 +26,7 @@ const normalize = (value) => String(value || "")
 const asNumber = (value) => Number(value) || 0;
 const currency = (value) => money.format(asNumber(value));
 const percentage = (value) => `${percent.format(asNumber(value) * 100)}%`;
+const share = (amount, base) => asNumber(base) > 0 ? percentage(asNumber(amount) / asNumber(base)) : "—";
 
 const isRealized = (status) => {
   const value = normalize(status);
@@ -69,7 +71,7 @@ function CostTable({ rows, total }) {
   return (
     <div className={styles.costTable}>
       <div className={`${styles.costRow} ${styles.costHeader}`}>
-        <span>Categoria</span><span>Pago</span><span>A pagar</span><span>Total</span>
+        <span>Categoria</span><span>Pago</span><span>A pagar</span><span>Total</span><span>% dos custos</span>
       </div>
       {rows.map((row) => (
         <div className={styles.costRow} key={row.name}>
@@ -77,10 +79,11 @@ function CostTable({ rows, total }) {
           <span>{currency(row.paid)}</span>
           <span>{currency(row.scheduled)}</span>
           <strong>{currency(row.total)}</strong>
+          <span>{share(row.total, total)}</span>
         </div>
       ))}
       <div className={`${styles.costRow} ${styles.costTotal}`}>
-        <strong>Total conhecido</strong><span /><span /><strong>{currency(total)}</strong>
+        <strong>Total conhecido</strong><span /><span /><strong>{currency(total)}</strong><strong>{asNumber(total) > 0 ? "100,0%" : "—"}</strong>
       </div>
     </div>
   );
@@ -93,7 +96,10 @@ export default function ProjectViabilityReport({
   includeAdminAllocation,
   onClose,
 }) {
+  const [portalTarget, setPortalTarget] = useState(null);
+
   useEffect(() => {
+    setPortalTarget(document.body);
     document.body.classList.add("project-viability-report-open");
     const handleKeyDown = (event) => {
       if (event.key === "Escape") onClose();
@@ -128,7 +134,9 @@ export default function ProjectViabilityReport({
 
     movements.forEach((item) => {
       const nature = normalize(item?.natureza);
-      const value = Math.abs(asNumber(item?.valor));
+      // Preserva estornos de receita e utiliza custos absolutos como no painel.
+      const rawValue = asNumber(item?.valor);
+      const value = Math.abs(rawValue);
       if (!value) return;
 
       if (nature === "SAIDA" && (isRealized(item?.status) || isScheduled(item?.status))) {
@@ -145,7 +153,7 @@ export default function ProjectViabilityReport({
       if (!date) return;
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       const current = monthly.get(key) || { key, date, received: 0, paid: 0 };
-      if (nature === "ENTRADA") current.received += value;
+      if (nature === "ENTRADA") current.received += rawValue;
       if (nature === "SAIDA") current.paid += value;
       monthly.set(key, current);
     });
@@ -163,7 +171,7 @@ export default function ProjectViabilityReport({
     }
 
     const monthRows = [...monthly.values()].sort((a, b) => a.key.localeCompare(b.key));
-    const maxMonthly = Math.max(1, ...monthRows.flatMap((row) => [row.received, row.paid]));
+    const maxMonthly = Math.max(1, ...monthRows.flatMap((row) => [Math.max(0, row.received), row.paid]));
 
     const viable = projectedResult >= 0 && knownRevenue > 0;
     const inconclusive = knownRevenue === 0;
@@ -206,7 +214,9 @@ export default function ProjectViabilityReport({
       ? "Projeto viável nos registros atuais"
       : "Projeto exige revisão financeira";
 
-  return (
+  if (!portalTarget) return null;
+
+  return createPortal(
     <div className={`${styles.overlay} project-viability-overlay`} role="dialog" aria-modal="true" aria-label={`Relatório de viabilidade de ${project?.nome || "projeto"}`}>
       <div className={styles.toolbar}>
         <div>
@@ -218,7 +228,7 @@ export default function ProjectViabilityReport({
             <X size={16} /> Fechar
           </button>
           <button type="button" className={styles.primaryButton} onClick={() => window.print()}>
-            <Printer size={16} /> Emitir relatório
+            <Printer size={16} /> Exportar análise (PDF)
           </button>
         </div>
       </div>
@@ -249,10 +259,10 @@ export default function ProjectViabilityReport({
                 <p>Valores integrais, com centavos, conforme a posição atual do projeto.</p>
               </div>
               <div className={styles.kpis}>
-                <div className={styles.kpi}><span>Valor contratado</span><strong>{currency(analysis.contract)}</strong><small>Base contratual</small></div>
-                <div className={styles.kpi}><span>Faturado</span><strong>{currency(analysis.billed)}</strong><small>{percentage(analysis.contract ? analysis.billed / analysis.contract : 0)} do contrato</small></div>
-                <div className={styles.kpi}><span>Recebido</span><strong>{currency(analysis.received)}</strong><small>Receita realizada no período</small></div>
-                <div className={styles.kpi}><span>Custos pagos</span><strong>{currency(analysis.paid)}</strong><small>Desembolsos realizados</small></div>
+                <div className={styles.kpi}><span>Valor contratado</span><strong>{currency(analysis.contract)}</strong><small>Base contratual · {analysis.contract > 0 ? "100% do contrato" : "sem contrato informado"}</small></div>
+                <div className={styles.kpi}><span>Faturado</span><strong>{currency(analysis.billed)}</strong><small>{share(analysis.billed, analysis.contract)} do contrato</small></div>
+                <div className={styles.kpi}><span>Recebido</span><strong>{currency(analysis.received)}</strong><small>{share(analysis.received, analysis.billed)} do valor faturado</small></div>
+                <div className={styles.kpi}><span>Custos pagos</span><strong>{currency(analysis.paid)}</strong><small>{share(analysis.paid, analysis.received)} da receita recebida</small></div>
                 <div className={`${styles.kpi} ${analysis.realizedResult >= 0 ? styles.kpiPositive : styles.kpiNegative}`}><span>Resultado realizado</span><strong>{currency(analysis.realizedResult)}</strong><small>Margem de {percentage(analysis.realizedMargin)}</small></div>
                 <div className={`${styles.kpi} ${analysis.projectedResult >= 0 ? styles.kpiPositive : styles.kpiNegative}`}><span>Resultado projetado</span><strong>{currency(analysis.projectedResult)}</strong><small>Margem de {percentage(analysis.projectedMargin)}</small></div>
               </div>
@@ -267,9 +277,9 @@ export default function ProjectViabilityReport({
                   <span className={styles.pendingBar} style={{ width: `${pendingWidth}%` }} />
                 </div>
                 <div className={styles.legend}>
-                  <div><i className={styles.dotReceived} /><span>Recebido</span><strong>{currency(analysis.received)}</strong></div>
-                  <div><i className={styles.dotReceivable} /><span>A receber programado</span><strong>{currency(analysis.receivable)}</strong></div>
-                  <div><i className={styles.dotPending} /><span>Saldo sem previsão</span><strong>{currency(analysis.unscheduledContract)}</strong></div>
+                  <div><i className={styles.dotReceived} /><span>Recebido · {share(analysis.received, analysis.contract)}</span><strong>{currency(analysis.received)}</strong></div>
+                  <div><i className={styles.dotReceivable} /><span>A receber · {share(analysis.receivable, analysis.contract)}</span><strong>{currency(analysis.receivable)}</strong></div>
+                  <div><i className={styles.dotPending} /><span>Sem previsão · {share(analysis.unscheduledContract, analysis.contract)}</span><strong>{currency(analysis.unscheduledContract)}</strong></div>
                 </div>
                 {analysis.overContract > 0 && <p className={styles.inlineAlert}>Os registros financeiros conhecidos superam o contrato em {currency(analysis.overContract)}.</p>}
               </div>
@@ -278,8 +288,8 @@ export default function ProjectViabilityReport({
                 <div className={styles.panelHeading}><h3>Resultado realizado</h3><p>Receita recebida menos os custos efetivamente pagos.</p></div>
                 <div className={styles.resultRows}>
                   <div><span>Receita recebida</span><strong>{currency(analysis.received)}</strong></div>
-                  <div><span>(–) Custos pagos</span><strong>{currency(analysis.paid)}</strong></div>
-                  <div className={styles.resultTotal}><span>(=) Resultado realizado</span><strong>{currency(analysis.realizedResult)}</strong></div>
+                  <div><span>(–) Custos pagos ({share(analysis.paid, analysis.received)} da receita)</span><strong>{currency(analysis.paid)}</strong></div>
+                  <div className={styles.resultTotal}><span>(=) Resultado realizado · {share(analysis.realizedResult, analysis.received)} de margem</span><strong>{currency(analysis.realizedResult)}</strong></div>
                 </div>
               </div>
             </section>
@@ -317,8 +327,8 @@ export default function ProjectViabilityReport({
               <div>
                 <div className={styles.sectionHeading}><div><span>03</span><h2>Pontos de atenção</h2></div><p>Itens que podem alterar o parecer.</p></div>
                 <div className={styles.risks}>
-                  <div><i /><p><strong>{currency(analysis.unscheduledContract)} sem previsão financeira</strong><span>Parcela contratual ainda não registrada como recebida ou programada.</span></p></div>
-                  <div><i /><p><strong>{currency(analysis.payable)} em compromissos a pagar</strong><span>Valor já conhecido que integra o cenário projetado.</span></p></div>
+                  <div><i /><p><strong>{currency(analysis.unscheduledContract)} sem previsão financeira ({share(analysis.unscheduledContract, analysis.contract)} do contrato)</strong><span>Parcela contratual ainda não registrada como recebida ou programada.</span></p></div>
+                  <div><i /><p><strong>{currency(analysis.payable)} em compromissos a pagar ({share(analysis.payable, analysis.knownCost)} dos custos conhecidos)</strong><span>Valor já conhecido que integra o cenário projetado.</span></p></div>
                   <div className={styles.riskHigh}><i /><p><strong>Custo para concluir não informado</strong><span>Sem avanço físico e orçamento remanescente, o teto contratual é apenas um limite superior.</span></p></div>
                 </div>
               </div>
@@ -339,6 +349,7 @@ export default function ProjectViabilityReport({
                         <i className={styles.monthCost} style={{ height: `${Math.max((row.paid / analysis.maxMonthly) * 100, row.paid ? 3 : 0)}%` }} />
                       </div>
                       <strong>{new Intl.DateTimeFormat("pt-BR", { month: "short", year: "2-digit" }).format(row.date).replace(" de ", "/")}</strong>
+                      <small>{row.received > 0 ? `${share(row.received - row.paid, row.received)} margem` : "—"}</small>
                     </div>
                   ))}
                 </div>
@@ -353,6 +364,7 @@ export default function ProjectViabilityReport({
           </footer>
         </article>
       </div>
-    </div>
+    </div>,
+    portalTarget
   );
 }
