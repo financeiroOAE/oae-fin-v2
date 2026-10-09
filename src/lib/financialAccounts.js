@@ -56,7 +56,7 @@ export function groupFinancialAccounts(rows, { includeRows = true } = {}) {
     const current = groups.get(key);
     const name = financialAccountName(row);
     const cents = moneyCents(row?.valor);
-    const kind = row?.paid === true ? 'paid' : row?.paid === false && !row?.status ? 'open' : financialPaymentKind(row);
+    const kind = row?.paid === true ? 'paid' : row?.paid === false ? 'open' : financialPaymentKind(row);
     if (kind === 'paid') current.paidCents += cents;
     else if (kind === 'open') current.openCents += cents;
     else current.unknownCents += cents;
