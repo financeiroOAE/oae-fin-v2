@@ -282,14 +282,16 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   })),[partnerMonthly]);
 
   const directorSummary=useMemo(()=>{
-    const withdrawals=partners.reduce((sum,partner)=>sum+Number(partner.withdrawal||0),0);
+    // O total da conta é independente da identificação de favorecidos.
+    // Retiradas não atribuídas não podem desaparecer do indicador contábil.
+    const withdrawals=Number(data.partnerWithdrawalReconciliation?.ledger?.paid ?? partners.reduce((sum,partner)=>sum+Number(partner.withdrawal||0),0));
     const teamPaid=partners.reduce((sum,partner)=>sum+Number(partner.fixedPaid||0),0);
     return {
       withdrawals,
       teamPaid,
       total:withdrawals+teamPaid,
     };
-  },[partners]);
+  },[partners,data.partnerWithdrawalReconciliation]);
 
   const projectParticipation=useMemo(()=>Object.fromEntries(partners.map((partner)=>{
     const map=new Map();
@@ -386,6 +388,13 @@ export default function AdministrativeDashboard({ view = 'overview' }){
         <AdminMetricCard icon={Landmark} label="Total geral" value={directorSummary.total} tone="info" info="Total de retiradas + pagamentos mensais realizados para Francielle e Paulo em 2026."/>
       </div>
 
+      {data.partnerWithdrawalReconciliation?.unassigned?.total!==0 && <div className="mgmt-alert" role="status">
+        Retiradas sem favorecido identificado na conta 2010522:
+        {' '}{brl(data.partnerWithdrawalReconciliation.unassigned.total)}
+        {' '}(pago: {brl(data.partnerWithdrawalReconciliation.unassigned.paid)};
+        a pagar: {brl(data.partnerWithdrawalReconciliation.unassigned.open)}).
+        Essas movimentações integram o total da conta e precisam ser conciliadas com o cadastro de origem.
+      </div>}
       {partnerSection}
 
       <div className="mgmt-director-grid">
