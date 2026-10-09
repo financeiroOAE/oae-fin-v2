@@ -192,8 +192,8 @@
 }
 
 @media print {
-  :global(body.project-viability-report-open) > :not(.project-viability-overlay) { display: none !important; }
-  :global(body.project-viability-report-open) > .project-viability-overlay,
+  :global(body.project-viability-report-open > :not(.project-viability-overlay)) { display: none !important; }
+  :global(body.project-viability-report-open > .project-viability-overlay),
   .overlay, .overlay * { visibility: visible !important; }
   .overlay h1, .overlay h2, .overlay h3 { color: #172522 !important; }
   .overlay, .report, .report * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
