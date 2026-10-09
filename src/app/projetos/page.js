@@ -274,7 +274,7 @@ export default function Projetos() {
   // Drawer e Toggle
   const [selectedProject, setSelectedProject] = useState(null);
   const [isViabilityReportOpen, setIsViabilityReportOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [canIssueViabilityReport, setCanIssueViabilityReport] = useState(false);
   const [incluirRateioAdm, setIncluirRateioAdm] = useState(true);
 
   useEffect(() => {
@@ -282,10 +282,12 @@ export default function Projetos() {
     fetch('/api/session', { cache: 'no-store' })
       .then((response) => response.json())
       .then((result) => {
-        if (active) setIsAdmin(result?.user?.role === 'ADMIN');
+        if (active) setCanIssueViabilityReport(
+          result?.user?.role === 'ADMIN' && String(result?.user?.username || '').trim().toLowerCase() === 'admin'
+        );
       })
       .catch(() => {
-        if (active) setIsAdmin(false);
+        if (active) setCanIssueViabilityReport(false);
       });
     return () => { active = false; };
   }, []);
@@ -1156,13 +1158,15 @@ export default function Projetos() {
       const scheduled = !realized && (status.includes('A REALIZAR') || status.includes('A RECEBER') || status.includes('A PAGAR') || status.includes('PREVISTO'));
       if (!realized && !scheduled) return acc;
 
-      const value = Math.abs(Number(item.valor) || 0);
+      // Entradas preservam o sinal do caixa: estornos reduzem as receitas.
+      // Saídas usam o valor absoluto, como nos totais de Projetos.
+      const value = Number(item.valor) || 0;
       if (item.natureza === 'Entrada') {
         if (realized) acc.recebido += value;
         else acc.aReceber += value;
       } else if (item.natureza === 'Saída') {
-        if (realized) acc.pago += value;
-        else acc.aPagar += value;
+        if (realized) acc.pago += Math.abs(value);
+        else acc.aPagar += Math.abs(value);
       }
       return acc;
     }, { recebido: 0, aReceber: 0, pago: 0, aPagar: 0 });
@@ -1979,7 +1983,7 @@ export default function Projetos() {
                 <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--primary)' }}>{selectedProject.nome}</h2>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                {isAdmin && (
+                {canIssueViabilityReport && (
                   <button onClick={() => setIsViabilityReportOpen(true)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                     <Activity size={14} /> Análise de viabilidade
                   </button>
@@ -2102,7 +2106,7 @@ export default function Projetos() {
         </div>
       )}
 
-      {selectedProject && isAdmin && isViabilityReportOpen && (
+      {selectedProject && canIssueViabilityReport && isViabilityReportOpen && (
         <ProjectViabilityReport
           project={selectedProjectViability.project}
           movements={selectedProjectViability.movements}
