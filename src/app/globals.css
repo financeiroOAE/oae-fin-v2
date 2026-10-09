@@ -740,17 +740,17 @@ tbody tr:hover {
 .report-preview-logo { width: 42px; max-height: 32px; object-fit: contain; object-position: left center; margin-bottom: 0.3rem; }
 .report-preview-brand { color: #1e3a8a; font-size: 20px; }
 .report-preview-header span { color: #64748b; font-size: 10px; }
-.report-preview-header h1 { margin: 0 0 0.25rem; color: #334155; font-size: 18px; }
+.report-preview-header h1 { margin: 0 0 0.25rem; color: #334155; font-size: 17px; line-height: 1.25; font-weight: 700; }
 .report-preview-sections { display: flex; flex-direction: column; gap: 2.25rem; margin-top: 1.5rem; }
 .report-preview-section { break-inside: avoid; }
 .report-preview-section-title { display: flex; align-items: center; gap: 0.55rem; padding-bottom: 0.4rem; border-bottom: 1px solid #e2e8f0; }
 .report-preview-section-title > span { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; color: #fff; background: #1e3a8a; font-size: 8px; font-weight: 800; }
-.report-preview-section h2 { margin: 0; color: #1e3a8a; font-size: 15px; }
+.report-preview-section h2 { margin: 0; color: #1e3a8a; font-size: 13px; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; }
 .report-preview-filter { margin: 0.4rem 0; color: #64748b; font-size: 9px; }
-.report-preview-explanation { margin: 0.45rem 0; color: #475569; font-size: 10px; line-height: 1.5; }
+.report-preview-explanation { margin: 0.35rem 0 0.6rem; color: #475569; font-size: 9px; font-weight: 400; line-height: 1.45; overflow-wrap: anywhere; }
 .report-preview-chart { display: block; max-width: 100%; max-height: 95mm; margin: 0.65rem auto 0; object-fit: contain; }
 .report-preview-table-wrap { width: 100%; margin-top: 0.65rem; overflow-x: auto; }
-.report-preview-subtitle { margin: 0 0 0.4rem; color: #334155; font-size: 11px; }
+.report-preview-subtitle { margin: 0 0 0.4rem; color: #475569; font-size: 10px; line-height: 1.35; font-weight: 600; }
 .report-preview-table { width: 100%; border-collapse: collapse; color: #334155; font-size: 8px; }
 .report-preview-table th { min-width: 0; padding: 0.35rem; overflow: hidden; resize: none; color: #334155; background: #e2e8f0; border-color: #cbd5e1; text-align: left; }
 .report-preview-table td { padding: 0.35rem; color: #334155; border-bottom: 1px solid #e2e8f0; }

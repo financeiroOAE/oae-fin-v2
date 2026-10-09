@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import DesignPreviewToggle from '@/components/DesignPreviewToggle';
 import { 
   LayoutDashboard, 
   BarChart3,
@@ -22,7 +21,7 @@ import {
   UserRoundCheck
 } from 'lucide-react';
 
-export default function Sidebar({ initialUser = null, canPreview = false, previewActive = false }) {
+export default function Sidebar({ initialUser = null }) {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [logoError, setLogoError] = useState(false);
@@ -350,7 +349,6 @@ export default function Sidebar({ initialUser = null, canPreview = false, previe
         </nav>
 
         {/* Logout */}
-        {canPreview && <DesignPreviewToggle active={previewActive} collapsed={collapsed && !isMobile} />}
         <div style={{ padding: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
           <form action="/api/auth/logout" method="POST">
             <button 
