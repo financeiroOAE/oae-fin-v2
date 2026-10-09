@@ -24,6 +24,7 @@ import { isRevenueTax, getRevenueTaxLabel, classifyFinancialEntry, isTeamExpense
 import { getProjectKey, isGeneralProjectsBucket } from "@/lib/projectRules";
 import { loadFinancialData } from "@/lib/clientSync";
 import FinancialRefreshButton from "@/components/FinancialRefreshButton";
+import ProjectViabilityReport from "@/components/ProjectViabilityReport";
 
 const TABLE_PAGE_SIZE = 15;
 
@@ -272,7 +273,24 @@ export default function Projetos() {
   
   // Drawer e Toggle
   const [selectedProject, setSelectedProject] = useState(null);
+  const [isViabilityReportOpen, setIsViabilityReportOpen] = useState(false);
+  const [canIssueViabilityReport, setCanIssueViabilityReport] = useState(false);
   const [incluirRateioAdm, setIncluirRateioAdm] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/session', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((result) => {
+        if (active) setCanIssueViabilityReport(
+          result?.user?.role === 'ADMIN' && String(result?.user?.username || '').trim().toLowerCase() === 'admin'
+        );
+      })
+      .catch(() => {
+        if (active) setCanIssueViabilityReport(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   const fetchDados = async (force = false, showRefreshError = false, manual = force) => {
     setIsSyncing(true);
@@ -1122,6 +1140,47 @@ export default function Projetos() {
     });
   }, [selectedProjectMoves, filterDataInicial, filterDataFinal]);
 
+  // A viabilidade sempre usa a vida financeira completa do projeto. Os filtros
+  // temporais da tela continuam valendo para o drawer e para o extrato comum,
+  // mas não podem esconder custos futuros ou recebimentos históricos do parecer.
+  const selectedProjectViability = useMemo(() => {
+    if (!selectedProject) return { project: null, movements: [] };
+    const movements = baseData.filter((item) => {
+      const itemProjectKey = item.natureza === 'Entrada' && isProjectRelatedRevenueEntry(item)
+        ? getFinancialRevenueProjectIdentity(item).projectKey
+        : getProjectKey(item.projeto);
+      return itemProjectKey === selectedProject.projectKey;
+    });
+
+    const totals = movements.reduce((acc, item) => {
+      const status = String(item.status || '').toUpperCase();
+      const realized = status.includes('REALIZADO') || status.includes('RECEBIDO') || status.includes('PAGO') || status.includes('EFETIVADO');
+      const scheduled = !realized && (status.includes('A REALIZAR') || status.includes('A RECEBER') || status.includes('A PAGAR') || status.includes('PREVISTO'));
+      if (!realized && !scheduled) return acc;
+
+      // Entradas preservam o sinal do caixa: estornos reduzem as receitas.
+      // Saídas usam o valor absoluto, como nos totais de Projetos.
+      const value = Number(item.valor) || 0;
+      if (item.natureza === 'Entrada') {
+        if (realized) acc.recebido += value;
+        else acc.aReceber += value;
+      } else if (item.natureza === 'Saída') {
+        if (realized) acc.pago += Math.abs(value);
+        else acc.aPagar += Math.abs(value);
+      }
+      return acc;
+    }, { recebido: 0, aReceber: 0, pago: 0, aPagar: 0 });
+
+    return {
+      movements,
+      project: {
+        ...selectedProject,
+        ...totals,
+        resultadoCaixa: totals.recebido - totals.pago,
+      },
+    };
+  }, [selectedProject, baseData]);
+
   const projectReportFileName = useCallback(() => {
     const base = String(selectedProject?.nome || 'projeto')
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -1924,6 +1983,11 @@ export default function Projetos() {
                 <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--primary)' }}>{selectedProject.nome}</h2>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {canIssueViabilityReport && (
+                  <button onClick={() => setIsViabilityReportOpen(true)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                    <Activity size={14} /> Análise de viabilidade
+                  </button>
+                )}
                 <button onClick={() => isReportMode ? exitReportMode() : openReportBuilder('Projetos')} className={`btn ${isReportMode ? 'btn-primary' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', minHeight: '38px', padding: '0 0.85rem', fontSize: '13px', fontWeight: '600', background: isReportMode ? 'var(--primary)' : 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: isReportMode ? '#fff' : 'var(--text-main)', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                   <FileText size={14} /> {isReportMode ? 'Sair do Modo Relatório' : 'Gerar Relatório'}
                 </button>
@@ -2040,6 +2104,16 @@ export default function Projetos() {
             </div>
           </div>
         </div>
+      )}
+
+      {selectedProject && canIssueViabilityReport && isViabilityReportOpen && (
+        <ProjectViabilityReport
+          project={selectedProjectViability.project}
+          movements={selectedProjectViability.movements}
+          periodLabel="Posição acumulada da base"
+          includeAdminAllocation={incluirRateioAdm}
+          onClose={() => setIsViabilityReportOpen(false)}
+        />
       )}
 
       <style dangerouslySetInnerHTML={{ __html: `
