@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
 import { RefreshCw, Database, CheckCircle, AlertTriangle, Clock, ServerCrash, CheckSquare } from "lucide-react";
 import { loadFinancialData } from "@/lib/clientSync";
 import FinancialRefreshButton from "@/components/FinancialRefreshButton";
@@ -52,6 +53,8 @@ export default function AtualizacaoDados() {
       setIsSyncing(false);
     }
   };
+
+  useFinancialSnapshotUpdate(() => fetchDados(false, false, false));
 
   useEffect(() => {
     const timeoutId = setTimeout(() => fetchDados(false, false, false), 0);

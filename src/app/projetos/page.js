@@ -1,5 +1,6 @@
 "use client";
 import { applyValidFilterDate } from '@/lib/dateRange';
+import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { 
@@ -291,6 +292,8 @@ export default function Projetos() {
       setIsSyncing(false);
     }
   };
+
+  useFinancialSnapshotUpdate(() => fetchDados(false, false, false));
 
   useEffect(() => {
     const timeoutId = setTimeout(() => fetchDados(false, false, false), 0);

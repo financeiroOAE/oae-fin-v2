@@ -10,6 +10,7 @@ import UiEnhancements from "@/components/UiEnhancements";
 import { ReportProvider } from "@/contexts/ReportContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ReportDrawer from "@/components/report/ReportDrawer";
+import FinancialSnapshotWatcher from "@/components/FinancialSnapshotWatcher";
 
 export const metadata = {
   title: "Painel Financeiro OAE",
@@ -37,6 +38,7 @@ export default async function RootLayout({ children }) {
         <ThemeProvider>
           <ReportProvider>
             <UiEnhancements />
+            <FinancialSnapshotWatcher enabled={Boolean(safeUser)} />
             <div className="app-layout">
               <Sidebar initialUser={safeUser} canPreview={currentUser?.role === 'ADMIN' && !currentUser.mustChangePass} previewActive={preview} />
               <main className="main-content">{children}</main>

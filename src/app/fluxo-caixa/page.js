@@ -1,6 +1,7 @@
 "use client";
 
 import { paymentStatusForReport } from "@/lib/paymentCommitment";
+import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
 
 import React, { useState, useEffect, useMemo } from "react";
 import {
@@ -66,6 +67,8 @@ export default function FluxoDeCaixa() {
       setIsSyncing(false);
     }
   };
+
+  useFinancialSnapshotUpdate(() => fetchDados(false, false, false));
 
   useEffect(() => {
     // A abertura da tela usa somente o último snapshot válido. A leitura pesada
