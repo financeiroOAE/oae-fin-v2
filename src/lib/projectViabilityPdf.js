@@ -158,14 +158,8 @@ export function buildProjectViabilityItems(project, analysis, options = {}) {
 }
 
 export async function exportProjectViabilityPdf({ project, analysis, periodLabel, includeAdminAllocation }) {
-  const { exportReportToPdf } = await import("./reportExport");
-  const items = buildProjectViabilityItems(project, analysis, {
-    periodLabel,
-    includeAdminAllocation,
-  });
-  await exportReportToPdf(items, {
-    title: "Resultado Financeiro e Viabilidade",
-    orientation: "landscape",
-    includeExplanations: true,
-  });
+  // Exportação dedicada: o arquivo baixado segue a composição da prévia do ADMIN,
+  // sem recorrer à tabela genérica do construtor de relatórios.
+  const { downloadProjectViabilityPdf } = await import("./projectViabilityPdfLayout");
+  await downloadProjectViabilityPdf({ project, analysis, periodLabel, includeAdminAllocation });
 }
