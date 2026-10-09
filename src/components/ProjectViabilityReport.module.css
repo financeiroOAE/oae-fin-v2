@@ -299,3 +299,44 @@
 @media print {
   .overlay .report .costRow { grid-template-columns: minmax(175px, 1.5fr) repeat(3, minmax(125px, .9fr)) minmax(78px, .55fr); }
 }
+
+/* Evolução mensal editorial: leitura comparativa, valores integrais e paginação estável. */
+.costNote { margin: 12px 0 0; color: #52647a; font-size: 10px; line-height: 1.5; }
+.cashEvolution { border: 1px solid #d9e2ec; background: #fff; }
+.cashOverview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid #d9e2ec; background: #f4f7fa; }
+.cashOverview > div { min-width: 0; padding: 13px 16px; border-right: 1px solid #d9e2ec; }
+.cashOverview > div:last-child { border-right: 0; }
+.cashOverview span { display: block; color: #52647a; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.cashOverview strong { display: block; margin-top: 5px; color: #142b45; font-size: 17px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cashTable { width: 100%; }
+.cashRow { display: grid; grid-template-columns: minmax(75px,.65fr) minmax(165px,1.6fr) repeat(3,minmax(128px,1fr)) minmax(78px,.65fr); gap: 14px; align-items: center; min-height: 42px; padding: 8px 16px; border-bottom: 1px solid #e1e8f0; color: #142b45; }
+.cashRow:last-child { border-bottom: 0; }
+.cashHeader { min-height: 34px; background: #edf2f8; color: #415a75; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.cashHeader > span:nth-child(n+3) { text-align: right; }
+.cashMonth { font-size: 11px; text-transform: capitalize; }
+.cashTracks { display: grid; gap: 5px; min-width: 0; }
+.cashTrack { height: 7px; background: #e8eef4; border-radius: 2px; overflow: hidden; }
+.cashTrack i { display: block; height: 100%; border-radius: 2px; }
+.cashBarRevenue { background: #245a89; }
+.cashBarCost { background: #9aa9b8; }
+.cashAmount, .cashResult, .cashMargin { font-size: 10px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cashResult { color: #245a89; font-weight: 800; }
+.cashMargin { font-weight: 700; }
+.cashNegative { color: #a34639; }
+.cashFoot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 16px; border-top: 1px solid #d9e2ec; }
+.cashFoot p { max-width: 550px; margin: 0; color: #52647a; font-size: 9px; line-height: 1.5; }
+.cashLegend { display: flex; gap: 15px; }
+.cashLegend span { display: inline-flex; align-items: center; gap: 6px; color: #52647a; font-size: 10px; }
+.cashLegend i { display: block; width: 10px; height: 10px; }
+@media (max-width: 1000px) {
+  .cashTable { overflow-x: auto; }
+  .cashRow { min-width: 870px; }
+  .cashOverview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cashOverview > div:nth-child(2) { border-right: 0; }
+}
+@media print {
+  .cashRow { min-width: 0; grid-template-columns: minmax(65px,.6fr) minmax(130px,1.5fr) repeat(3,minmax(108px,1fr)) minmax(67px,.6fr); gap: 8px; padding: 6px 9px; break-inside: avoid; }
+  .cashTable { overflow: visible; }
+  .cashOverview > div { padding: 9px 12px; }
+  .cashOverview strong { font-size: 14px; }
+}
