@@ -19,7 +19,8 @@ import { consolidateFinancialData } from "@/lib/consolidation";
 import { getFinancialDisplayStatus, isForecastOnlyReceivableDocument, isProjectRevenue } from "@/lib/financialClassification";
 import { useReport } from "@/contexts/ReportContext";
 import ReportAdder from "@/components/report/ReportAdder";
-import { getRolling30DayRange, applyValidFilterDate } from "@/lib/dateRange";
+import { getRolling30DayRange, applyValidFilterDate, isValidFilterDate } from "@/lib/dateRange";
+import { isInvoiceWithinDueRange } from "@/lib/invoiceDateRange.mjs";
 import { getActiveProjectNames } from "@/lib/projectRules";
 import { loadFinancialData } from "@/lib/clientSync";
 import FinancialRefreshButton from "@/components/FinancialRefreshButton";
@@ -325,7 +326,8 @@ export default function FluxoDeCaixa() {
   const [filtroFaturamentoStatus, setFiltroFaturamentoStatus] = useState('TODOS');
   const [filtroFaturamentoProjeto, setFiltroFaturamentoProjeto] = useState('TODOS');
   const [filtroFaturamentoDocumento, setFiltroFaturamentoDocumento] = useState('');
-  const [filtroFaturamentoVencimento, setFiltroFaturamentoVencimento] = useState('');
+  const [filtroFaturamentoVencimentoInicial, setFiltroFaturamentoVencimentoInicial] = useState('');
+  const [filtroFaturamentoVencimentoFinal, setFiltroFaturamentoVencimentoFinal] = useState('');
   const [filtroFaturamentoValor, setFiltroFaturamentoValor] = useState('');
 
   const projetosFaturamentoDisponiveis = useMemo(() => (
@@ -344,7 +346,7 @@ export default function FluxoDeCaixa() {
 
     return faturamentosNfes
       .filter((row) => {
-        if (filtroFaturamento !== 'TODOS') {
+        if (filtroFaturamento === 'MES_ATUAL') {
           if (!row.data) return false;
           const [d, m, y] = String(row.data).split('/').map(Number);
           if (!d || !m || !y) return false;
@@ -356,11 +358,11 @@ export default function FluxoDeCaixa() {
         if (filtroFaturamentoProjeto !== 'TODOS' && row.projeto !== filtroFaturamentoProjeto) return false;
         if (documentoFiltro && !String(row.documento || '').toUpperCase().includes(documentoFiltro)) return false;
 
-        if (filtroFaturamentoVencimento) {
-          const [ano, mes, dia] = filtroFaturamentoVencimento.split('-');
-          const vencimentoFiltro = `${dia}/${mes}/${ano}`;
-          if (String(row.data || '') !== vencimentoFiltro) return false;
-        }
+        // Período personalizado inclusivo. Uma única data informada cria
+        // intervalo aberto, sem restringir inadvertidamente ao mês atual.
+        if (filtroFaturamento === 'PERIODO' && !isInvoiceWithinDueRange(
+          row.data, filtroFaturamentoVencimentoInicial, filtroFaturamentoVencimentoFinal
+        )) return false;
 
         if (valorFiltroTexto) {
           if (!Number.isFinite(valorFiltro)) return false;
@@ -376,7 +378,8 @@ export default function FluxoDeCaixa() {
     filtroFaturamentoStatus,
     filtroFaturamentoProjeto,
     filtroFaturamentoDocumento,
-    filtroFaturamentoVencimento,
+    filtroFaturamentoVencimentoInicial,
+    filtroFaturamentoVencimentoFinal,
     filtroFaturamentoValor,
   ]);
 
@@ -385,7 +388,8 @@ export default function FluxoDeCaixa() {
     setFiltroFaturamentoStatus('TODOS');
     setFiltroFaturamentoProjeto('TODOS');
     setFiltroFaturamentoDocumento('');
-    setFiltroFaturamentoVencimento('');
+    setFiltroFaturamentoVencimentoInicial('');
+    setFiltroFaturamentoVencimentoFinal('');
     setFiltroFaturamentoValor('');
   };
 
@@ -909,12 +913,19 @@ export default function FluxoDeCaixa() {
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <select
                   value={filtroFaturamento}
-                  onChange={(e) => setFiltroFaturamento(e.target.value)}
+                  onChange={(e) => {
+                    setFiltroFaturamento(e.target.value);
+                    if (e.target.value !== 'PERIODO') {
+                      setFiltroFaturamentoVencimentoInicial('');
+                      setFiltroFaturamentoVencimentoFinal('');
+                    }
+                  }}
                   style={{ minWidth: '190px', height: '34px', fontSize: '11px' }}
                   aria-label="Período do Painel de Faturamento"
                 >
                   <option value="MES_ATUAL">Vencimento no mês atual</option>
                   <option value="TODOS">Todos os vencimentos</option>
+                  <option value="PERIODO">Intervalo personalizado</option>
                 </select>
 
                 <ReportAdder
@@ -930,10 +941,11 @@ export default function FluxoDeCaixa() {
                   filters={{
                     Tipo: "NFES",
                     Situação: filtroFaturamentoStatus === 'TODOS' ? 'Recebidas + a receber' : filtroFaturamentoStatus,
-                    Período: filtroFaturamento === 'TODOS' ? 'Todos os vencimentos' : 'Mês atual',
+                    Período: filtroFaturamento === 'TODOS' ? 'Todos os vencimentos' : filtroFaturamento === 'PERIODO' ? 'Personalizado' : 'Mês atual',
                     Projeto: filtroFaturamentoProjeto === 'TODOS' ? 'Todos' : filtroFaturamentoProjeto,
                     Documento: filtroFaturamentoDocumento || 'Todos',
-                    Vencimento: filtroFaturamentoVencimento || 'Todos',
+                    'Vencimento inicial': filtroFaturamento === 'PERIODO' ? filtroFaturamentoVencimentoInicial || 'Sem limite' : 'Não aplicado',
+                    'Vencimento final': filtroFaturamento === 'PERIODO' ? filtroFaturamentoVencimentoFinal || 'Sem limite' : 'Não aplicado',
                     "Valor Líquido": filtroFaturamentoValor || 'Todos',
                   }}
                   explanation="Relação de notas fiscais recebidas e a receber, com uma única linha por NF e sem duplicação do valor bruto entre rateios."
@@ -974,13 +986,41 @@ export default function FluxoDeCaixa() {
                 aria-label="Filtrar por documento"
               />
 
-              <input
-                type="date"
-                value={filtroFaturamentoVencimento}
-                onChange={(e) => setFiltroFaturamentoVencimento(e.target.value)}
-                style={{ height: '34px', fontSize: '11px' }}
-                aria-label="Filtrar por vencimento"
-              />
+              <label style={{ display: 'grid', gap: '0.2rem', fontSize: '10px', color: 'var(--text-secondary)' }}>
+                Vencimento inicial
+                <input
+                  type="date"
+                  value={filtroFaturamentoVencimentoInicial}
+                  max={filtroFaturamentoVencimentoFinal || undefined}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || isValidFilterDate(value)) {
+                      setFiltroFaturamentoVencimentoInicial(value);
+                      setFiltroFaturamento('PERIODO');
+                    }
+                  }}
+                  style={{ height: '34px', fontSize: '11px', width: '100%', boxSizing: 'border-box' }}
+                  aria-label="Vencimento inicial da nota fiscal"
+                />
+              </label>
+
+              <label style={{ display: 'grid', gap: '0.2rem', fontSize: '10px', color: 'var(--text-secondary)' }}>
+                Vencimento final
+                <input
+                  type="date"
+                  value={filtroFaturamentoVencimentoFinal}
+                  min={filtroFaturamentoVencimentoInicial || undefined}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || isValidFilterDate(value)) {
+                      setFiltroFaturamentoVencimentoFinal(value);
+                      setFiltroFaturamento('PERIODO');
+                    }
+                  }}
+                  style={{ height: '34px', fontSize: '11px', width: '100%', boxSizing: 'border-box' }}
+                  aria-label="Vencimento final da nota fiscal"
+                />
+              </label>
 
               <input
                 type="text"
