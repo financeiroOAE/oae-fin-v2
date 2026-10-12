@@ -325,10 +325,8 @@ export default function FluxoDeCaixa() {
   const [filtroFaturamento, setFiltroFaturamento] = useState('MES_ATUAL');
   const [filtroFaturamentoStatus, setFiltroFaturamentoStatus] = useState('TODOS');
   const [filtroFaturamentoProjeto, setFiltroFaturamentoProjeto] = useState('TODOS');
-  const [filtroFaturamentoDocumento, setFiltroFaturamentoDocumento] = useState('');
   const [filtroFaturamentoVencimentoInicial, setFiltroFaturamentoVencimentoInicial] = useState('');
   const [filtroFaturamentoVencimentoFinal, setFiltroFaturamentoVencimentoFinal] = useState('');
-  const [filtroFaturamentoValor, setFiltroFaturamentoValor] = useState('');
 
   const projetosFaturamentoDisponiveis = useMemo(() => (
     Array.from(new Set(faturamentosNfes.map(row => row.projeto).filter(Boolean))).sort()
@@ -338,11 +336,6 @@ export default function FluxoDeCaixa() {
     const hoje = new Date();
     const mesAtual = hoje.getMonth();
     const anoAtual = hoje.getFullYear();
-    const documentoFiltro = filtroFaturamentoDocumento.trim().toUpperCase();
-    const valorFiltroTexto = filtroFaturamentoValor.trim();
-    const valorFiltro = valorFiltroTexto
-      ? Number(valorFiltroTexto.replace(/\./g, '').replace(',', '.'))
-      : null;
 
     return faturamentosNfes
       .filter((row) => {
@@ -356,18 +349,12 @@ export default function FluxoDeCaixa() {
 
         if (filtroFaturamentoStatus !== 'TODOS' && row.situacao !== filtroFaturamentoStatus) return false;
         if (filtroFaturamentoProjeto !== 'TODOS' && row.projeto !== filtroFaturamentoProjeto) return false;
-        if (documentoFiltro && !String(row.documento || '').toUpperCase().includes(documentoFiltro)) return false;
 
         // Período personalizado inclusivo. Uma única data informada cria
         // intervalo aberto, sem restringir inadvertidamente ao mês atual.
         if (filtroFaturamento === 'PERIODO' && !isInvoiceWithinDueRange(
           row.data, filtroFaturamentoVencimentoInicial, filtroFaturamentoVencimentoFinal
         )) return false;
-
-        if (valorFiltroTexto) {
-          if (!Number.isFinite(valorFiltro)) return false;
-          if (Math.abs((Number(row.valor) || 0) - valorFiltro) > 0.009) return false;
-        }
 
         return true;
       })
@@ -377,20 +364,16 @@ export default function FluxoDeCaixa() {
     filtroFaturamento,
     filtroFaturamentoStatus,
     filtroFaturamentoProjeto,
-    filtroFaturamentoDocumento,
     filtroFaturamentoVencimentoInicial,
     filtroFaturamentoVencimentoFinal,
-    filtroFaturamentoValor,
   ]);
 
   const limparFiltrosFaturamento = () => {
     setFiltroFaturamento('MES_ATUAL');
     setFiltroFaturamentoStatus('TODOS');
     setFiltroFaturamentoProjeto('TODOS');
-    setFiltroFaturamentoDocumento('');
     setFiltroFaturamentoVencimentoInicial('');
     setFiltroFaturamentoVencimentoFinal('');
-    setFiltroFaturamentoValor('');
   };
 
   const totalFaturamentosNfes = faturamentosNfesFiltrados.reduce((acc, row) => acc + (Number(row.valor) || 0), 0);
@@ -943,48 +926,43 @@ export default function FluxoDeCaixa() {
                     Situação: filtroFaturamentoStatus === 'TODOS' ? 'Recebidas + a receber' : filtroFaturamentoStatus,
                     Período: filtroFaturamento === 'TODOS' ? 'Todos os vencimentos' : filtroFaturamento === 'PERIODO' ? 'Personalizado' : 'Mês atual',
                     Projeto: filtroFaturamentoProjeto === 'TODOS' ? 'Todos' : filtroFaturamentoProjeto,
-                    Documento: filtroFaturamentoDocumento || 'Todos',
                     'Vencimento inicial': filtroFaturamento === 'PERIODO' ? filtroFaturamentoVencimentoInicial || 'Sem limite' : 'Não aplicado',
                     'Vencimento final': filtroFaturamento === 'PERIODO' ? filtroFaturamentoVencimentoFinal || 'Sem limite' : 'Não aplicado',
-                    "Valor Líquido": filtroFaturamentoValor || 'Todos',
                   }}
                   explanation="Relação de notas fiscais recebidas e a receber, com uma única linha por NF e sem duplicação do valor bruto entre rateios."
                 />
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <select
-                value={filtroFaturamentoStatus}
-                onChange={(e) => setFiltroFaturamentoStatus(e.target.value)}
-                style={{ height: '34px', fontSize: '11px' }}
-                aria-label="Situação da nota fiscal"
-              >
-                <option value="TODOS">Todas as situações</option>
-                <option value="A receber">A receber</option>
-                <option value="Recebido">Recebido</option>
-              </select>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.5rem', alignItems: 'end', marginBottom: '0.75rem' }}>
+              <label style={{ display: 'grid', gap: '0.2rem', minWidth: 0, fontSize: '10px', color: 'var(--text-secondary)' }}>
+                Situação
+                <select
+                  value={filtroFaturamentoStatus}
+                  onChange={(e) => setFiltroFaturamentoStatus(e.target.value)}
+                  style={{ width: '100%', height: '34px', fontSize: '11px', boxSizing: 'border-box' }}
+                  aria-label="Situação da nota fiscal"
+                >
+                  <option value="TODOS">Todas as situações</option>
+                  <option value="A receber">A receber</option>
+                  <option value="Recebido">Recebido</option>
+                </select>
+              </label>
 
-              <select
-                value={filtroFaturamentoProjeto}
-                onChange={(e) => setFiltroFaturamentoProjeto(e.target.value)}
-                style={{ height: '34px', fontSize: '11px' }}
-                aria-label="Projeto da nota fiscal"
-              >
-                <option value="TODOS">Todos os projetos</option>
-                {projetosFaturamentoDisponiveis.map((projeto) => (
-                  <option key={projeto} value={projeto}>{projeto}</option>
-                ))}
-              </select>
-
-              <input
-                type="search"
-                value={filtroFaturamentoDocumento}
-                onChange={(e) => setFiltroFaturamentoDocumento(e.target.value)}
-                placeholder="Documento / NFES"
-                style={{ height: '34px', fontSize: '11px' }}
-                aria-label="Filtrar por documento"
-              />
+              <label style={{ display: 'grid', gap: '0.2rem', minWidth: 0, fontSize: '10px', color: 'var(--text-secondary)' }}>
+                Projeto
+                <select
+                  value={filtroFaturamentoProjeto}
+                  onChange={(e) => setFiltroFaturamentoProjeto(e.target.value)}
+                  style={{ width: '100%', height: '34px', fontSize: '11px', boxSizing: 'border-box' }}
+                  aria-label="Projeto da nota fiscal"
+                >
+                  <option value="TODOS">Todos os projetos</option>
+                  {projetosFaturamentoDisponiveis.map((projeto) => (
+                    <option key={projeto} value={projeto}>{projeto}</option>
+                  ))}
+                </select>
+              </label>
 
               <label style={{ display: 'grid', gap: '0.2rem', fontSize: '10px', color: 'var(--text-secondary)' }}>
                 Vencimento inicial
@@ -1022,21 +1000,11 @@ export default function FluxoDeCaixa() {
                 />
               </label>
 
-              <input
-                type="text"
-                inputMode="decimal"
-                value={filtroFaturamentoValor}
-                onChange={(e) => setFiltroFaturamentoValor(e.target.value)}
-                placeholder="Valor líquido"
-                style={{ height: '34px', fontSize: '11px' }}
-                aria-label="Filtrar por valor líquido"
-              />
-
               <button
                 type="button"
                 className="btn-secondary"
                 onClick={limparFiltrosFaturamento}
-                style={{ minHeight: '34px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                style={{ height: '34px', width: '100%', boxSizing: 'border-box', fontSize: '11px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
               >
                 <FilterX size={13} />
                 Limpar filtros
