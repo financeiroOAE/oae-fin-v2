@@ -46,7 +46,8 @@ export default function FinancialRefreshButton({
     try {
       let result = null;
       let lastError = null;
-      const attempts = isAdmin ? 3 : 1;
+      // Full-sync é intensivo em memória; repetir 502 pode reiniciar o Render.
+      const attempts = 1;
 
       for (let attempt = 1; attempt <= attempts; attempt += 1) {
         try {
@@ -67,7 +68,9 @@ export default function FinancialRefreshButton({
     } catch (error) {
       await loadMetadata();
       if (isAdmin) {
-        onError?.(error?.message || "Não foi possível atualizar os dados.");
+        onError?.(isTransientRefreshError(error)
+          ? "O servidor não concluiu a sincronização (HTTP 502/503/504). Os dados anteriores foram preservados. Aguarde a estabilização do Render antes de tentar novamente."
+          : error?.message || "Não foi possível atualizar os dados.");
       } else {
         await onUpdated?.({ ok: true, skipped: true, refreshReason: "PRESERVED_SNAPSHOT" });
       }
