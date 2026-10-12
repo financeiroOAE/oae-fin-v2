@@ -65,14 +65,11 @@ export async function GET() {
   // A aba Equipe é consultada com frequência. Em vez de percorrer o CP_GERAL
   // completo para cada cadastro, preparamos os lançamentos uma única vez e
   // indexamos por conta. Isso preserva a regra financeira sem sobrecarregar o servidor.
-  const cp = cpRows(snapshot)
+  const cp = cpRows(snapshot, { teamOnly: true })
     .map((row) => {
+      // Mantém uma cópia reduzida apenas para os registros pertinentes à equipe.
       const rowMonth = monthOf(row.data);
-      return {
-        ...row,
-        _accountCode: String(row.contaCodigo || '').replace(/\D/g, ''),
-        _month: rowMonth,
-      };
+      return { ...row, _month: rowMonth };
     })
     .filter((row) => {
       const isHistorical = isHistoricalTeamMonth(row._month);
@@ -86,7 +83,6 @@ export async function GET() {
   const cpByPerson = new Map();
   const teamAccountRows = [];
   cp.forEach((row) => {
-    if (!row.teamAccount) return;
     teamAccountRows.push(row);
     const party = norm(row.nome).replace(/^\d{2}[.\s]?\d{3}[.\s]?\d{3}\s+/, '').trim();
     if (!party) return;
@@ -119,7 +115,7 @@ export async function GET() {
       // - todos permanecem com movimentos de 2025 e 2026;
       // - somente terceiros mantêm A PAGAR após dez/2026.
       return isHistorical || isFutureOpenThirdParty;
-    }).map(({ _accountCode, _month, ...row }) => row);
+    }).map(({ _month, ...row }) => row);
 
     const paid = transactions.filter((row) => row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0);
     const open = transactions.filter((row) => !row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0);
