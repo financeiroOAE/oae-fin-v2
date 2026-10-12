@@ -94,6 +94,7 @@ export default function ProjectViabilityReport({
   movements = [],
   periodLabel,
   includeAdminAllocation,
+  canExport = false,
   onClose,
 }) {
   const [portalTarget, setPortalTarget] = useState(null);
@@ -102,7 +103,7 @@ export default function ProjectViabilityReport({
   const reportRef = useRef(null);
 
   const handleExport = async () => {
-    if (isExporting || !reportRef.current) return;
+    if (!canExport || isExporting || !reportRef.current) return;
     setIsExporting(true);
     setExportError("");
     try {
@@ -244,9 +245,9 @@ export default function ProjectViabilityReport({
           <button type="button" className={styles.secondaryButton} onClick={onClose}>
             <X size={16} /> Fechar
           </button>
-          <button type="button" className={styles.primaryButton} disabled={isExporting} onClick={handleExport}>
+          {canExport && <button type="button" className={styles.primaryButton} disabled={isExporting} onClick={handleExport}>
             <Download size={16} /> {isExporting ? "Gerando PDF..." : "Exportar análise (PDF)"}
-          </button>
+          </button>}
         </div>
       </div>
 
