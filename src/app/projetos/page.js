@@ -25,6 +25,7 @@ import { getProjectKey, isGeneralProjectsBucket } from "@/lib/projectRules";
 import { loadFinancialData } from "@/lib/clientSync";
 import FinancialRefreshButton from "@/components/FinancialRefreshButton";
 import ProjectViabilityReport from "@/components/ProjectViabilityReport";
+import { resolveProjectViabilityAccess } from "@/lib/reportVisibility.mjs";
 
 const TABLE_PAGE_SIZE = 15;
 
@@ -277,7 +278,7 @@ export default function Projetos() {
   const [isViabilityPickerOpen, setIsViabilityPickerOpen] = useState(false);
   const [viabilityProjectKey, setViabilityProjectKey] = useState("");
   const [viabilityProjectSearch, setViabilityProjectSearch] = useState("");
-  const [canIssueViabilityReport, setCanIssueViabilityReport] = useState(false);
+  const [viabilityAccess, setViabilityAccess] = useState({ canView: false, canExport: false });
   const [incluirRateioAdm, setIncluirRateioAdm] = useState(true);
 
   useEffect(() => {
@@ -285,12 +286,10 @@ export default function Projetos() {
     fetch('/api/session', { cache: 'no-store' })
       .then((response) => response.json())
       .then((result) => {
-        if (active) setCanIssueViabilityReport(
-          result?.user?.role === 'ADMIN' && String(result?.user?.username || '').trim().toLowerCase() === 'admin'
-        );
+        if (active) setViabilityAccess(resolveProjectViabilityAccess(result?.user));
       })
       .catch(() => {
-        if (active) setCanIssueViabilityReport(false);
+        if (active) setViabilityAccess({ canView: false, canExport: false });
       });
     return () => { active = false; };
   }, []);
@@ -1370,7 +1369,7 @@ export default function Projetos() {
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Acompanhamento executivo da carteira de obras</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {canIssueViabilityReport && (
+          {viabilityAccess.canView && (
             <button type="button" onClick={() => { setViabilityProjectKey(""); setViabilityProjectSearch(""); setIsViabilityPickerOpen(true); }} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
               <Activity size={15} /> Análise de viabilidade
             </button>
@@ -2110,11 +2109,11 @@ export default function Projetos() {
         </div>
       )}
 
-      {canIssueViabilityReport && isViabilityPickerOpen && (
+      {viabilityAccess.canView && isViabilityPickerOpen && (
         <div role="dialog" aria-modal="true" aria-label="Selecionar projeto para análise de viabilidade" style={{ position: 'fixed', inset: 0, zIndex: 11990, background: 'rgba(3,15,30,0.75)', display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <div className="card" style={{ width: 'min(560px, 100%)', padding: '1.5rem', display: 'grid', gap: '1rem', border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 12 }}>
-              <div><h2 style={{ margin: 0, fontSize: 19, color: 'var(--text-main)' }}>Análise de viabilidade</h2><p style={{ marginTop: 6, color: 'var(--text-secondary)', fontSize: 12 }}>Selecione o projeto para emitir sua análise financeira completa.</p></div>
+              <div><h2 style={{ margin: 0, fontSize: 19, color: 'var(--text-main)' }}>Análise de viabilidade</h2><p style={{ marginTop: 6, color: 'var(--text-secondary)', fontSize: 12 }}>Selecione o projeto para visualizar sua análise financeira completa.</p></div>
               <button type="button" aria-label="Fechar" className="btn" onClick={() => setIsViabilityPickerOpen(false)}><X size={18} /></button>
             </div>
             <label htmlFor="viability-project-search" style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>Pesquisar projeto / obra</label>
@@ -2158,12 +2157,13 @@ export default function Projetos() {
         </div>
       )}
 
-      {viabilitySelection && canIssueViabilityReport && isViabilityReportOpen && (
+      {viabilitySelection && viabilityAccess.canView && isViabilityReportOpen && (
         <ProjectViabilityReport
           project={selectedProjectViability.project}
           movements={selectedProjectViability.movements}
           periodLabel="Posição acumulada da base"
           includeAdminAllocation={incluirRateioAdm}
+          canExport={viabilityAccess.canExport}
           onClose={() => setIsViabilityReportOpen(false)}
         />
       )}
