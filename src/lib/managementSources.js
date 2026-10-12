@@ -22,9 +22,19 @@ export function monthOf(value) {
   return match ? `${match[2]}-${match[1].padStart(2, '0')}` : null;
 }
 
-export function cpRows(snapshot) {
+export function cpRows(snapshot, { teamOnly = false } = {}) {
   const occurrences = new Map();
-  return (snapshot?.payload?.data || []).filter((row) => row.natureza === 'Saída').map((row) => {
+  // Em Equipe, descarta saídas de outras contas antes de gerar cópias e hashes.
+  // Usa exatamente os três campos que são mantidos na linha de CP abaixo,
+  // garantindo que a classificação seja idêntica à versão não filtrada.
+  return (snapshot?.payload?.data || []).filter((row) => (
+    row.natureza === 'Saída'
+    && (!teamOnly || isTeamExpense({
+      contaCodigo: row.contaCodigo,
+      contaNome: row.contaNome,
+      contaDescricao: row.contaDescricao,
+    }))
+  )).map((row) => {
     // Status and payment date can change after settlement. The business title stays linked.
     const identity = [row.documento, row.titulo, row.nome, row.contaCodigo, row.projeto, row.valorTotalTitulo || row.valor]
       .map(norm).join('|');
