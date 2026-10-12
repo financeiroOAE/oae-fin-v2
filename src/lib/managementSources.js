@@ -29,11 +29,7 @@ export function cpRows(snapshot, { teamOnly = false } = {}) {
   // garantindo que a classificação seja idêntica à versão não filtrada.
   return (snapshot?.payload?.data || []).filter((row) => (
     row.natureza === 'Saída'
-    && (!teamOnly || isTeamExpense({
-      contaCodigo: row.contaCodigo,
-      contaNome: row.contaNome,
-      contaDescricao: row.contaDescricao,
-    }))
+    && (!teamOnly || isTeamExpense(row))
   )).map((row) => {
     // Status and payment date can change after settlement. The business title stays linked.
     const identity = [row.documento, row.titulo, row.nome, row.contaCodigo, row.projeto, row.valorTotalTitulo || row.valor]
