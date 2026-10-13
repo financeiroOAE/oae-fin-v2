@@ -43,6 +43,7 @@ export default function FluxoDeCaixa() {
   const [filterStatus, setFilterStatus] = useState([]);
   const [filterNomes, setFilterNomes] = useState([]);
   const [filterContas, setFilterContas] = useState([]);
+  const [movementTableRows, setMovementTableRows] = useState(null);
 
   // Modal para detalhamento do Resumo de Hoje
   const [modalResumo, setModalResumo] = useState(null);
@@ -506,7 +507,7 @@ export default function FluxoDeCaixa() {
     Nomes: filterNomes.length ? filterNomes : "Todos",
     Contas: filterContas.length ? filterContas : "Todas",
   };
-  const reportMovementRows = filteredData.map((item) => ({
+  const reportMovementRows = (movementTableRows ?? filteredData).map((item) => ({
     Data: item.data,
     "Nome / Pessoa / Fornecedor": item.nome || "-",
     "Projeto / Obra": item.projeto || "-",
@@ -1095,7 +1096,7 @@ export default function FluxoDeCaixa() {
           type="TABLE"
           data={reportMovementRows}
           dataSets={{
-            summary: [{ "Quantidade de lançamentos": reportMovementRows.length, "Valor total": filteredData.reduce((sum, item) => sum + (item.valor || 0), 0) }],
+            summary: [{ "Quantidade de lançamentos": reportMovementRows.length, "Valor total": (movementTableRows ?? filteredData).reduce((sum, item) => sum + (item.valor || 0), 0) }],
             visible: reportMovementRows.slice(0, 15),
             all: reportMovementRows
           }}
@@ -1114,7 +1115,7 @@ export default function FluxoDeCaixa() {
           style={{ float: 'right' }}
         />
         <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '1rem' }}>Movimentações Financeiras</h2>
-        <DataTable data={filteredData} />
+        <DataTable data={filteredData} onFilteredRowsChange={setMovementTableRows} />
       </div>
 
       {/* Modal Drawer para Resumo de Hoje */}
