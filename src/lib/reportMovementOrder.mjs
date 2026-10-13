@@ -53,3 +53,29 @@ export function sortMovementRowsByDate(rows) {
       return a.date.localeCompare(b.date) || a.index - b.index;
     }).map((entry) => entry.row);
 }
+
+/**
+ * Restringe exportações de movimentações ao intervalo ativo da própria seção.
+ * O filtro é reaplicado na exportação para impedir que listas armazenadas
+ * anteriormente ou o dataset "all" contornem a seleção do usuário.
+ */
+export function filterMovementRowsByReportPeriod(rows, filters) {
+  if (!Array.isArray(rows)) return [];
+  const entries = Object.entries(filters || {});
+  const findLimit = (aliases) => {
+    for (const [name, value] of entries) {
+      if (aliases.includes(normalizeColumn(name))) {
+        const normalized = dateKey(value);
+        if (normalized) return normalized;
+      }
+    }
+    return '';
+  };
+  const start = findLimit(['data inicial', 'data inicio', 'inicio', 'período inicial', 'periodo inicial']);
+  const end = findLimit(['data final', 'data fim', 'fim', 'período final', 'periodo final']);
+  if (!start && !end) return rows;
+  return rows.filter(row => {
+    const date = rowDate(row);
+    return Boolean(date) && (!start || date >= start) && (!end || date <= end);
+  });
+}
