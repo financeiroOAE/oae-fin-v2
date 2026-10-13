@@ -1,4 +1,4 @@
-import { sortMovementRowsByDate } from '@/lib/reportMovementOrder.mjs';
+import { sortMovementRowsByDate, filterMovementRowsByReportPeriod } from '@/lib/reportMovementOrder.mjs';
 import { isDocumentedPayableNext30Days } from '@/lib/paymentCommitment';
 import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 const CURRENCY_FORMAT = '[$R$-pt-BR] #,##0.00;[Red]-[$R$-pt-BR] #,##0.00';
@@ -15,7 +15,7 @@ function fileName(value, extension) {
 
 export function getReportRows(item) {
   const rows = item?.dataSets?.[item.detailMode] ?? item?.data;
-  if (Array.isArray(rows)) return isMovementReport(item) ? sortMovementRowsByDate(rows) : rows;
+  if (Array.isArray(rows)) return isMovementReport(item) ? sortMovementRowsByDate(filterMovementRowsByReportPeriod(rows, item.filters)) : rows;
   if (rows && typeof rows === "object") return [rows];
   return [];
 }
@@ -278,7 +278,7 @@ export async function exportReportToPdf(items, config) {
   };
 
   const drawTable = (item, sourceRows, title) => {
-    const rows = isMovementReport(item) ? sortMovementRowsByDate(sourceRows) : sourceRows;
+    const rows = isMovementReport(item) ? sortMovementRowsByDate(filterMovementRowsByReportPeriod(sourceRows, item.filters)) : sourceRows;
     if (title) {
       ensureSpace(9);
       pdf.setTextColor("#142b45");
