@@ -15,7 +15,7 @@ function fileName(value, extension) {
 
 export function getReportRows(item) {
   const rows = item?.dataSets?.[item.detailMode] ?? item?.data;
-  if (Array.isArray(rows)) return isMovementReport(item) ? sortMovementRowsByDate(filterMovementRowsByReportPeriod(rows, item.filters)) : rows;
+  if (Array.isArray(rows)) return isMovementReport(item) && item.detailMode !== 'summary' ? sortMovementRowsByDate(filterMovementRowsByReportPeriod(rows, item.filters)) : rows;
   if (rows && typeof rows === "object") return [rows];
   return [];
 }
