@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { encodeFinancialSnapshot, decodeFinancialSnapshot } from '@/lib/financialSnapshotCodec.mjs';
 import { batchReadSheets } from '@/lib/googleSheets';
 import { processSiengeData, extractAccountCode, parseBRL } from '@/lib/businessRules';
 
@@ -362,7 +363,7 @@ export async function readCurrentSnapshot() {
   if (!snapshot) return null;
 
   return {
-    payload: JSON.parse(snapshot.payload),
+    payload: JSON.parse(decodeFinancialSnapshot(snapshot.payload)),
     updatedAt: snapshot.updatedAt,
     updatedBy: snapshot.username,
   };
@@ -376,7 +377,7 @@ export async function refreshFinancialSnapshot(triggeredBy) {
   const syncPromise = (async () => {
     const payload = await performFullSync(triggeredBy);
     memorySnapshot('antes-serializacao');
-    const serializedPayload = JSON.stringify(payload);
+    const serializedPayload = encodeFinancialSnapshot(payload);
     memorySnapshot('depois-serializacao');
 
     await prisma.financialSnapshot.upsert({
