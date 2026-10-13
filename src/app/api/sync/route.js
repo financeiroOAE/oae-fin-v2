@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { snapshotHttpPayload } from '@/lib/financialSnapshotCodec.mjs';
 import { getSession } from '@/lib/auth';
 import {
   readCurrentSnapshotMetadata,
@@ -15,7 +16,11 @@ const JSON_HEADERS = {
 };
 
 function snapshotResponse(snapshot) {
-  return new Response(snapshot.payload, { status: 200, headers: JSON_HEADERS });
+  const { body, contentEncoding } = snapshotHttpPayload(snapshot.payload);
+  return new Response(body, {
+    status: 200,
+    headers: contentEncoding ? { ...JSON_HEADERS, 'Content-Encoding': contentEncoding } : JSON_HEADERS,
+  });
 }
 
 export async function GET(request) {
