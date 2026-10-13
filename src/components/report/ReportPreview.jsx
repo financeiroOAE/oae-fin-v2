@@ -22,7 +22,7 @@ function ReportTable({ item, rows, title }) {
         </thead>
         <tbody>
           {orderedRows.map((row, rowIndex) => (
-            <tr key={`${item.id}-row-${rowIndex}`} className={isPriorityExportRow(row) ? "is-payment-due-soon" : undefined}>
+            <tr key={`${item.id}-row-${rowIndex}`} className={item.page === "Equipe" && isPriorityExportRow(row) ? "is-payment-due-soon" : undefined}>
               {columns.map((column) => {
                 const format = inferReportFormat(column.key, column.format || item.columnFormats?.[column.key]);
                 const classes = [
@@ -33,6 +33,11 @@ function ReportTable({ item, rows, title }) {
             </tr>
           ))}
         </tbody>
+        {/moviment/i.test([item?.title, item?.componentName, item?.sectionKey].join(" ")) && item.detailMode !== "summary" && (
+          <tfoot><tr><td colSpan={columns.length} style={{ textAlign: "right", fontWeight: 700, background: "#eaf1f9", color: "#142b45", padding: "10px 12px" }}>
+            TOTAL DOS TÍTULOS FILTRADOS ({orderedRows.length}): {orderedRows.reduce((sum, row) => sum + (Number(row.Valor ?? row.valor) || 0), 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+          </td></tr></tfoot>
+        )}
       </table>
     </div>
   );
