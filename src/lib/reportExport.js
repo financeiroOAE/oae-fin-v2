@@ -365,7 +365,7 @@ export async function exportReportToPdf(items, config) {
         addPage();
         drawTableHeader();
       }
-      if (isPriorityExportRow(row)) {
+      if (item.page === "Equipe" && isPriorityExportRow(row)) {
         pdf.setFillColor("#e0edf8");
         pdf.rect(margin, y, contentWidth, finalHeight, 'F');
         pdf.setFillColor("#245a89");
@@ -393,6 +393,18 @@ export async function exportReportToPdf(items, config) {
       pdf.line(margin, y + finalHeight, pageWidth - margin, y + finalHeight);
       y += finalHeight;
     });
+    if (isMovementReport(item) && item.detailMode !== "summary") {
+      ensureSpace(9);
+      const total = rows.reduce((sum, row) => sum + (Number(row.Valor ?? row.valor) || 0), 0);
+      pdf.setFillColor("#eaf1f9");
+      pdf.rect(margin, y, contentWidth, 8, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor("#142b45");
+      pdf.text(`TOTAL DOS TÍTULOS FILTRADOS (${rows.length})`, margin + 2, y + 5.3);
+      pdf.text(total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), pageWidth - margin - 2, y + 5.3, { align: "right" });
+      y += 8;
+    }
     y += 4;
   };
 
@@ -620,11 +632,17 @@ export async function exportReportToExcel(items, config) {
       : getReportRows(item);
     const rows = isMovementReport(item) ? sortMovementRowsByDate(sourceRows) : sourceRows;
     const worksheet = createWorksheet(XLSX, item, rows);
-    prioritySheets.push(rows.flatMap((row, rowIndex) => isPriorityExportRow(row) ? [rowIndex] : []));
+    if (isMovementReport(item) && item.detailMode !== "summary") {
+      const total = rows.reduce((sum, row) => sum + (Number(row.Valor ?? row.valor) || 0), 0);
+      const last = rows.length + 2;
+      XLSX.utils.sheet_add_aoa(worksheet, [[`TOTAL DOS TÍTULOS FILTRADOS (${rows.length})`, total]], { origin: `A${last}` });
+      worksheet[`B${last}`].z = CURRENCY_FORMAT;
+    }
+    prioritySheets.push(rows.flatMap((row, rowIndex) => item.page === "Equipe" && isPriorityExportRow(row) ? [rowIndex] : []));
     XLSX.utils.book_append_sheet(workbook, worksheet, uniqueSheetName(item.title || `Bloco ${index + 1}`, usedNames));
     if (item.includePending && Array.isArray(item.pendingData) && item.pendingData.length > 0) {
       const pendingSheet = createWorksheet(XLSX, { ...item, columns: undefined }, item.pendingData);
-      prioritySheets.push(item.pendingData.flatMap((row, rowIndex) => isPriorityExportRow(row) ? [rowIndex] : []));
+      prioritySheets.push(item.pendingData.flatMap((row, rowIndex) => item.page === "Equipe" && isPriorityExportRow(row) ? [rowIndex] : []));
       XLSX.utils.book_append_sheet(workbook, pendingSheet, uniqueSheetName(`Pendências ${item.title}`, usedNames));
     }
   });
