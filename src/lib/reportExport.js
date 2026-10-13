@@ -630,7 +630,7 @@ export async function exportReportToExcel(items, config) {
     const sourceRows = Array.isArray(item?.dataSets?.all)
       ? item.dataSets.all
       : getReportRows(item);
-    const rows = isMovementReport(item) ? sortMovementRowsByDate(sourceRows) : sourceRows;
+    const rows = isMovementReport(item) && item.detailMode !== "summary" ? sortMovementRowsByDate(filterMovementRowsByReportPeriod(sourceRows, item.filters)) : sourceRows;
     const worksheet = createWorksheet(XLSX, item, rows);
     if (isMovementReport(item) && item.detailMode !== "summary") {
       const total = rows.reduce((sum, row) => sum + (Number(row.Valor ?? row.valor) || 0), 0);
