@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import MultiSelect from '@/components/MultiSelect';
 
-export default function DataTable({ data, initialPageSize = 25, pageSizeOptions = [25, 50, 100] }) {
+export default function DataTable({ data, initialPageSize = 25, pageSizeOptions = [25, 50, 100], onFilteredRowsChange }) {
   // Configuração
   const [pageSize, setPageSize] = useState(initialPageSize);
   const [currentPage, setCurrentPage] = useState(1);
@@ -71,7 +71,8 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
       // 1. Busca textual geral
       if (debouncedSearch) {
         const term = debouncedSearch.toLowerCase();
-        const textContent = `${item.documento || ''} ${item.contaCodigo || ''}`.toLowerCase();
+        const amountText = Number(item.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        const textContent = `${item.documento || ''} ${item.contaCodigo || ''} ${amountText} ${Number(item.valor || 0)}`.toLowerCase();
         // Não incluir os selects na busca livre para não confundir o usuário que já filtrou via dropdown
         if (!textContent.includes(term) && !String(item.nome || '').toLowerCase().includes(term)) return false;
       }
@@ -97,6 +98,12 @@ export default function DataTable({ data, initialPageSize = 25, pageSizeOptions 
       return true;
     });
   }, [processedData, debouncedSearch, filterDataInicial, filterDataFinal, filterStatus, filterProjeto, filterNome, filterConta]);
+
+  // Informa a seleção completa da tabela aos relatórios, sem limitar à página
+  // atual. O callback não interfere na apresentação nem nos filtros locais.
+  useEffect(() => {
+    onFilteredRowsChange?.(filteredData);
+  }, [filteredData, onFilteredRowsChange]);
 
   // Ordenação
   const sortedData = useMemo(() => {
