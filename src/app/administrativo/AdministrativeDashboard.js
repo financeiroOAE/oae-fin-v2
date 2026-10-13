@@ -176,6 +176,8 @@ export default function AdministrativeDashboard({ view = 'overview' }){
   const[personFilters,setPersonFilters]=useState([]);
   const[accountFilters,setAccountFilters]=useState([]);
   const[statusFilters,setStatusFilters]=useState([]);
+  const[adminMovementTableRows,setAdminMovementTableRows]=useState(null);
+  const[directorMovementTableRows,setDirectorMovementTableRows]=useState(null);
   const[showAllAccounts,setShowAllAccounts]=useState(false);
   const[detail,setDetail]=useState(null);
   const[selectedDirectorPerson,setSelectedDirectorPerson]=useState(null);
@@ -322,7 +324,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
     })))
     .sort((a,b)=>getDateKey(b.data).localeCompare(getDateKey(a.data))),[partners]);
 
-  const directorReportRows=useMemo(()=>directorFinancialRows.map((row)=>({
+  const directorReportRows=useMemo(()=>(directorMovementTableRows ?? directorFinancialRows).map((row)=>({
     Data:row.data,
     Pessoa:row.nome,
     Projeto:row.projeto||'ADMINISTRAÇÃO',
@@ -331,7 +333,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
     Lançamento:row.lancamento||row.titulo||'',
     Situação:paymentStatusForReport({...row,natureza:'Saída',status:row.paid?'Pago':'A pagar'}),
     Valor:row.valor,
-  })),[directorFinancialRows]);
+  })),[directorFinancialRows,directorMovementTableRows]);
 
 
   const adminFinancialRows=useMemo(()=>expenses.map(r=>({...r,natureza:'Saída',projeto:'ADMINISTRAÇÃO',contaDescricao:r.contaNome||r.contaCodigo,status:r.paid?'Realizado':'A realizar'})),[expenses]);
@@ -342,7 +344,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
     'Plano de contas':accountFilters.length?accountFilters.join(', '):'Todos',
     'Situação':statusFilters.length?statusFilters.join(', '):'Todas',
   };
-  const reportMovementRows=adminFinancialRows.map(r=>({Data:r.data,'Nome / fornecedor':r.nome,Conta:r.contaDescricao,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Situação:paymentStatusForReport({...r,natureza:'Saída',status:r.paid?'Pago':'A pagar'}),Valor:r.valor}));
+  const reportMovementRows=(adminMovementTableRows ?? adminFinancialRows).map(r=>({Data:r.data,'Nome / fornecedor':r.nome,Conta:r.contaDescricao,Documento:r.documento||'',Lançamento:r.lancamento||r.titulo||'',Situação:paymentStatusForReport({...r,natureza:'Saída',status:r.paid?'Pago':'A pagar'}),Valor:r.valor}));
 
   const partnerSection=<section id="report-adm-socios" data-report-section className="mgmt-panel">
     <ReportAdder sectionKey="administrativo:socios" title="Visão Geral dos Sócios" componentName="Movimentação Geral dos Sócios" page="Administrativo" type="CHART" data={partnerGeneralMonthly} captureId="report-adm-socios" filters={{Ano:2026}} style={{float:'right'}}/>
@@ -433,7 +435,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
             filters={{Ano:2026,Pessoas:'Francielle Paiva + Paulo Henrique Lemes Araujo'}}
           />
         </div>
-        <DataTable data={directorFinancialRows} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
+        <DataTable data={directorFinancialRows} onFilteredRowsChange={setDirectorMovementTableRows} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
       </section>
 
       <MovementModal title={detail?.title} rows={detail?.rows} onClose={()=>setDetail(null)}/>
@@ -514,7 +516,7 @@ export default function AdministrativeDashboard({ view = 'overview' }){
       <ReportAdder sectionKey="administrativo:movimentacoes" title="Movimentações Financeiras — Administrativo" componentName="Tabela de Movimentações Administrativas" page="Administrativo" type="TABLE" data={reportMovementRows} dataSets={{summary:[{'Quantidade de lançamentos':reportMovementRows.length,'Pago':paid,'A pagar':open}],visible:reportMovementRows.slice(0,30),all:reportMovementRows}} detailMode="visible" detailOptions={['summary','visible','all']} filters={reportFilters} style={{float:'right'}}/>
       <h2 style={{fontSize:'18px',fontWeight:600,marginBottom:'1rem'}}>Movimentações Financeiras · Administrativo</h2>
       <p style={{fontSize:'12px',color:'var(--text-secondary)',marginBottom:'1rem'}}>Mesma estrutura do Fluxo de Caixa, restrita às contas pagas e a pagar do Administrativo. Receita não entra nesta tabela.</p>
-      <DataTable data={adminFinancialRows} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
+      <DataTable data={adminFinancialRows} onFilteredRowsChange={setAdminMovementTableRows} initialPageSize={30} pageSizeOptions={[30,50,'all']}/>
     </section>
 
     <MovementModal title={detail?.title} rows={detail?.rows} onClose={()=>setDetail(null)}/>
