@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireMenuAccess } from '@/lib/authorization';
 import { readCurrentSnapshot } from '@/lib/financialSync';
 import { cpRows, monthOf } from '@/lib/managementSources';
+import { filterTeamMovementsByPerson, matchesTeamParty, normalizeTeamParty, teamPartyAliases } from '@/lib/teamMovementMatching.mjs';
 
 const fail = (error, status = 400) => NextResponse.json({ error }, { status });
 const START_YEAR = '2025';
@@ -11,44 +12,6 @@ const END_MONTH = `${END_YEAR}-12`;
 
 function isHistoricalTeamMonth(month) {
   return Boolean(month && month >= START_MONTH && month <= END_MONTH);
-}
-
-function norm(value) {
-  return String(value ?? '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/\u00a0/g, ' ').replace(/\s+/g, ' ')
-    .trim().toUpperCase();
-}
-
-function partyAliases(value) {
-  const raw = norm(value).replace(/^\d{2}[.\s]?\d{3}[.\s]?\d{3}\s+/, '').trim();
-  const aliases = new Set([raw]);
-  raw.split(/\s+-\s+/).map((part) => part.trim()).filter((part) => part.length >= 5).forEach((part) => aliases.add(part));
-  return [...aliases].filter(Boolean);
-}
-
-function matchesParty(rosterName, cpName) {
-  const target = norm(cpName);
-  if (!target) return false;
-  return partyAliases(rosterName).some((alias) => target === alias || target.includes(alias) || alias.includes(target));
-}
-
-function isExecutiveTeamPerson(name) {
-  const target = norm(name);
-  return target.includes('FRANCIELLE PAIVA') || target.includes('PAULO HENRIQUE LEMES ARAUJO');
-}
-
-function projectCode(value) {
-  return norm(value).match(/(?:^|\b)P?\.?\s*(\d{3,4}[A-Z0-9]*)/)?.[1] || '';
-}
-
-function matchesProject(rosterProject, cpProject) {
-  const a = projectCode(rosterProject);
-  const b = projectCode(cpProject);
-  if (a && b) return a === b;
-  const left = norm(rosterProject);
-  const right = norm(cpProject);
-  return Boolean(left && right && (left.includes(right) || right.includes(left)));
 }
 
 export async function GET() {
@@ -84,25 +47,22 @@ export async function GET() {
   const teamAccountRows = [];
   cp.forEach((row) => {
     teamAccountRows.push(row);
-    const party = norm(row.nome).replace(/^\d{2}[.\s]?\d{3}[.\s]?\d{3}\s+/, '').trim();
+    const party = normalizeTeamParty(row.nome);
     if (!party) return;
     if (!cpByPerson.has(party)) cpByPerson.set(party, []);
     cpByPerson.get(party).push(row);
   });
 
   const entries = roster.map((item, index) => {
-    const aliases = partyAliases(item.person);
+    const aliases = teamPartyAliases(item.person);
     const exactMatches = new Map();
     aliases.forEach((alias) => {
       (cpByPerson.get(alias) || []).forEach((row) => exactMatches.set(row.sourceKey, row));
     });
     // Fallback para diferenças de razão social/nome entre o cadastro e o CP.
     // Só percorre as linhas da equipe quando não há correspondência exata.
-    const candidates = exactMatches.size ? [...exactMatches.values()] : teamAccountRows.filter((row) => matchesParty(item.person, row.nome));
-    const transactions = candidates.filter((row) => {
-      if (!matchesParty(item.person, row.nome)) return false;
-      if (item.thirdParty && !matchesProject(item.departmentProject, row.projeto)) return false;
-
+    const candidates = exactMatches.size ? [...exactMatches.values()] : teamAccountRows.filter((row) => matchesTeamParty(item.person, row.nome));
+    const transactions = filterTeamMovementsByPerson(item.person, candidates, (row) => {
       const isHistorical = isHistoricalTeamMonth(row._month);
       const isFutureOpenThirdParty = Boolean(
         item.thirdParty
@@ -111,9 +71,10 @@ export async function GET() {
         && row._month > END_MONTH
       );
 
-      // Regra da relação de equipe:
-      // - todos permanecem com movimentos de 2025 e 2026;
-      // - somente terceiros mantêm A PAGAR após dez/2026.
+      // Departamento/Obra não restringe a movimentação financeira da pessoa.
+      // O projeto exibido vem de cada lançamento no CP_GERAL.
+      // Todos mantêm movimentos de 2025 e 2026; somente terceiros mantêm
+      // A PAGAR após dez/2026.
       return isHistorical || isFutureOpenThirdParty;
     }).map(({ _month, ...row }) => row);
 
