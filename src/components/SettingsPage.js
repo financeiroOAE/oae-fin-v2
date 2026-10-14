@@ -26,10 +26,11 @@ export default function SettingsPage() {
   }, []);
 
   const isAdmin = sessionUser?.role === 'ADMIN';
+  const canCreateUsers = Boolean(sessionUser?.canCreateUsers);
   const sections = [
     { id: 'aparencia', label: 'Aparência', icon: Palette },
     { id: 'empresa', label: 'Perfil Corporativo', icon: Building2 },
-    ...(isAdmin ? [{ id: 'acessos', label: 'Permissões e Acessos', icon: Shield }] : []),
+    ...(canCreateUsers ? [{ id: 'acessos', label: isAdmin ? 'Permissões e Acessos' : 'Cadastro de Usuários', icon: Shield }] : []),
     ...(isAdmin ? [{ id: 'backup', label: 'Backup', icon: Settings }] : []),
   ];
 
@@ -78,7 +79,7 @@ export default function SettingsPage() {
             </section>
           )}
 
-          {activeSection === 'acessos' && isAdmin && <UserAccessManager />}
+          {activeSection === 'acessos' && canCreateUsers && <UserAccessManager canManageExistingUsers={isAdmin} />}
           {activeSection === 'backup' && isAdmin && <section><div className="settings-section-heading"><div><h2>Backup dos cadastros</h2><p>Baixe uma cópia dos cadastros ativos do painel.</p></div></div><div className="settings-info-row"><Shield size={17} /><div><strong>Arquivo ZIP para guardar em local restrito</strong><span>Inclui cadastros complementares de Equipe, vínculos, metas, classificações legadas e permissões. A base CP/CR e os documentos externos permanecem nas suas fontes de origem.</span></div></div><a className="btn btn-primary" style={{ marginTop: 20 }} href="/api/backup">Baixar backup</a></section>}
         </main>
       </div>

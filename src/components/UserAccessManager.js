@@ -26,7 +26,7 @@ function PermissionGrid({ menus, permissions, onChange, disabled = false }) {
   );
 }
 
-export default function UserAccessManager() {
+export default function UserAccessManager({ canManageExistingUsers = false }) {
   const [users, setUsers] = useState([]);
   const [menus, setMenus] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -132,7 +132,7 @@ export default function UserAccessManager() {
       <div className="settings-section-heading">
         <div>
           <h2><ShieldCheck size={19} /> Permissões e Acessos</h2>
-          <p>Somente o administrador pode criar usuários e definir os menus visíveis.</p>
+          <p>{canManageExistingUsers ? 'Cadastre usuários e gerencie as permissões existentes.' : 'Cadastre novos usuários e escolha os menus disponíveis para cada um.'}</p>
         </div>
       </div>
 
@@ -153,7 +153,7 @@ export default function UserAccessManager() {
         <div className="settings-actions"><button className="btn btn-primary" type="submit" disabled={savingId === 'new'}>{savingId === 'new' ? <LoaderCircle size={15} className="report-spin" /> : <Plus size={15} />} Criar usuário</button></div>
       </form>
 
-      <div className="access-user-list">
+      {canManageExistingUsers && <div className="access-user-list">
         {users.map((user) => {
           const isAdmin = user.role === 'ADMIN';
           const deleting = savingId === `delete:${user.id}`;
@@ -176,6 +176,10 @@ export default function UserAccessManager() {
                   </div>
                   <p className="access-label">Menus que este usuário pode ver</p>
                   <PermissionGrid menus={menus} permissions={user.permissions || []} onChange={(permissions) => updateLocalUser(user.id, { permissions })} />
+                  <label className="access-active" style={{ marginTop: '0.65rem', display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input type="checkbox" checked={(user.permissions || []).includes('usuarios_criar')} onChange={(event) => updateLocalUser(user.id, { permissions: event.target.checked ? [...new Set([...(user.permissions || []), 'usuarios_criar'])] : (user.permissions || []).filter((key) => key !== 'usuarios_criar') })} />
+                    Pode cadastrar novos usuários
+                  </label>
                   <div className="settings-actions split">
                     <label className="access-active"><input type="checkbox" checked={user.isActive} onChange={(event) => updateLocalUser(user.id, { isActive: event.target.checked })} /> Usuário ativo</label>
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -190,7 +194,7 @@ export default function UserAccessManager() {
             </article>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }

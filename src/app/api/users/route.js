@@ -1,19 +1,22 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
-import { MENU_DEFINITIONS, prisma, requireAdmin, serializePermissions, toSafeUser } from '@/lib/authorization';
+import { MENU_DEFINITIONS, prisma, requireUserCreation, serializeMenuPermissions, toSafeUser } from '@/lib/authorization';
 
 const USERNAME_PATTERN = /^[A-Za-z0-9._-]{3,40}$/;
 
 export async function GET() {
-  const access = await requireAdmin();
+  const access = await requireUserCreation();
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const users = await prisma.user.findMany({ orderBy: [{ role: 'asc' }, { username: 'asc' }] });
+  // Quem apenas cadastra não recebe listagem nem pode gerenciar usuários existentes.
+  const users = access.user.role === 'ADMIN'
+    ? await prisma.user.findMany({ orderBy: [{ role: 'asc' }, { username: 'asc' }] })
+    : [];
   return NextResponse.json({ users: users.map(toSafeUser), menus: MENU_DEFINITIONS });
 }
 
 export async function POST(request) {
-  const access = await requireAdmin();
+  const access = await requireUserCreation();
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   try {
@@ -36,7 +39,7 @@ export async function POST(request) {
         displayName: displayName || null,
         passwordHash,
         role: 'USER',
-        menuPermissions: serializePermissions(body.permissions),
+        menuPermissions: serializeMenuPermissions(body.permissions),
         isActive: true,
         mustChangePass: true,
       },

@@ -80,6 +80,7 @@ export default function Sidebar({ initialUser = null }) {
   const restrictedManagementMenus = ['equipe_gestao', 'administrativo_geral', 'administrativo_diretoria'];
   const canAccess = (permission) => {
     if (!permission) return false;
+    if (permission === 'configuracoes' && sessionUser?.canCreateUsers) return true;
     return restrictedManagementMenus.includes(permission)
       ? Boolean(sessionUser && (sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission)))
       : !sessionUser || sessionUser.role === 'ADMIN' || sessionUser.permissions?.includes(permission);

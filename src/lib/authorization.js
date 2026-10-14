@@ -15,7 +15,8 @@ export const MENU_DEFINITIONS = [
   { key: 'historico', label: 'Histórico', path: '/historico' },
 ];
 
-const allowedPermissionKeys = new Set(MENU_DEFINITIONS.map((item) => item.key));
+export const USER_CREATE_PERMISSION = 'usuarios_criar';
+const allowedPermissionKeys = new Set([...MENU_DEFINITIONS.map((item) => item.key), USER_CREATE_PERMISSION]);
 const LEGACY_PERMISSION_MAP = {
   administrativo: ['administrativo_geral', 'administrativo_diretoria'],
 };
@@ -44,6 +45,16 @@ export function serializePermissions(value) {
   return JSON.stringify(normalizePermissions(value));
 }
 
+// Cadastrar usuários não transfere a permissão de delegar novos cadastros.
+export function serializeMenuPermissions(value) {
+  return JSON.stringify(normalizePermissions(value).filter((key) => key !== USER_CREATE_PERMISSION));
+}
+
+export function canCreateUsers(user) {
+  return Boolean(user?.isActive && (user.role === 'ADMIN'
+    || normalizePermissions(user.menuPermissions).includes(USER_CREATE_PERMISSION)));
+}
+
 export function toSafeUser(user) {
   if (!user) return null;
   return {
@@ -51,6 +62,7 @@ export function toSafeUser(user) {
     username: user.username,
     displayName: user.displayName || '',
     role: user.role,
+    canCreateUsers: canCreateUsers(user),
     permissions: normalizePermissions(user.menuPermissions),
     isActive: user.isActive,
     mustChangePass: user.mustChangePass,
@@ -78,6 +90,13 @@ export async function requireAdmin() {
   const user = await getCurrentUser();
   if (!user) return { ok: false, status: 401, error: 'Sessão inválida ou expirada.' };
   if (user.role !== 'ADMIN') return { ok: false, status: 403, error: 'Apenas o administrador pode alterar acessos.' };
+  return { ok: true, user };
+}
+
+export async function requireUserCreation() {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, status: 401, error: 'Sessão inválida ou expirada.' };
+  if (!canCreateUsers(user)) return { ok: false, status: 403, error: 'Sem permissão para cadastrar usuários.' };
   return { ok: true, user };
 }
 
