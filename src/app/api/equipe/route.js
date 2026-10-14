@@ -80,7 +80,7 @@ export async function GET() {
 
     const paid = transactions.filter((row) => row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0);
     const open = transactions.filter((row) => !row.paid).reduce((sum, row) => sum + Number(row.valor || 0), 0);
-    const projects = [...new Set(transactions.map((row) => String(row.projeto || '').trim()).filter((value) => value && norm(value) !== 'ADMINISTRACAO'))];
+    const projects = [...new Set(transactions.map((row) => String(row.projeto || '').trim()).filter((value) => value && normalizeTeamParty(value) !== 'ADMINISTRACAO'))];
 
     return {
       id: `roster-${index + 1}`,
