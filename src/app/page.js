@@ -86,7 +86,7 @@ export default function Home() {
   ].filter((item) => canAccess(item.permission));
 
   return (
-    <div className="home-dashboard" style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+    <div className="home-dashboard" style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
       {error && (
         <div className="fade-in" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--danger)', padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1.5rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '13px' }}>
           <AlertCircle size={18} /> <strong>Falha:</strong> {error}
@@ -137,6 +137,9 @@ export default function Home() {
           })}
         </div>
       </div>
+      <footer aria-label="Créditos de desenvolvimento" style={{ marginTop: 'auto', paddingTop: '2.5rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)', opacity: 0.8 }}>
+        by Emanuelle Kuhn
+      </footer>
       <style dangerouslySetInnerHTML={{__html: `
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
