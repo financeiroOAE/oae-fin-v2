@@ -1,4 +1,5 @@
 "use client";
+import { REPORT_TITLE_NUMBER_KEY } from '@/lib/reportTitleNumber.mjs';
 import { applyValidFilterDate } from '@/lib/dateRange';
 import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
 
@@ -592,7 +593,8 @@ export default function VisaoFinanceira() {
     "Nome / Fornecedor": item.nome,
     Conta: item.contaDescricao,
     Documento: item.documento || '',
-    Lançamento: item.lancamento || '',
+    Lançamento: item.lancamento || item.titulo || '',
+    [REPORT_TITLE_NUMBER_KEY]: item.titulo || item.lancamento || '',
     Situação: item.statusExibicao,
     Natureza: item.natureza,
     "Classificação Financeira": item.natureza === 'Entrada' ? classifyFinancialEntry(item).label : 'Saída / Pagamento',

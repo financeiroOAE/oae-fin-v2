@@ -1,4 +1,5 @@
 "use client";
+import { REPORT_TITLE_NUMBER_KEY } from '@/lib/reportTitleNumber.mjs';
 
 import { paymentStatusForReport } from "@/lib/paymentCommitment";
 import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
@@ -383,6 +384,7 @@ export default function FluxoDeCaixa() {
   const reportFaturamentosNfesRows = useMemo(() => [
     ...faturamentosNfesFiltrados.map((row) => ({
       Documento: row.documento,
+      [REPORT_TITLE_NUMBER_KEY]: row.titulo || row.lancamento || '',
       Projeto: row.projeto,
       Situação: row.situacao,
       Vencimento: row.data,
@@ -428,6 +430,7 @@ export default function FluxoDeCaixa() {
       Situação: 'A Receber',
       Data: item.data,
       Documento: item.documento || item.lancamento || '-',
+      [REPORT_TITLE_NUMBER_KEY]: item.titulo || item.lancamento || '',
       Nome: item.nome || '-',
       Projeto: item.projeto || '-',
       Conta: item.contaDescricao || '-',
@@ -446,6 +449,7 @@ export default function FluxoDeCaixa() {
       Situação: 'A Pagar',
       Data: item.data,
       Documento: item.documento || item.lancamento || '-',
+      [REPORT_TITLE_NUMBER_KEY]: item.titulo || item.lancamento || '',
       Nome: item.nome || '-',
       Projeto: item.projeto || '-',
       Conta: item.contaDescricao || '-',
@@ -513,6 +517,7 @@ export default function FluxoDeCaixa() {
     "Projeto / Obra": item.projeto || "-",
     "Conta / Plano": item.contaDescricao || "-",
     Documento: item.documento || "-",
+    [REPORT_TITLE_NUMBER_KEY]: item.titulo || item.lancamento || '',
     Situação: paymentStatusForReport(item) || "-",
     Valor: Number(item.valor) || 0,
   }));

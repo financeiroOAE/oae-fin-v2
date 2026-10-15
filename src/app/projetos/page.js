@@ -1,4 +1,5 @@
 "use client";
+import { REPORT_TITLE_NUMBER_KEY } from '@/lib/reportTitleNumber.mjs';
 import { applyValidFilterDate } from '@/lib/dateRange';
 import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
 
@@ -1070,7 +1071,8 @@ export default function Projetos() {
       'Nome / Fornecedor': item.nome || '',
       Conta: item.contaNome || item.contaDescricao || item.contaCodigo || '',
       Documento: item.documento || '',
-      Lançamento: item.lancamento || '',
+      Lançamento: item.lancamento || item.titulo || '',
+      [REPORT_TITLE_NUMBER_KEY]: item.titulo || item.lancamento || '',
       Valor: Number(item.valor) || 0,
     }));
 
@@ -1204,7 +1206,7 @@ export default function Projetos() {
       'Nome / Fornecedor': item.nome || '',
       Conta: item.contaNome || item.contaDescricao || item.contaCodigo || '',
       Documento: item.documento || '',
-      Lancamento: item.lancamento || '',
+      'Número do Título': item.titulo || item.lancamento || '',
       Valor: Number(item.valor) || 0,
     }));
     const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -1235,7 +1237,8 @@ export default function Projetos() {
       'Nome / Fornecedor': item.nome || '',
       Conta: item.contaNome || item.contaDescricao || item.contaCodigo || '',
       Documento: item.documento || '',
-      Lançamento: item.lancamento || '',
+      Lançamento: item.lancamento || item.titulo || '',
+      [REPORT_TITLE_NUMBER_KEY]: item.titulo || item.lancamento || '',
       Valor: Number(item.valor) || 0,
     }));
 

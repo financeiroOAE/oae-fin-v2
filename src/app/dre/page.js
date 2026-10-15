@@ -1,4 +1,5 @@
 "use client";
+import { REPORT_TITLE_NUMBER_KEY } from '@/lib/reportTitleNumber.mjs';
 import { applyValidFilterDate } from '@/lib/dateRange';
 import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
 
@@ -848,6 +849,7 @@ export default function Dre() {
       Nomenclatura: item.contaNome || item.contaDescricao,
       Motivo: classification.reason,
       Nome: item.nome,
+      [REPORT_TITLE_NUMBER_KEY]: item.titulo || item.lancamento || '',
       Situação: item.status,
       Valor: Math.abs(item.valor || 0),
     };

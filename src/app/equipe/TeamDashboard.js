@@ -1,4 +1,5 @@
 'use client';
+import { REPORT_TITLE_NUMBER_KEY } from '@/lib/reportTitleNumber.mjs';
 import { applyValidFilterDate } from '@/lib/dateRange';
 import useFinancialSnapshotUpdate from '@/lib/useFinancialSnapshotUpdate';
 import { paymentStatusForReport } from '@/lib/paymentCommitment';
@@ -138,6 +139,7 @@ const reportMovementRows = (rows, personName) => (rows||[]).map((r)=>({
   Data:r.data||'',
   'Pessoa / empresa':personName || r.rosterPerson || r.nome || '',
   Documento:r.documento||r.titulo||'',
+  [REPORT_TITLE_NUMBER_KEY]:r.titulo||r.lancamento||'',
   Obra:r.projeto||'',
   Plano:planLabel(r.contaNome||r.contaCodigo),
   Situação:paymentStatusForReport({...r, natureza:'Saída', status:r.paid?'Pago':'A pagar'}),
@@ -409,6 +411,7 @@ function ProjectSummaryModal({ project, onClose }) {
     Data:row.data,
     'Pessoa / empresa':row.rosterPerson||row.nome,
     Documento:row.documento||row.titulo||'',
+    [REPORT_TITLE_NUMBER_KEY]:row.titulo||row.lancamento||'',
     Plano:planLabel(row.contaNome||row.contaCodigo),
     Situação:paymentStatusForReport({...row, natureza:'Saída', status:row.paid?'Pago':'A pagar'}),
     Valor:Number(row.valor||0),
@@ -697,6 +700,7 @@ export default function TeamDashboard(){
       ...base,
       Data:r.data||'',
       Documento:r.documento||r.titulo||'',
+      [REPORT_TITLE_NUMBER_KEY]:r.titulo||r.lancamento||'',
       Obra:r.projeto||'',
       Plano:planLabel(r.contaNome||r.contaCodigo),
       Situação:paymentStatusForReport({...r, natureza:'Saída', status:r.paid?'Pago':'A pagar'}),

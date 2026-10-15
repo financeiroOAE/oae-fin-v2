@@ -1,6 +1,7 @@
 import { sortMovementRowsByDate, filterMovementRowsByReportPeriod } from '@/lib/reportMovementOrder.mjs';
 import { isDocumentedPayableNext30Days } from '@/lib/paymentCommitment';
 import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
+import { getReportTitleNumber, REPORT_TITLE_NUMBER_KEY } from '@/lib/reportTitleNumber.mjs';
 const CURRENCY_FORMAT = '[$R$-pt-BR] #,##0.00;[Red]-[$R$-pt-BR] #,##0.00';
 
 function fileName(value, extension) {
@@ -77,7 +78,7 @@ export function getReportColumns(item, rows = getReportRows(item)) {
   } else {
     const first = rows.find((row) => row && typeof row === "object");
     columns = first
-      ? Object.keys(first).map((key) => ({ key, label: key }))
+      ? Object.keys(first).filter((key) => key !== REPORT_TITLE_NUMBER_KEY).map((key) => ({ key, label: key }))
       : [];
   }
 
@@ -468,18 +469,33 @@ function uniqueSheetName(rawName, usedNames) {
   return name;
 }
 
-function createWorksheet(XLSX, item, rows) {
+// Somente no Excel: título original do CP_GERAL ou lançamento do CR_GERAL.
+export function getExcelReportColumns(item, rows = getReportRows(item)) {
   const columns = getReportColumns(item, rows);
+  if (!rows.some(row => getReportTitleNumber(row))) return columns;
+  if (columns.some(column => normalizedColumnName(column.key || column.label) === 'numero do titulo')) return columns;
+  const dateIndex = columns.findIndex(column => normalizedColumnName(column.key || column.label) === 'data');
+  const documentIndex = columns.findIndex(column => normalizedColumnName(column.key || column.label) === 'documento');
+  const index = dateIndex >= 0 ? dateIndex + 1 : documentIndex >= 0 ? documentIndex : 0;
+  return [...columns.slice(0,index), { key: REPORT_TITLE_NUMBER_KEY, label: 'Número do Título', format: 'text' }, ...columns.slice(index)];
+}
+
+function excelReportCellValue(row, column) {
+  return column.key === REPORT_TITLE_NUMBER_KEY ? getReportTitleNumber(row) : getReportCellValue(row, column);
+}
+
+function createWorksheet(XLSX, item, rows) {
+  const columns = getExcelReportColumns(item, rows);
   const aoa = [columns.map((column) => column.label || column.key)];
   rows.forEach((row) => {
     aoa.push(columns.map((column) => {
       const format = inferReportFormat(column.key, column.format || item.columnFormats?.[column.key]);
-      return excelCellValue(getReportCellValue(row, column), format);
+      return excelCellValue(excelReportCellValue(row, column), format);
     }));
   });
   const worksheet = XLSX.utils.aoa_to_sheet(aoa);
   worksheet["!cols"] = columns.map((column, columnIndex) => {
-    const values = [column.label || column.key, ...rows.slice(0, 100).map((row) => String(getReportCellValue(row, column) ?? ""))];
+    const values = [column.label || column.key, ...rows.slice(0, 100).map((row) => String(excelReportCellValue(row, column) ?? ""))];
     return { wch: Math.min(42, Math.max(12, ...values.map((value) => value.length + 2))) };
   });
   if (rows.length > 0 && columns.length > 0) {
@@ -635,8 +651,12 @@ export async function exportReportToExcel(items, config) {
     if (isMovementReport(item) && item.detailMode !== "summary") {
       const total = rows.reduce((sum, row) => sum + (Number(row.Valor ?? row.valor) || 0), 0);
       const last = rows.length + 2;
-      XLSX.utils.sheet_add_aoa(worksheet, [[`TOTAL DOS TÍTULOS FILTRADOS (${rows.length})`, total]], { origin: `A${last}` });
-      worksheet[`B${last}`].z = CURRENCY_FORMAT;
+      const columns = getExcelReportColumns(item, rows);
+      const valueIndex = columns.findIndex(column => normalizedColumnName(column.key || column.label) === 'valor');
+      const totalIndex = valueIndex >= 0 ? valueIndex : Math.max(1, columns.length - 1);
+      XLSX.utils.sheet_add_aoa(worksheet, [[`TOTAL DOS TÍTULOS FILTRADOS (${rows.length})`]], { origin: {r:last-1,c:0} });
+      XLSX.utils.sheet_add_aoa(worksheet, [[total]], { origin: {r:last-1,c:totalIndex} });
+      worksheet[XLSX.utils.encode_cell({r:last-1,c:totalIndex})].z = CURRENCY_FORMAT;
     }
     prioritySheets.push(rows.flatMap((row, rowIndex) => item.page === "Equipe" && isPriorityExportRow(row) ? [rowIndex] : []));
     XLSX.utils.book_append_sheet(workbook, worksheet, uniqueSheetName(item.title || `Bloco ${index + 1}`, usedNames));
