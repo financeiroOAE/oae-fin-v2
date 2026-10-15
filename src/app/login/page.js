@@ -199,6 +199,9 @@ export default function LoginPage() {
         <div style={{ marginTop: "2rem", textAlign: "center", fontSize: "0.75rem", color: "var(--text-secondary)" }}>
           Oliveira Araújo Engenharia &copy; {new Date().getFullYear()}
         </div>
+        <footer aria-label="Créditos de desenvolvimento" style={{ marginTop: "0.5rem", textAlign: "center", fontSize: "0.75rem", color: "var(--text-secondary)", opacity: 0.8 }}>
+          by Emanuelle Kuhn
+        </footer>
       </div>
     </div>
   );
